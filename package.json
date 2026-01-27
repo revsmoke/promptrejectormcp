@@ -1,7 +1,7 @@
 {
   "name": "prompt-rejector",
-  "version": "1.0.0",
-  "description": "A dual-layer security gateway for AI agents - detects prompt injection, jailbreaks, and traditional vulnerabilities (XSS, SQLi, Shell Injection)",
+  "version": "1.0.1",
+  "description": "Security gateway for AI agents: detects prompt injections, jailbreaks, and common vulnerabilities.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -57,5 +57,13 @@
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
-  }
+  },
+  "mcpName": "io.github.revsmoke/promptrejectormcp",
+  "packages": [
+    {
+      "registry_type": "npm",
+      "identifier": "prompt-rejector",
+      "version": "1.0.1"
+    }
+  ]
 }

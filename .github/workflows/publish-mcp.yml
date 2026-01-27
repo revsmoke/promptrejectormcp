@@ -1,0 +1,60 @@
+name: Publish MCP server (npm + MCP Registry)
+
+on:
+  push:
+    tags:
+      - "v*"  # Run on version tags like v1.0.0
+
+permissions:
+  contents: read
+  id-token: write  # Required for GitHub OIDC auth to MCP Registry
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build --if-present
+
+      - name: Validate server.json against MCP schema
+        run: npx -y ajv-cli validate -s https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json -d server.json
+
+      - name: Audit npm pack contents (fail on leaked files)
+        run: |
+          npm pack --dry-run > pack.txt
+          echo "Pack contents preview:" && sed -n '1,120p' pack.txt
+          ! grep -q "npm_recovery_codes.txt" pack.txt || (echo "Refusing to publish: npm_recovery_codes.txt present" && exit 1)
+          ! grep -q ".tmp_server.schema.json" pack.txt || (echo "Refusing to publish: .tmp_server.schema.json present" && exit 1)
+
+      - name: Sync server.json version from tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public
+
+      - name: Download mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish

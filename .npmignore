@@ -1,0 +1,24 @@
+# Exclude secrets and local config
+.mcpregistry_*
+.env
+.env.*
+# NPM 2FA artifacts / temp files
+npm_recovery_codes.txt
+.tmp_server.schema.json
+*.schema.json
+
+# Do not publish TS sources or tests
+src/
+tsconfig.json
+**/test/**
+__tests__/**
+
+# VCS / CI
+.git*
+.github/
+
+# Node
+node_modules/
+
+# Optional: exclude sourcemaps
+**/*.map
