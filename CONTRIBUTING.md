@@ -324,7 +324,7 @@ Contributors will be recognized in:
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/yourusername/promptrejectormcp/discussions) for general questions
+- Open a [Discussion](https://github.com/revsmoke/promptrejectormcp/discussions) for general questions
 - Check existing issues and discussions first
 - Be patient - maintainers are volunteers!
 

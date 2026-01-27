@@ -31,11 +31,11 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/promptrejectormcp.git"
+    "url": "git+https://github.com/revsmoke/promptrejectormcp.git"
   },
-  "homepage": "https://github.com/yourusername/promptrejectormcp#readme",
+  "homepage": "https://github.com/revsmoke/promptrejectormcp#readme",
   "bugs": {
-    "url": "https://github.com/yourusername/promptrejectormcp/issues"
+    "url": "https://github.com/revsmoke/promptrejectormcp/issues"
   },
   "engines": {
     "node": ">=18.0.0"
