@@ -330,4 +330,45 @@ Contributors will be recognized in:
 
 ---
 
+## Release & Publishing
+
+This project uses Release Drafter + Git tags to automate releases. CI then publishes to npm and the MCP Registry.
+
+### How release notes are drafted
+- When PRs are opened/updated/merged on `main`, the Release Drafter workflow updates a single draft release.
+- PR labels determine sections and the next version:
+  - `breaking`, `semver:major` → next release = major (X.0.0)
+  - `feature`, `enhancement`, `semver:minor` → minor (Y increase)
+  - `fix`, `bug`, `security`, `docs`, `chore`, `refactor`, `dependencies` → patch (Z increase)
+- Exclude a PR from notes with `skip-changelog`.
+
+### Cutting a release (two options)
+1) Using GitHub UI (recommended)
+- Go to Releases → open the draft → review → Publish.
+- Publishing creates tag `vX.Y.Z`. Our CI workflow then:
+  - builds and validates `server.json` against the MCP schema,
+  - publishes the package to npm,
+  - authenticates via GitHub OIDC and publishes to the MCP Registry.
+
+2) From the CLI
+```bash
+# Make sure package.json and server.json versions are bumped
+npm run build
+# Create and push the tag (replaces Publish in UI)
+git tag vX.Y.Z -m "Release X.Y.Z"
+git push origin vX.Y.Z
+```
+
+### CI prerequisites (already configured here)
+- GitHub Secret `NPM_TOKEN`: npm granular token with Read/Write and "Bypass 2FA requirement" enabled.
+- Workflow permissions include `id-token: write` for OIDC to the MCP Registry.
+
+### Deprecating or yanking versions
+- Deprecate a bad version with a message:
+```bash
+npm deprecate prompt-rejector@1.0.0 "Deprecated; please upgrade to 1.0.1"
+```
+
+---
+
 Thank you for helping make AI agents safer! 🛡️
