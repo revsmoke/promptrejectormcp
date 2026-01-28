@@ -1,0 +1,44 @@
+name-template: "PromptRejector v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "🚨 Breaking Changes"
+    labels: ["breaking", "semver:major"]
+  - title: "✨ Features"
+    labels: ["feature", "enhancement", "semver:minor"]
+  - title: "🐛 Fixes"
+    labels: ["fix", "bug"]
+  - title: "🔒 Security"
+    labels: ["security"]
+  - title: "🧰 Maintenance"
+    labels: ["chore", "refactor"]
+  - title: "📝 Docs"
+    labels: ["docs"]
+  - title: "📦 Dependencies"
+    labels: ["dependencies"]
+
+change-template: "- $TITLE (#$NUMBER) by @$AUTHOR"
+
+exclude-labels:
+  - "skip-changelog"
+
+version-resolver:
+  major:
+    labels: ["breaking", "semver:major"]
+  minor:
+    labels: ["feature", "enhancement", "semver:minor"]
+  patch:
+    labels: ["fix", "bug", "security", "docs", "chore", "refactor", "dependencies", "semver:patch"]
+  default: patch
+
+template: |
+  Highlights
+  - Summarize the key changes here.
+
+  ## Changes
+  $CHANGES
+
+  ## Upgrade Notes
+  - Note any migration steps if applicable.
+
+  Full Changelog: https://github.com/revsmoke/promptrejectormcp/compare/$PREVIOUS_TAG...$NEXT_TAG
