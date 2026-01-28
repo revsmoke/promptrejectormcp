@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, edited, closed]
+  workflow_dispatch:
 
 permissions:
   contents: write
