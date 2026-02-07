@@ -210,7 +210,11 @@ export class SkillScanService {
 
         const hasObfuscation = obfuscationPatterns.some(pattern => {
             const matches = content.match(pattern);
-            if (matches && matches.length > 5) { // Only flag if significant obfuscation
+            // Flag if many matches OR a single large encoded blob (200+ chars)
+            const hasMultipleMatches = matches && matches.length > 5;
+            const hasSingleLargeBlob = matches && matches.some(m => m.length >= 200);
+
+            if (hasMultipleMatches || hasSingleLargeBlob) {
                 findings.push(`Obfuscation detected: potential encoded content`);
                 categories.push("obfuscation");
                 if (severity === "low") severity = "medium";
