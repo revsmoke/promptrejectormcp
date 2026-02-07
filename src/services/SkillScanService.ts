@@ -3,7 +3,7 @@ import { StaticCheckService } from "./StaticCheckService.js";
 
 export interface SkillScanResult {
     safe: boolean;
-    overallConfidence: number;
+    geminiConfidence: number; // Confidence score from LLM analysis only
     overallSeverity: "low" | "medium" | "high" | "critical";
     categories: string[];
     skillSpecific: SkillSpecificFindings;
@@ -31,10 +31,28 @@ export interface SkillSpecificFindings {
     categories: string[];
 }
 
+/**
+ * Service for scanning Claude Code SKILL.md files for security vulnerabilities.
+ *
+ * This service performs comprehensive security analysis by combining:
+ * - LLM-based semantic analysis (via GeminiService)
+ * - Static pattern matching (via StaticCheckService)
+ * - Skill-specific threat detection (dangerous tools, file access, exfiltration)
+ *
+ * @example
+ * const scanner = new SkillScanService();
+ * const result = await scanner.scanSkill(skillContent);
+ * if (!result.safe) {
+ *   console.error(`Security threat detected: ${result.overallSeverity}`);
+ * }
+ */
 export class SkillScanService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
 
+    /**
+     * Initializes the skill scanning service with default dependencies.
+     */
     constructor() {
         this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService();
@@ -46,15 +64,11 @@ export class SkillScanService {
      * @returns Comprehensive security scan result
      */
     async scanSkill(skillContent: string): Promise<SkillScanResult> {
-        // Extract instruction blocks from markdown
-        const instructionBlocks = this.extractInstructionBlocks(skillContent);
-
-        // Combine all instructions for analysis
-        const combinedInstructions = instructionBlocks.join("\n\n");
-
+        // Analyze the FULL skill content to catch prompt injection anywhere in the file,
+        // not just in structured ## Instructions blocks
         // Run parallel scans
         const [geminiResult, staticResult, skillSpecificResult] = await Promise.all([
-            this.geminiService.checkPrompt(combinedInstructions),
+            this.geminiService.checkPrompt(skillContent),
             Promise.resolve(this.staticCheckService.check(skillContent)),
             Promise.resolve(this.runSkillSpecificChecks(skillContent))
         ]);
@@ -85,7 +99,7 @@ export class SkillScanService {
 
         return {
             safe,
-            overallConfidence: geminiResult.confidence,
+            geminiConfidence: geminiResult.confidence,
             overallSeverity,
             categories,
             skillSpecific: skillSpecificResult,
@@ -96,36 +110,19 @@ export class SkillScanService {
     }
 
     /**
-     * Extract instruction blocks from SKILL.md markdown
-     */
-    private extractInstructionBlocks(content: string): string[] {
-        const blocks: string[] = [];
-
-        // Match ## Instructions section and capture content until next ## header
-        const instructionRegex = /##\s+Instructions?\s*\n([\s\S]*?)(?=\n##|\n#|$)/gi;
-        let match;
-
-        while ((match = instructionRegex.exec(content)) !== null) {
-            blocks.push(match[1].trim());
-        }
-
-        // Also extract content from code blocks which might hide instructions
-        const codeBlockRegex = /```[\s\S]*?```/g;
-        const codeMatches = content.match(codeBlockRegex);
-        if (codeMatches) {
-            blocks.push(...codeMatches);
-        }
-
-        // If no structured blocks found, analyze entire content
-        if (blocks.length === 0) {
-            blocks.push(content);
-        }
-
-        return blocks;
-    }
-
-    /**
-     * Run skill-specific security checks
+     * Performs skill-specific security checks on SKILL.md content.
+     *
+     * Checks for six categories of threats:
+     * 1. Hidden instructions in HTML comments
+     * 2. Dangerous tool usage (curl, wget, rm -rf, sudo)
+     * 3. Sensitive file access (.ssh/, .aws/, .env, /etc/passwd)
+     * 4. Obfuscation techniques (Base64, hex, unicode, zero-width chars)
+     * 5. Social engineering indicators (urgency, fake authority)
+     * 6. Network exfiltration attempts (data in URL params, POST with secrets)
+     *
+     * @param content - The raw SKILL.md content to analyze
+     * @returns Detailed findings with severity and categories
+     * @private
      */
     private runSkillSpecificChecks(content: string): SkillSpecificFindings {
         const findings: string[] = [];
@@ -175,7 +172,7 @@ export class SkillScanService {
             /\/etc\/(passwd|shadow|sudoers)/gi,
             /~?\/.ssh\/(id_rsa|id_ed25519|authorized_keys)/gi,
             /~?\/.aws\/(credentials|config)/gi,
-            /\.env/gi,
+            /(?:^|\/|\\|~\/|\.\/|['"`\s])\.env(?:\.local|\.production|\.development)?(?:$|\s|['"`]|\/)/gim,
             /\.git\/config/gi,
         ];
 

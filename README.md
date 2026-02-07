@@ -265,8 +265,9 @@ curl -X POST http://localhost:3000/v1/scan-skill \
 
 **MCP Tool:**
 ```json
+// Tool name: scan_skill
+// Arguments:
 {
-  "tool": "scan_skill",
   "skillContent": "# My Skill\n## Instructions\n..."
 }
 ```
@@ -290,7 +291,7 @@ The skill scanner checks for:
 {
   "safe": false,
   "overallSeverity": "critical",
-  "overallConfidence": 0.95,
+  "geminiConfidence": 0.95,
   "categories": ["shell_injection", "data_exfiltration", "obfuscation"],
   "skillSpecific": {
     "hasDangerousToolUsage": true,
@@ -312,7 +313,8 @@ The skill scanner checks for:
 | Field | Type | Description |
 |-------|------|-------------|
 | `safe` | `boolean` | `true` if input appears safe, `false` if potentially malicious |
-| `overallConfidence` | `number` | 0.0 - 1.0 confidence score |
+| `overallConfidence` | `number` | 0.0 - 1.0 confidence score (for prompt checking) |
+| `geminiConfidence` | `number` | 0.0 - 1.0 confidence score from LLM analysis (for skill scanning) |
 | `overallSeverity` | `string` | `"low"` \| `"medium"` \| `"high"` \| `"critical"` |
 | `categories` | `string[]` | Merged categories from both analyzers |
 | `gemini` | `object` | Detailed results from semantic analysis |
