@@ -155,6 +155,16 @@ export class SkillScanService {
             /bash.*?(sudo|su\s+|chmod\s+777|chown)/gi,
             // Process manipulation
             /bash.*?(kill\s+-9|killall|pkill)/gi,
+
+            // Standalone dangerous commands (with or without shell prefix)
+            // Network access commands in code blocks
+            /(?:^|\s|```)(bash|sh|zsh)?\s*(curl|wget)\s+.*?https?:\/\/(?!(?:localhost|127\.0\.0\.1|github\.com|npmjs\.com))/gim,
+            // Destructive file system commands
+            /(?:^|\s|```)(bash|sh|zsh)?\s*(rm\s+-rf|dd\s+if=|mkfs|format)/gim,
+            // Privilege escalation commands
+            /(?:^|\s|```)(bash|sh|zsh)?\s*(sudo|su\s+|chmod\s+777|chown)/gim,
+            // Process manipulation commands
+            /(?:^|\s|```)(bash|sh|zsh)?\s*(kill\s+-9|killall|pkill)/gim,
         ];
 
         const hasDangerousToolUsage = dangerousToolPatterns.some(pattern => {
