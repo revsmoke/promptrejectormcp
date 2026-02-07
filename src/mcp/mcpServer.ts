@@ -5,14 +5,17 @@ import {
     ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { SecurityService } from "../services/SecurityService.js";
+import { SkillScanService } from "../services/SkillScanService.js";
 import { z } from "zod";
 
 export class PromptRejectorMCPServer {
     private server: Server;
     private securityService: SecurityService;
+    private skillScanService: SkillScanService;
 
     constructor() {
         this.securityService = new SecurityService();
+        this.skillScanService = new SkillScanService();
         this.server = new Server(
             {
                 name: "prompt-rejector",
@@ -47,6 +50,20 @@ export class PromptRejectorMCPServer {
                             required: ["prompt"],
                         },
                     },
+                    {
+                        name: "scan_skill",
+                        description: "Scan a SKILL.md file for security vulnerabilities including prompt injection, malicious tool usage, data exfiltration attempts, and social engineering. Use this before installing any third-party skills.",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                skillContent: {
+                                    type: "string",
+                                    description: "The raw markdown content of the SKILL.md file to scan.",
+                                },
+                            },
+                            required: ["skillContent"],
+                        },
+                    },
                 ],
             };
         });
@@ -58,6 +75,20 @@ export class PromptRejectorMCPServer {
             if (name === "check_prompt") {
                 const { prompt } = args as { prompt: string };
                 const report = await this.securityService.runSecurityScan(prompt);
+
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify(report, null, 2),
+                        },
+                    ],
+                };
+            }
+
+            if (name === "scan_skill") {
+                const { skillContent } = args as { skillContent: string };
+                const report = await this.skillScanService.scanSkill(skillContent);
 
                 return {
                     content: [

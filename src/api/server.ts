@@ -1,25 +1,47 @@
 import express from "express";
 import cors from "cors";
 import { SecurityService } from "../services/SecurityService.js";
+import { SkillScanService } from "../services/SkillScanService.js";
 import { z } from "zod";
 
 const app = express();
 const port = process.env.PORT || 3000;
 const securityService = new SecurityService();
+const skillScanService = new SkillScanService();
 
 app.use(cors());
 app.use(express.json());
 
-// Validation schema
+// Validation schemas
 const CheckPromptSchema = z.object({
     prompt: z.string().min(1, "Prompt cannot be empty"),
 });
 
-// Primary Endpoint
+const ScanSkillSchema = z.object({
+    skillContent: z.string().min(1, "Skill content cannot be empty"),
+});
+
+// Primary Endpoint - Check Prompt
 app.post("/v1/check-prompt", async (req, res) => {
     try {
         const validatedBody = CheckPromptSchema.parse(req.body);
         const report = await securityService.runSecurityScan(validatedBody.prompt);
+
+        res.json(report);
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ error: "Invalid request body", details: error.issues });
+        }
+        console.error("API Error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Skill Scanning Endpoint
+app.post("/v1/scan-skill", async (req, res) => {
+    try {
+        const validatedBody = ScanSkillSchema.parse(req.body);
+        const report = await skillScanService.scanSkill(validatedBody.skillContent);
 
         res.json(report);
     } catch (error) {

