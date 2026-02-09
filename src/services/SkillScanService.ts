@@ -1,5 +1,6 @@
 import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
+import type { PatternService, ActivePattern } from "./PatternService.js";
 
 export interface SkillScanResult {
     safe: boolean;
@@ -31,42 +32,24 @@ export interface SkillSpecificFindings {
     categories: string[];
 }
 
-/**
- * Service for scanning Claude Code SKILL.md files for security vulnerabilities.
- *
- * This service performs comprehensive security analysis by combining:
- * - LLM-based semantic analysis (via GeminiService)
- * - Static pattern matching (via StaticCheckService)
- * - Skill-specific threat detection (dangerous tools, file access, exfiltration)
- *
- * @example
- * const scanner = new SkillScanService();
- * const result = await scanner.scanSkill(skillContent);
- * if (!result.safe) {
- *   console.error(`Security threat detected: ${result.overallSeverity}`);
- * }
- */
+const SEVERITIES: readonly ("low" | "medium" | "high" | "critical")[] = ["low", "medium", "high", "critical"];
+
+function severityIdx(s: string): number {
+    return SEVERITIES.indexOf(s as any);
+}
+
 export class SkillScanService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
+    private patternService: PatternService | null;
 
-    /**
-     * Initializes the skill scanning service with default dependencies.
-     */
-    constructor() {
+    constructor(patternService?: PatternService) {
+        this.patternService = patternService ?? null;
         this.geminiService = new GeminiService();
-        this.staticCheckService = new StaticCheckService();
+        this.staticCheckService = new StaticCheckService(patternService);
     }
 
-    /**
-     * Scan a SKILL.md file content for security vulnerabilities
-     * @param skillContent The raw markdown content of the SKILL.md file
-     * @returns Comprehensive security scan result
-     */
     async scanSkill(skillContent: string): Promise<SkillScanResult> {
-        // Analyze the FULL skill content to catch prompt injection anywhere in the file,
-        // not just in structured ## Instructions blocks
-        // Run parallel scans
         const [geminiResult, staticResult, skillSpecificResult] = await Promise.all([
             this.geminiService.checkPrompt(skillContent),
             Promise.resolve(this.staticCheckService.check(skillContent)),
@@ -74,11 +57,10 @@ export class SkillScanService {
         ]);
 
         // Aggregate severity
-        const severities: ("low" | "medium" | "high" | "critical")[] = ["low", "medium", "high", "critical"];
-        const geminiSevIdx = severities.indexOf(geminiResult.severity);
-        const staticSevIdx = severities.indexOf(staticResult.severity);
-        const skillSevIdx = severities.indexOf(skillSpecificResult.severity);
-        const overallSeverity = severities[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx)];
+        const geminiSevIdx = SEVERITIES.indexOf(geminiResult.severity);
+        const staticSevIdx = SEVERITIES.indexOf(staticResult.severity);
+        const skillSevIdx = SEVERITIES.indexOf(skillSpecificResult.severity);
+        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx)];
 
         // Aggregate categories
         const categories = Array.from(new Set([
@@ -109,27 +91,108 @@ export class SkillScanService {
         };
     }
 
-    /**
-     * Performs skill-specific security checks on SKILL.md content.
-     *
-     * Checks for six categories of threats:
-     * 1. Hidden instructions in HTML comments
-     * 2. Dangerous tool usage (curl, wget, rm -rf, sudo)
-     * 3. Sensitive file access (.ssh/, .aws/, .env, /etc/passwd)
-     * 4. Obfuscation techniques (Base64, hex, unicode, zero-width chars)
-     * 5. Social engineering indicators (urgency, fake authority)
-     * 6. Network exfiltration attempts (data in URL params, POST with secrets)
-     *
-     * @param content - The raw SKILL.md content to analyze
-     * @returns Detailed findings with severity and categories
-     * @private
-     */
     private runSkillSpecificChecks(content: string): SkillSpecificFindings {
+        if (this.patternService) {
+            return this.runSkillChecksWithPatternService(content);
+        }
+        return this.runSkillChecksWithHardcoded(content);
+    }
+
+    private runSkillChecksWithPatternService(content: string): SkillSpecificFindings {
         const findings: string[] = [];
         const categories: string[] = [];
         let severity: "low" | "medium" | "high" | "critical" = "low";
 
-        // 1. Check for hidden instructions in HTML comments
+        const patterns = this.patternService!.getActivePatterns("skill");
+
+        // Group patterns by flagGroup
+        const groups = new Map<string, ActivePattern[]>();
+        for (const p of patterns) {
+            const group = groups.get(p.entry.flagGroup) || [];
+            group.push(p);
+            groups.set(p.entry.flagGroup, group);
+        }
+
+        const flags: Record<string, boolean> = {
+            hasHiddenInstructions: false,
+            hasDangerousToolUsage: false,
+            hasSensitiveFileAccess: false,
+            hasObfuscation: false,
+            hasSocialEngineering: false,
+            hasNetworkExfiltration: false,
+        };
+
+        for (const [flagGroup, groupPatterns] of groups) {
+            for (const { entry, regex } of groupPatterns) {
+                let triggered = false;
+
+                if (entry.detection.mode === "threshold") {
+                    const matches = content.match(regex);
+                    if (matches) {
+                        const countThreshold = entry.detection.countThreshold;
+                        const singleMatchLength = entry.detection.singleMatchLength;
+
+                        const exceedsCount = countThreshold !== undefined && matches.length > countThreshold;
+                        const exceedsLength = singleMatchLength !== undefined && matches.some(m => m.length >= singleMatchLength);
+
+                        triggered = exceedsCount || exceedsLength;
+                    }
+                } else {
+                    triggered = regex.test(content);
+                }
+
+                if (triggered) {
+                    // Build finding message based on flag group
+                    if (flagGroup === "hasHiddenInstructions") {
+                        findings.push("Hidden instructions detected in HTML comments");
+                    } else if (flagGroup === "hasDangerousToolUsage") {
+                        findings.push(`Dangerous tool usage detected: ${entry.pattern}`);
+                    } else if (flagGroup === "hasSensitiveFileAccess") {
+                        findings.push(`Sensitive file access detected: ${entry.pattern}`);
+                    } else if (flagGroup === "hasObfuscation") {
+                        findings.push("Obfuscation detected: potential encoded content");
+                    } else if (flagGroup === "hasSocialEngineering") {
+                        findings.push("Social engineering indicators detected");
+                    } else if (flagGroup === "hasNetworkExfiltration") {
+                        findings.push(`Potential data exfiltration detected: ${entry.pattern}`);
+                    }
+
+                    if (!categories.includes(entry.category)) {
+                        categories.push(entry.category);
+                    }
+
+                    if (severityIdx(entry.severity) > severityIdx(severity)) {
+                        severity = entry.severity;
+                    }
+
+                    if (flagGroup in flags) {
+                        flags[flagGroup] = true;
+                    }
+
+                    break; // first match per flag group
+                }
+            }
+        }
+
+        return {
+            hasHiddenInstructions: flags.hasHiddenInstructions,
+            hasDangerousToolUsage: flags.hasDangerousToolUsage,
+            hasSensitiveFileAccess: flags.hasSensitiveFileAccess,
+            hasObfuscation: flags.hasObfuscation,
+            hasSocialEngineering: flags.hasSocialEngineering,
+            hasNetworkExfiltration: flags.hasNetworkExfiltration,
+            findings,
+            severity,
+            categories: Array.from(new Set(categories)),
+        };
+    }
+
+    private runSkillChecksWithHardcoded(content: string): SkillSpecificFindings {
+        const findings: string[] = [];
+        const categories: string[] = [];
+        let severity: "low" | "medium" | "high" | "critical" = "low";
+
+        // 1. Hidden instructions
         const hiddenInstructionPatterns = [
             /<!--[\s\S]*?(ignore|override|bypass|secret|hidden)[\s\S]*?-->/gi,
             /<!--[\s\S]*?(curl|wget|bash|exec|eval)[\s\S]*?-->/gi,
@@ -145,25 +208,15 @@ export class SkillScanService {
             return false;
         });
 
-        // 2. Check for dangerous tool usage patterns
+        // 2. Dangerous tool usage
         const dangerousToolPatterns = [
-            // Bash tool with network access
             /bash.*?(curl|wget)\s+.*?https?:\/\/(?!(?:localhost|127\.0\.0\.1|github\.com|npmjs\.com))/gi,
-            // File system manipulation
             /bash.*?(rm\s+-rf|dd\s+if=|mkfs|format)/gi,
-            // Privilege escalation
             /bash.*?(sudo|su\s+|chmod\s+777|chown)/gi,
-            // Process manipulation
             /bash.*?(kill\s+-9|killall|pkill)/gi,
-
-            // Standalone dangerous commands (with or without shell prefix)
-            // Network access commands in code blocks
             /(?:^|\s|```)(bash|sh|zsh)?\s*(curl|wget)\s+.*?https?:\/\/(?!(?:localhost|127\.0\.0\.1|github\.com|npmjs\.com))/gim,
-            // Destructive file system commands
             /(?:^|\s|```)(bash|sh|zsh)?\s*(rm\s+-rf|dd\s+if=|mkfs|format)/gim,
-            // Privilege escalation commands
             /(?:^|\s|```)(bash|sh|zsh)?\s*(sudo|su\s+|chmod\s+777|chown)/gim,
-            // Process manipulation commands
             /(?:^|\s|```)(bash|sh|zsh)?\s*(kill\s+-9|killall|pkill)/gim,
         ];
 
@@ -177,7 +230,7 @@ export class SkillScanService {
             return false;
         });
 
-        // 3. Check for sensitive file access
+        // 3. Sensitive file access
         const sensitiveFilePatterns = [
             /\/etc\/(passwd|shadow|sudoers)/gi,
             /~?\/.ssh\/(id_rsa|id_ed25519|authorized_keys)/gi,
@@ -196,21 +249,16 @@ export class SkillScanService {
             return false;
         });
 
-        // 4. Check for obfuscation techniques
+        // 4. Obfuscation
         const obfuscationPatterns = [
-            // Base64 encoded content that looks like commands
             /[A-Za-z0-9+/]{40,}={0,2}/g,
-            // Hex encoding
             /\\x[0-9a-fA-F]{2}/g,
-            // Unicode obfuscation
             /\\u[0-9a-fA-F]{4}/g,
-            // Zero-width characters
             /[\u200B-\u200D\uFEFF]/g,
         ];
 
         const hasObfuscation = obfuscationPatterns.some(pattern => {
             const matches = content.match(pattern);
-            // Flag if many matches OR a single large encoded blob (200+ chars)
             const hasMultipleMatches = matches && matches.length > 5;
             const hasSingleLargeBlob = matches && matches.some(m => m.length >= 200);
 
@@ -223,7 +271,7 @@ export class SkillScanService {
             return false;
         });
 
-        // 5. Check for social engineering indicators
+        // 5. Social engineering
         const socialEngineeringPatterns = [
             /\b(official|urgent|critical|immediate|security update|required|mandatory)\b/gi,
             /\b(from Anthropic|from Claude|from OpenAI|authorized by|approved by)\b/gi,
@@ -232,7 +280,7 @@ export class SkillScanService {
 
         const hasSocialEngineering = socialEngineeringPatterns.some(pattern => {
             const matches = content.match(pattern);
-            if (matches && matches.length > 2) { // Multiple social engineering indicators
+            if (matches && matches.length > 2) {
                 findings.push(`Social engineering indicators detected`);
                 categories.push("social_engineering");
                 if (severity === "low") severity = "medium";
@@ -241,13 +289,10 @@ export class SkillScanService {
             return false;
         });
 
-        // 6. Check for network exfiltration attempts
+        // 6. Network exfiltration
         const exfiltrationPatterns = [
-            // HTTP requests to non-standard domains with data parameters
             /https?:\/\/(?!(?:localhost|127\.0\.0\.1|github\.com|npmjs\.com|api\.github\.com))[\w.-]+.*?[\?&](data|key|token|secret|password)=/gi,
-            // Curl/wget with POST data
             /(curl|wget).*?(-d|--data|--data-binary).*?(key|token|secret|password|env)/gi,
-            // DNS exfiltration
             /nslookup.*?\$\(/gi,
         ];
 

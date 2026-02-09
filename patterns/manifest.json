@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "generatedAt": "2026-02-08T23:40:15.008Z",
+  "files": {
+    "custom.json": {
+      "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
+      "patternCount": 0
+    },
+    "prompt-injection.json": {
+      "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
+      "patternCount": 0
+    },
+    "shell-injection.json": {
+      "sha256": "3366caa4c030d8a186cd142ada285375d4d088c801c0e4e7968f1ffb9c637811",
+      "patternCount": 3
+    },
+    "skill-threats.json": {
+      "sha256": "dd16f4762b997546e77c12b6ac6ac29470569b811406985c43d02866c2811c50",
+      "patternCount": 26
+    },
+    "sqli.json": {
+      "sha256": "992dd305ba613e570c4a65db0c0f3df26ac9fee71b6b802ccd56bb7fca9744e7",
+      "patternCount": 5
+    },
+    "xss.json": {
+      "sha256": "3f49de1b9fb221eeedb7992c546c7eda1aade469927ddea4f1e8f97a8c4c2956",
+      "patternCount": 5
+    }
+  },
+  "rootHash": "f831a96e59f0a16955ad607b278b01c2ec3be2458cb4ee7d67a6cea620568cce",
+  "signature": ""
+}

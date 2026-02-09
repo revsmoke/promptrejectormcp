@@ -6,6 +6,7 @@ export interface GeminiCheckResult {
   severity: "low" | "medium" | "high" | "critical";
   categories: ("prompt_injection" | "social_engineering" | "obfuscation" | "multilingual")[];
   explanation: string;
+  error?: boolean;
 }
 
 export class GeminiService {
@@ -81,10 +82,16 @@ export class GeminiService {
       return {
         isInjection: false,
         confidence: 0,
-        severity: "low",
+        severity: "medium",
         categories: [],
-        explanation: "Error performing Gemini check. Defaulting to safe (static checks still apply)."
+        explanation: "Error performing Gemini check. Defaulting to medium severity (static checks still apply).",
+        error: true,
       };
     }
+  }
+
+  async generateRaw(prompt: string): Promise<string> {
+    const result = await this.model.generateContent([{ text: prompt }]);
+    return result.response.text();
   }
 }

@@ -11,7 +11,7 @@ async function listModels() {
     }
     const genAI = new GoogleGenerativeAI(apiKey);
     try {
-        // There is no direct listModels in the standard SDK client sometimes, 
+        // There is no direct listModels in the standard SDK client sometimes,
         // but we can try to fetch them via the REST API or see if there's a helper.
         // Actually, let's just try the common ones.
         const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-2.0-flash-preview", "gemini-3-flash-preview", "gemini-3-pro-preview"];

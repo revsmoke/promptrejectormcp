@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npx tsx src/test/patternServiceTests.ts && npx tsx src/test/integrationTests.ts && npx tsx src/test/vulnFeedTests.ts",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

@@ -1,11 +1,13 @@
 import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService, StaticCheckResult } from "./StaticCheckService.js";
+import type { PatternService } from "./PatternService.js";
 
 export interface SecurityReport {
     safe: boolean;
     overallConfidence: number;
     overallSeverity: "low" | "medium" | "high" | "critical";
     categories: string[];
+    geminiAvailable: boolean;
     gemini: GeminiCheckResult;
     static: StaticCheckResult;
     timestamp: string;
@@ -15,9 +17,9 @@ export class SecurityService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
 
-    constructor() {
+    constructor(patternService?: PatternService) {
         this.geminiService = new GeminiService();
-        this.staticCheckService = new StaticCheckService();
+        this.staticCheckService = new StaticCheckService(patternService);
     }
 
     async runSecurityScan(prompt: string): Promise<SecurityReport> {
@@ -49,6 +51,7 @@ export class SecurityService {
             overallConfidence: geminiResult.confidence,
             overallSeverity,
             categories,
+            geminiAvailable: !geminiResult.error,
             gemini: geminiResult,
             static: staticResult,
             timestamp: new Date().toISOString()

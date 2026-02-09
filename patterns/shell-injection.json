@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "shell-etc-passwd",
+      "name": "/etc/passwd access",
+      "description": "Detects attempts to access /etc/passwd",
+      "pattern": "(\\betc\\/passwd\\b)",
+      "flags": "gim",
+      "severity": "high",
+      "category": "directory_traversal",
+      "flagGroup": "hasShellInjection",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2025-01-01",
+      "whitelistedDomains": []
+    },
+    {
+      "id": "shell-directory-traversal",
+      "name": "Directory traversal",
+      "description": "Detects ../ directory traversal sequences",
+      "pattern": "\\.\\.\\/",
+      "flags": "g",
+      "severity": "high",
+      "category": "directory_traversal",
+      "flagGroup": "hasShellInjection",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2025-01-01",
+      "whitelistedDomains": []
+    },
+    {
+      "id": "shell-redirection",
+      "name": "Shell output redirection",
+      "description": "Detects shell output redirection patterns like 2>&1, &>, >/dev/null",
+      "pattern": "(2>&1|&>|>\\/dev\\/null)",
+      "flags": "g",
+      "severity": "high",
+      "category": "shell_injection",
+      "flagGroup": "hasShellInjection",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2025-01-01",
+      "whitelistedDomains": []
+    }
+  ]
+}

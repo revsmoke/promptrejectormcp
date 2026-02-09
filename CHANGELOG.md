@@ -108,6 +108,47 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 ---
 
+## [1.0.1] - 2026-02-08
+
+### Added
+
+- **Dynamic Pattern Library** — File-based pattern CRUD via `PatternService` with `patterns/` directory. Supports two detection modes: `simple` (any match) and `threshold` (count/length gating).
+- **Vulnerability Intelligence** — `VulnFeedService` scans NVD and GitHub Advisory databases for new CVEs (XSS, SQLi, command injection, path traversal, SSRF) and generates candidate detection patterns via Gemini, staged for human review.
+- **Integrity Verification** — SHA-256 file hashes + optional HMAC signature in `patterns/manifest.json`. Automatic fallback to compiled-in patterns on verification failure.
+- **Skill Scanning** — `SkillScanService` with 6 threat categories: hidden instructions, dangerous tool usage, sensitive file access, obfuscation, social engineering, and network exfiltration.
+- 3 new MCP tools: `list_patterns`, `update_vuln_feeds`, `verify_pattern_integrity`
+- 3 new REST endpoints: `GET /v1/patterns`, `POST /v1/patterns/update-feeds`, `POST /v1/patterns/verify`
+- `npm test` now runs offline test suites (patternService, integration, vulnFeed)
+
+### Changed
+
+- `GeminiService` now exposes `generateRaw()` for non-security Gemini calls
+- `GeminiService` returns `error: true` and `severity: "medium"` on API failure (was `severity: "low"`)
+- `SecurityReport` includes `geminiAvailable` field indicating whether the LLM check succeeded
+- `VulnFeedResult.errors` are now structured objects (`{ source, cveId?, message }`) instead of plain strings
+- `PatternService.remove()` renamed to `disable()` for clarity (it soft-disables, not deletes)
+- Shell metacharacters pattern moved from general scope to skill scope to avoid false positives on `$50`, `Q&A`, etc.
+- Hardcoded regex fallback path now returns fresh `RegExp` instances per call (fixes `lastIndex` state pollution)
+- Severity handling simplified: removed `severityBehavior` field, all severity is now max-wins
+- `VulnFeedService` uses atomic writes for staging file
+- `VulnFeedService` uses public `generateRaw()` instead of accessing `GeminiService` private internals
+
+### Security
+
+- Input length limits: prompts capped at 100K chars, skill content at 500K chars (REST + MCP)
+- CORS is now configurable via `CORS_ORIGIN` env var (was hardcoded `*`)
+
+### Fixed
+
+- `lastIndex` pollution on hardcoded regex arrays causing intermittent false negatives
+- Version string in health endpoint and MCP server now reads from `package.json` (was hardcoded `1.0.0`)
+- Removed unused `zod` import from MCP server
+
+### Removed
+
+- `severityBehavior` field from pattern schema, all pattern files, and fallback patterns
+- `src/listModels.ts` moved to `scripts/listModels.ts` (utility, not part of build)
+
 ## [Unreleased]
 
 ### Planned
@@ -125,6 +166,7 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.0.1 | 2026-02-08 | Pattern library, vuln feeds, skill scanning, code review fixes |
 | 1.0.0 | 2026-01-27 | Initial release with dual-layer detection |
 
 ---
