@@ -108,7 +108,7 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 ---
 
-## [1.0.1] - 2026-02-08
+## [1.0.2] - 2026-02-08
 
 ### Added
 
@@ -166,7 +166,8 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 1.0.1 | 2026-02-08 | Pattern library, vuln feeds, skill scanning, code review fixes |
+| 1.0.2 | 2026-02-08 | Pattern library, vuln feeds, skill scanning, code review fixes |
+| 1.0.1 | 2026-02-01 | MCP publishing setup |
 | 1.0.0 | 2026-01-27 | Initial release with dual-layer detection |
 
 ---
