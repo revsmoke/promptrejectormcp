@@ -18,6 +18,7 @@ import { TrifectaAnalyzer } from "../services/TrifectaAnalyzer.js";
 import { CanaryService } from "../services/CanaryService.js";
 import { McpToolScanner } from "../services/McpToolScanner.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
+import { UnifiedCveCache, type QueryCveFilters } from "../services/UnifiedCveCache.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../package.json");
@@ -37,6 +38,7 @@ export class PromptRejectorMCPServer {
     private canaryService: CanaryService;
     private mcpToolScanner: McpToolScanner;
     private tasteTesterService: TasteTesterService;
+    private unifiedCveCache: UnifiedCveCache;
 
     constructor() {
         this.patternService = new PatternService();
@@ -64,6 +66,13 @@ export class PromptRejectorMCPServer {
         this.canaryService = new CanaryService();
         this.mcpToolScanner = new McpToolScanner(this.patternService);
         this.tasteTesterService = new TasteTesterService();
+        // Pass 9: read-only aggregator over staged CVE candidates. Depends on
+        // vulnFeedService + atlasService + kevFeedService already being live.
+        this.unifiedCveCache = new UnifiedCveCache(
+            this.vulnFeedService,
+            this.atlasService,
+            this.kevFeedService,
+        );
         this.server = new Server(
             {
                 name: "prompt-rejector",
@@ -346,8 +355,9 @@ export class PromptRejectorMCPServer {
             }
 
             if (name === "query_cve") {
-                // Stub: real unified-cache lookup lands in Pass 9
-                const result = { stub: true, total: 0, records: [] };
+                // Pass 9: real implementation backed by UnifiedCveCache.
+                const filters = (args || {}) as QueryCveFilters;
+                const result = this.unifiedCveCache.query(filters);
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };

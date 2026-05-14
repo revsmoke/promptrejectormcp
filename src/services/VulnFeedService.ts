@@ -10,7 +10,7 @@ import { KevFeedService } from "./KevFeedService.js";
 import { AI_PACKAGE_ALLOWLIST, ECOSYSTEMS_FOR_GHSA } from "./aiPackageAllowlist.js";
 import type { PatternEntry } from "../schemas/PatternSchemas.js";
 
-interface StagedCandidate {
+export interface StagedCandidate {
     id: string;
     name: string;
     pattern: string;
@@ -156,6 +156,16 @@ export class VulnFeedService {
             }
             this.stagingPath = join(dir, "patterns", "staging", "pending-review.json");
         }
+    }
+
+    /**
+     * Pass 9: expose staged candidates for read-only consumers like
+     * UnifiedCveCache. Returns the current `pending-review.json` contents.
+     * Safe to call on every query — the file is small enough that we don't
+     * need to maintain an in-memory cache here.
+     */
+    listStagedCandidates(): StagedCandidate[] {
+        return this.loadStaging().candidates;
     }
 
     async updateFeeds(lookbackDays = 30): Promise<VulnFeedResult> {
