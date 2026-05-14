@@ -28,7 +28,7 @@ export const PatternEntrySchema = z.object({
     scope: z.enum(["general", "skill"]),
     detection: DetectionSchema,
     enabled: z.boolean(),
-    source: z.enum(["original", "nvd", "github_advisory", "manual"]).optional(),
+    source: z.enum(["original", "nvd", "github_advisory", "manual", "ghsa_graphql", "osv"]).optional(),
     cveRefs: z.array(z.string()).default([]),
     dateAdded: z.string(),
     /** Informational only — whitelisting is baked into regex negative lookaheads, not enforced at runtime */

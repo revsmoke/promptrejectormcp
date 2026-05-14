@@ -3,6 +3,9 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { PatternService } from "./PatternService.js";
 import { GeminiService } from "./GeminiService.js";
+import { OsvFeedService, type OsvVuln } from "./OsvFeedService.js";
+import { GhsaGraphQLService, type GhsaAdvisory } from "./GhsaGraphQLService.js";
+import { AI_PACKAGE_ALLOWLIST, ECOSYSTEMS_FOR_GHSA } from "./aiPackageAllowlist.js";
 import type { PatternEntry } from "../schemas/PatternSchemas.js";
 
 interface StagedCandidate {
@@ -14,7 +17,7 @@ interface StagedCandidate {
     category: string;
     severity: string;
     cveId: string;
-    source: "nvd" | "github_advisory";
+    source: "nvd" | "github_advisory" | "ghsa_graphql" | "osv";
     generatedAt: string;
 }
 
@@ -24,9 +27,16 @@ interface StagingFile {
 }
 
 export interface VulnFeedError {
-    source: "nvd" | "github" | "gemini";
+    source: "nvd" | "github" | "gemini" | "ghsa_graphql" | "osv";
     cveId?: string;
     message: string;
+}
+
+export interface VulnFeedPerSourceCounts {
+    nvd: number;
+    ghsaRest: number;
+    ghsaGraphql: number;
+    osv: number;
 }
 
 export interface VulnFeedResult {
@@ -34,6 +44,7 @@ export interface VulnFeedResult {
     relevantCount: number;
     patternsGenerated: number;
     errors: VulnFeedError[];
+    perSource: VulnFeedPerSourceCounts;
 }
 
 // Simple sliding-window rate limiter
@@ -79,13 +90,21 @@ const NVD_SEARCH_KEYWORDS = [
 export class VulnFeedService {
     private patternService: PatternService;
     private geminiService: GeminiService | null;
+    private osvFeedService: OsvFeedService;
+    private ghsaGraphqlService: GhsaGraphQLService;
     private stagingPath: string;
     private githubToken: string | null;
     private nvdApiKey: string | null;
     private nvdLimiter: RateLimiter;
     private githubLimiter: RateLimiter;
 
-    constructor(patternService: PatternService, geminiService?: GeminiService, patternsDir?: string) {
+    constructor(
+        patternService: PatternService,
+        geminiService?: GeminiService,
+        patternsDir?: string,
+        osvFeedService?: OsvFeedService,
+        ghsaGraphqlService?: GhsaGraphQLService,
+    ) {
         this.patternService = patternService;
         // Lazy: only create GeminiService if provided or API key is available
         if (geminiService) {
@@ -95,6 +114,9 @@ export class VulnFeedService {
         } else {
             this.geminiService = null;
         }
+
+        this.osvFeedService = osvFeedService || new OsvFeedService();
+        this.ghsaGraphqlService = ghsaGraphqlService || new GhsaGraphQLService();
 
         this.githubToken = process.env.GITHUB_TOKEN || null;
         this.nvdApiKey = process.env.NVD_API_KEY || null;
@@ -130,35 +152,38 @@ export class VulnFeedService {
             relevantCount: 0,
             patternsGenerated: 0,
             errors: [],
+            perSource: { nvd: 0, ghsaRest: 0, ghsaGraphql: 0, osv: 0 },
         };
 
-        // Fetch from both sources in parallel
-        const [nvdVulns, ghVulns] = await Promise.all([
-            this.fetchNVD(lookbackDays).catch((err) => {
-                result.errors.push({ source: "nvd", message: `NVD fetch error: ${err.message}` });
-                return [] as CVEEntry[];
-            }),
-            this.fetchGitHubAdvisories(lookbackDays).catch((err) => {
-                result.errors.push({ source: "github", message: `GitHub Advisory fetch error: ${err.message}` });
-                return [] as CVEEntry[];
-            }),
+        // Fetch from all four sources in parallel via allSettled — one failure
+        // shouldn't kill the rest. Each branch returns its own typed payload.
+        const settled = await Promise.allSettled([
+            this.fetchNVD(lookbackDays),
+            this.fetchGitHubAdvisories(lookbackDays),
+            this.fetchOsv(),
+            this.fetchGhsaGraphql(),
         ]);
 
-        const allVulns = [...nvdVulns, ...ghVulns];
-        result.fetchedCount = allVulns.length;
+        const nvdVulns: CVEEntry[] = this.unwrapSettled(settled[0], "nvd", result, [] as CVEEntry[]);
+        const ghVulns: CVEEntry[] = this.unwrapSettled(settled[1], "github", result, [] as CVEEntry[]);
+        const osvVulns: OsvVuln[] = this.unwrapSettled(settled[2], "osv", result, [] as OsvVuln[]);
+        const ghsaGqlVulns: GhsaAdvisory[] = this.unwrapSettled(settled[3], "ghsa_graphql", result, [] as GhsaAdvisory[]);
 
-        // Deduplicate by CVE ID
+        result.perSource.nvd = nvdVulns.length;
+        result.perSource.ghsaRest = ghVulns.length;
+        result.perSource.osv = osvVulns.length;
+        result.perSource.ghsaGraphql = ghsaGqlVulns.length;
+
+        // --- Existing CWE-based path (NVD + GHSA REST) — Gemini regex generation ---
+        const allCveLikeVulns = [...nvdVulns, ...ghVulns];
+        result.fetchedCount = allCveLikeVulns.length + osvVulns.length + ghsaGqlVulns.length;
+
         const unique = new Map<string, CVEEntry>();
-        for (const v of allVulns) {
-            if (!unique.has(v.cveId)) {
-                unique.set(v.cveId, v);
-            }
+        for (const v of allCveLikeVulns) {
+            if (!unique.has(v.cveId)) unique.set(v.cveId, v);
         }
-
         const relevant = Array.from(unique.values());
-        result.relevantCount = relevant.length;
 
-        // Generate patterns for each CVE using Gemini
         const staging = this.loadStaging();
         const existingPatternStrings = new Set(
             this.patternService.list().map((p) => p.pattern),
@@ -166,21 +191,21 @@ export class VulnFeedService {
         const existingStagedPatterns = new Set(
             staging.candidates.map((c) => c.pattern),
         );
+        const existingStagedIds = new Set(staging.candidates.map((c) => c.id));
 
         for (const vuln of relevant) {
             try {
                 const candidates = await this.generatePatternsFromCVE(vuln);
                 for (const candidate of candidates) {
-                    // Skip duplicates
                     if (
                         existingPatternStrings.has(candidate.pattern) ||
                         existingStagedPatterns.has(candidate.pattern)
                     ) {
                         continue;
                     }
-
                     staging.candidates.push(candidate);
                     existingStagedPatterns.add(candidate.pattern);
+                    existingStagedIds.add(candidate.id);
                     result.patternsGenerated++;
                 }
             } catch (err: any) {
@@ -188,8 +213,131 @@ export class VulnFeedService {
             }
         }
 
+        // --- AI-supply-chain path (OSV + GHSA GraphQL) ---
+        // These vulns are code-level (dependencies), not prompt patterns. We
+        // stage them with empty pattern/flags + category "ai_supply_chain"
+        // so Pass 9's query_cve can surface them without running regex.
+        const relevant2 = result.relevantCount;
+        for (const v of osvVulns) {
+            const cand = this.osvVulnToCandidate(v);
+            if (cand && !existingStagedIds.has(cand.id)) {
+                staging.candidates.push(cand);
+                existingStagedIds.add(cand.id);
+                result.patternsGenerated++;
+            }
+        }
+        for (const a of ghsaGqlVulns) {
+            const cand = this.ghsaAdvisoryToCandidate(a);
+            if (cand && !existingStagedIds.has(cand.id)) {
+                staging.candidates.push(cand);
+                existingStagedIds.add(cand.id);
+                result.patternsGenerated++;
+            }
+        }
+        result.relevantCount = relevant.length + osvVulns.length + ghsaGqlVulns.length;
+        void relevant2; // (kept for clarity; relevantCount is now total across all sources)
+
         this.saveStaging(staging);
         return result;
+    }
+
+    /**
+     * Drain a Promise.allSettled result. Pushes any rejection onto result.errors
+     * tagged with the given source and returns the fallback value. Centralized
+     * here so the parallel fetch block stays readable.
+     */
+    private unwrapSettled<T>(
+        s: PromiseSettledResult<T>,
+        source: VulnFeedError["source"],
+        result: VulnFeedResult,
+        fallback: T,
+    ): T {
+        if (s.status === "fulfilled") return s.value;
+        const msg = s.reason instanceof Error ? s.reason.message : String(s.reason);
+        result.errors.push({ source, message: `${source} fetch error: ${msg}` });
+        return fallback;
+    }
+
+    /** OSV: query the AI-package allowlist. */
+    private async fetchOsv(): Promise<OsvVuln[]> {
+        return this.osvFeedService.query(AI_PACKAGE_ALLOWLIST);
+    }
+
+    /** GHSA GraphQL: walk ecosystems we care about, flatten. */
+    private async fetchGhsaGraphql(): Promise<GhsaAdvisory[]> {
+        const all: GhsaAdvisory[] = [];
+        for (const eco of ECOSYSTEMS_FOR_GHSA) {
+            try {
+                const advs = await this.ghsaGraphqlService.query(eco, 50);
+                all.push(...advs);
+            } catch (err: any) {
+                // Per-ecosystem failures are non-fatal; recorded but we keep going.
+                // We let updateFeeds() top-level allSettled record nothing extra,
+                // but surface it here via stderr.
+                console.error(`[VulnFeedService] GHSA GraphQL ${eco} failed:`, err?.message || err);
+            }
+        }
+        return all;
+    }
+
+    /** Map an OSV vuln to a staged candidate with empty regex (ai_supply_chain). */
+    private osvVulnToCandidate(v: OsvVuln): StagedCandidate | null {
+        // Prefer a CVE alias for cveId if present; otherwise fall back to the OSV id.
+        const cveAlias = (v.aliases || []).find((a) => /^CVE-/i.test(a));
+        const cveId = cveAlias || v.id;
+        const id = `osv-${v.id.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+        const sev = this.osvSeverityToLevel(v.severity);
+        const pkg = v.affected?.[0]?.package;
+        const pkgLabel = pkg ? `${pkg.ecosystem}:${pkg.name}` : "unknown";
+        return {
+            id,
+            name: `${v.id} (${pkgLabel})`,
+            pattern: "",
+            flags: "",
+            description: v.summary || v.details?.slice(0, 200) || "OSV advisory (no regex pattern)",
+            category: "ai_supply_chain",
+            severity: sev,
+            cveId,
+            source: "osv",
+            generatedAt: new Date().toISOString(),
+        };
+    }
+
+    /** Map a GHSA GraphQL advisory to a staged candidate with empty regex. */
+    private ghsaAdvisoryToCandidate(a: GhsaAdvisory): StagedCandidate | null {
+        const id = `ghsa-${a.ghsaId.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+        const cveId = a.cveId || a.ghsaId;
+        const pkg = a.vulnerablePackage;
+        const pkgLabel = pkg ? `${pkg.ecosystem}:${pkg.name}` : "unknown";
+        return {
+            id,
+            name: `${a.ghsaId} (${pkgLabel})`,
+            pattern: "",
+            flags: "",
+            description: a.summary || a.description?.slice(0, 200) || "GHSA advisory (no regex pattern)",
+            category: "ai_supply_chain",
+            severity: a.severity.toLowerCase() === "moderate" ? "medium" : a.severity.toLowerCase(),
+            cveId,
+            source: "ghsa_graphql",
+            generatedAt: new Date().toISOString(),
+        };
+    }
+
+    /** Map OSV severity array to our 4-level scale. Best-effort; defaults to medium. */
+    private osvSeverityToLevel(sev?: OsvVuln["severity"]): string {
+        if (!sev || sev.length === 0) return "medium";
+        // OSV severity entries can be CVSS_V3 vectors; try to extract a base score.
+        for (const s of sev) {
+            const m = s.score?.match(/CVSS:[0-9.]+\/.*?(\d+(?:\.\d+)?)/) || s.score?.match(/^(\d+(?:\.\d+)?)$/);
+            if (m) {
+                const score = parseFloat(m[1]);
+                if (score >= 9.0) return "critical";
+                if (score >= 7.0) return "high";
+                if (score >= 4.0) return "medium";
+                return "low";
+            }
+        }
+        return "medium";
     }
 
     promote(candidateId: string): PatternEntry {
