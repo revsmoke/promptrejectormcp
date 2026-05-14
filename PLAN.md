@@ -332,18 +332,18 @@ This section is updated as passes complete. Each entry: pass number, completion 
 
 | Pass | Completed | Commit | Note |
 |---|---|---|---|
-| 0 | _pending_ | — | — |
-| 1 | _pending_ | — | — |
-| 2 | _pending_ | — | — |
-| 3 | _pending_ | — | — |
-| 4 | _pending_ | — | — |
-| 5 | _pending_ | — | — |
-| 6 | _pending_ | — | — |
-| 7 | _pending_ | — | — |
-| 8 | _pending_ | — | — |
-| 9 | _pending_ | — | — |
-| 10 | _pending_ | — | — |
-| 11a | _pending_ | — | — |
-| 11b | _pending_ | — | — |
-| 12 | _pending_ | — | — |
-| 13 | _pending_ | — | — |
+| 0 | 2026-05-13 | `24e7dbb` | Walking skeleton — 6 new MCP tools reachable, 9 new service stubs wired |
+| 1 | 2026-05-13 | `3d8b366` | Unicode smuggling — Tag block + zero-width + bidi controls with threshold gating |
+| 2 | 2026-05-13 | `5066946` | Policy-puppetry — XML/INI/JSON/YAML fake-policy wrapper detection |
+| 3 | 2026-05-13 | `457793d` | Markdown-exfil patterns + curated indirect-injection IOC seed corpus |
+| 4 | 2026-05-13 | `cd70003` | `scan_mcp_tool` — canonical-hash + imperative/Unicode lint + drift detection |
+| 5 | 2026-05-13 | `8f92168` | `check_lethal_trifecta` — capability classifier (private/fetch/egress) |
+| 6 | 2026-05-13 | `f8df98b` | OSV.dev `/v1/querybatch` + GHSA GraphQL with AI-package allowlist |
+| 7 | 2026-05-13 | `e9297da` | MITRE ATLAS STIX bundle + CISA KEV severity escalator + `atlasTechnique` field |
+| 8 | 2026-05-13 | `3c8fc09` | Hugging Face `securityStatus` integration in `scan_skill` |
+| 9 | 2026-05-13 | `9cc9d15` | `query_cve` — unified read across NVD/OSV/GHSA/KEV/ATLAS |
+| 10 | 2026-05-13 | `e784938` | `deploy_canary` / `verify_canary` — UUID + HMAC-state + TTL pruning |
+| 11a | 2026-05-13 | `dc8e251` | Taste-Tester architecture, Monitor zod schema, fast-mode single-turn |
+| 11b | 2026-05-13 | `ec04cac` | Full mock-tool surface + multi-turn loop + 20-sample labeled corpus (20/20) |
+| 12 | 2026-05-13 | `fe7d64d` | Many-shot heuristic + Sneaky-Bits/Cyrillic/Base32/hex obfuscation expansion |
+| 13 | 2026-05-14 | _pending_ | Hardening, docs, ship — README/CHANGELOG/SKILLS_SECURITY/SPEC §13.1, smoke script, version bump, enumerated-Q FP fix |

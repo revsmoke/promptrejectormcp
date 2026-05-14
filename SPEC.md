@@ -433,6 +433,23 @@ Tracked here so reviewers can challenge before implementation:
 
 ---
 
+## 13.1. Resolved during v1.1.0
+
+Status of each §13 risk register entry as of the v1.1.0 release.
+
+| # | Risk | Status as of v1.1.0 |
+|---|---|---|
+| 1 | CVE-2026-2796 (ClaudeBleed) NVD unverified | **Deferred to runtime documentation.** Project scope is prompt/skill screening, not Chrome-extension runtime exploits. Documented as out-of-scope in CHANGELOG known-limitations. |
+| 2 | MemoryGraft arXiv ID `2512.16962` unverified | **Narrative citation only.** No code path or detection rule depends on the exact arXiv ID. Cited only for context in `RESEARCH_THREATS.md`. |
+| 3 | OWASP LLM Top 10 2026 still draft | **Resolved — using v2025 by design.** All references in SPEC and code use the operative v2025 taxonomy. |
+| 4 | ATLAS Feb 2026 technique IDs (`AML.T0070`, `AML.T0071`) unconfirmed | **Partially mitigated.** `AtlasService` attempts to fetch the live ATLAS STIX bundle on first use and falls back to a hand-maintained table when offline. Fallback table entries for `AML.T0070`/`AML.T0071` are flagged `[unverified]` in their description string so consumers can distinguish authoritative vs fallback tags. Real-bundle reconciliation deferred to v1.2 when STIX endpoint stabilizes. |
+| 5 | Taster `MAX_TURNS=5` uncalibrated | **Partially mitigated.** The 20-sample labeled corpus in `src/test/fixtures/taste-tester-corpus.json` exercises the Monitor verdict logic against scripted-mock Taster responses (20/20 pass — but this measures scripted-mock-flow correctness, not real-API predictive accuracy). Real-API calibration with cost telemetry deferred to a follow-up release. Hard caps prevent cost-runaway regardless. |
+| 6 | Mock tool router I/O leak | **Resolved.** All mock tools in `TasteTesterService` are pure functions returning canned strings; verified by inspection during Pass 11a/11b. |
+| 7 | Monitor itself prompt-injectable | **Resolved.** Monitor output is parsed through a zod-validated `BehaviorReport` schema; non-conforming responses fall back to a neutral stub rather than executing free-form Monitor text. |
+| 8 | Garak detection rate baseline unknown | **Deferred to v1.2.** Curated Garak-derived patterns shipped in `patterns/prompt-injection.json` (provenance tracked in `source`), but the full adversarial regression run against `check_prompt` is not yet recorded. Tracked as a known limitation in CHANGELOG. |
+
+---
+
 ## 14. Glossary
 
 | Term | Definition |

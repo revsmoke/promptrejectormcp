@@ -42,6 +42,27 @@
       "dateAdded": "2026-05-13",
       "whitelistedDomains": [],
       "atlasTechnique": "AML.T0054"
+    },
+    {
+      "id": "many-shot-enumerated-qa",
+      "name": "Many-shot enumerated Q/A stacking",
+      "description": "Many-shot heuristic — counts enumerated 'Q1:' / 'Question 1:' / 'Human 12:' markers; 15+ is suspicious context-saturation (Pass 12 follow-up: the enumerated variant Pass 12's non-enumerated heuristic missed)",
+      "pattern": "^\\s*(Q|Question|Human|User)\\s*\\d+\\s*[:\\.]",
+      "flags": "gim",
+      "severity": "high",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 15
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-14",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     }
   ]
 }

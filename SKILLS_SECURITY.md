@@ -431,6 +431,61 @@ If you believe a skill is incorrectly flagged:
 
 ---
 
+## v1.1.0 Additions
+
+Three new signal classes feed into `scan_skill` as of v1.1.0. They are surfaced as additional fields on the result object alongside the existing `skillSpecific` block, and each is independently disable-able by removing the relevant capability/reference from the skill.
+
+### Lethal Trifecta detection
+
+`scan_skill` now invokes `TrifectaAnalyzer` and reports a `hasLethalTrifecta` boolean plus a `trifectaResult` object. The trifecta — coined by Simon Willison — is the co-location in a single agent of:
+
+1. **Private-data read** (reading `~/.ssh`, `.env`, cloud creds, internal databases)
+2. **Untrusted-content fetch** (curl/wget/`from_pretrained()` against attacker-influenced sources)
+3. **External egress** (POST/email/webhook to a domain the user does not control)
+
+Any two of the three is *medium* risk; all three is *critical*. The recommended remediation is to disable any one capability — most often egress — when all three are present. The analyzer returns the signals it matched per bucket so users can see *which* capability to revoke.
+
+```json
+{
+  "hasLethalTrifecta": true,
+  "trifectaResult": {
+    "trifectaPresent": true,
+    "severity": "critical",
+    "privateRead":     { "matched": true, "signals": ["~/.ssh/id_rsa", "read_file"] },
+    "untrustedFetch":  { "matched": true, "signals": ["curl https://", "from_pretrained"] },
+    "externalEgress":  { "matched": true, "signals": ["POST", "send_email"] }
+  }
+}
+```
+
+### Hugging Face security signals
+
+`scan_skill` scans skill content for any `huggingface.co/<owner>/<model>` URL or `*.from_pretrained("<id>")` reference and checks each model against the Hugging Face Hub's `securityStatus` endpoint. Findings surface as `huggingFaceSecurityFlags` and `huggingFaceReports`.
+
+Flagged conditions include:
+
+- **Gated repository** — model requires explicit access grant
+- **Unsafe serialization** — model loads via legacy formats that execute embedded code on load
+- **Code-execution risk** — model card or config references `trust_remote_code=True`
+
+A clean reference returns an empty `huggingFaceSecurityFlags: []`. The check uses a 6-hour in-memory cache and degrades gracefully (returning `[]`) when `HF_TOKEN` is unset or the Hub is unreachable.
+
+### ATLAS taxonomy tags
+
+Findings now carry MITRE ATLAS technique IDs in an `atlasTechniques[]` array on the result. The mapping shipped in v1.1.0:
+
+| ATLAS Technique | Maps to |
+|---|---|
+| `AML.T0051` (LLM Prompt Injection) | `prompt_injection`, `policy_puppetry`, `unicode_smuggling`, `mcp_tool_poisoning` |
+| `AML.T0054` (LLM Jailbreak) | `many_shot`, role-play jailbreaks |
+| `AML.T0024` (Exfiltration via LLM Output) | `markdown_exfil`, data-exfiltration |
+| `AML.T0070` (Publish Poisoned AI Agent Tool) | `mcp_tool_poisoning` *(fallback table marks this `[unverified]` per SPEC §13.1)* |
+| `AML.T0071` (AI Agent Context Poisoning) | `rag_poisoning`, canary-echo findings *(fallback table marks this `[unverified]` per SPEC §13.1)* |
+
+The tags are advisory — they are emitted alongside, not in place of, the existing `categories[]`. Downstream consumers can route or filter on either field. ATLAS data is fetched from the live STIX bundle on first use, cached for 7 days, and falls back to a hand-maintained table when offline.
+
+---
+
 ## Reporting Issues
 
 If you find:

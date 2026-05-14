@@ -104,6 +104,8 @@ It combines two detection approaches for defense-in-depth:
 
 Results are aggregated with severity levels and categorical tags, giving you actionable intelligence to **block**, **flag for review**, or **allow** input.
 
+> ⚠️ **Defense in depth, not silver bullet.** A 2026 meta-study of 78 defense papers found that adaptive attacks still beat ~85% of state-of-the-art single defenses. Prompt Rejector stacks five complementary layers (static patterns, semantic LLM analysis, taxonomy-tagged vulnerability feeds, lethal-trifecta capability analysis, and the sandboxed Taste-Tester dynamic detonator) but does not guarantee detection. Use it as one layer among many, alongside output filtering, sandboxing, least-privilege, and human review.
+
 ---
 
 ## ✨ Features
@@ -163,7 +165,31 @@ GITHUB_TOKEN=
 # Optional: NVD API key for vulnerability feed scanning (5/30s → 50/30s)
 # Get one at https://nvd.nist.gov/developers/request-an-api-key
 NVD_API_KEY=
+
+# --- v1.1.0 additions (all optional with safe defaults) ---
+
+# Hugging Face Hub security signals (consumed by scan_skill)
+HF_TOKEN=
+
+# Feed refresh cadences (defaults shown)
+KEV_REFRESH_INTERVAL_HOURS=24
+ATLAS_REFRESH_INTERVAL_HOURS=168
+
+# Taste-Tester sandbox (opt-in dual-agent detonator; off by default)
+TASTE_TESTER_ENABLED=false
+TASTE_TESTER_MODEL=claude-sonnet-4-6
+TASTE_TESTER_MAX_TURNS=5
+TASTE_TESTER_MAX_TOKENS=4096
+TASTE_TESTER_TIMEOUT_MS=30000
+ANTHROPIC_API_KEY=
+
+# Canary tokens (deploy_canary / verify_canary)
+# Falls back to PATTERN_INTEGRITY_SECRET when unset
+CANARY_HMAC_SECRET=
+CANARY_DEFAULT_TTL_SECONDS=86400
 ```
+
+> All v1.1.0 env vars are **optional with safe defaults**; missing keys gracefully degrade (the relevant tool returns `{available: false, reason: "missing config"}` rather than throwing).
 
 ---
 
@@ -265,6 +291,42 @@ Add to your MCP settings configuration:
    ```json
    {}
    ```
+
+---
+
+## 🆕 v1.1.0 LLM/Agentic Threat Coverage
+
+v1.1.0 adds **six new MCP tools** focused on LLM-native threats that emerged through 2025–2026: MCP tool poisoning, the "lethal trifecta," Unicode-tag smuggling, Policy Puppetry, memory/RAG poisoning, indirect injection, and many-shot jailbreaks.
+
+| Tool | What it does |
+|------|--------------|
+| **`scan_mcp_tool`** | Hashes and lints an MCP tool descriptor for poisoning. Detects imperative override language, "ignore previous" phrases, hidden HTML comments, priority/authority claims, hidden Unicode-tag and zero-width characters, and drift vs a known-good SHA-256 hash. |
+| **`check_lethal_trifecta`** | Static analyzer for Willison's lethal trifecta — private-data read + untrusted-content fetch + external egress in one agent. Returns *critical* when all three are co-located; *medium* on any 2-of-3. Surfaces the matched signals per bucket so you know which capability to revoke. |
+| **`query_cve`** | Unified read across NVD, OSV, GHSA REST, GHSA GraphQL, CISA KEV, and MITRE ATLAS. Filters by keyword, ecosystem, severity, ATLAS technique, and KEV-only. |
+| **`deploy_canary`** / **`verify_canary`** | Memory/RAG poisoning detection via UUIDv4 canary tokens. HMAC-signed state, TTL-pruned. Issue a token, embed in a known-only-to-you memory/context slot, then check returned model output for echoes — `severity: critical` on match. |
+| **`taste_test`** | User-designed dual-agent sandbox detonator (the *Taste-Tester*). The Taster runs the suspect prompt against a mock tool surface; the Monitor returns a zod-validated structured verdict on observed intent. Gated behind `TASTE_TESTER_ENABLED`; see `SPEC.md` §5 for the full architecture. |
+
+### Pattern Categories
+
+The pattern library categorizes findings into the following categories. Filter `list_patterns` by any of these via the `category` argument:
+
+| Category | Introduced | Description |
+|---|---|---|
+| `xss` | v1.0 | Cross-site scripting payloads |
+| `sqli` | v1.0 | SQL injection patterns |
+| `shell_injection` | v1.0 | Shell/command injection |
+| `directory_traversal` | v1.0 | Path traversal (`../`, `/etc/passwd`) |
+| `ssrf` | v1.0 | Server-side request forgery |
+| `prompt_injection` | v1.0 | Classic prompt-injection IOCs (ignore-previous, act-as, system-prompt extraction) |
+| `obfuscation` | v1.0 → v1.1 | Base64, hex, Unicode tricks. v1.1 adds Cyrillic homoglyphs, Base32 (≥32 chars), hex chunks (≥60 chars), Sneaky Bits |
+| `unicode_smuggling` | v1.1 | Unicode Tag block (U+E0000–U+E007F), zero-width, bidi overrides |
+| `policy_puppetry` | v1.1 | XML/INI/JSON/YAML fake-policy wrappers (HiddenLayer Apr 2025) |
+| `markdown_exfil` | v1.1 | Markdown image/link exfil; `javascript:` and `data:text/html` URIs |
+| `mcp_tool_poisoning` | v1.1 | Imperatives, "ignore previous," hidden-HTML-comment channels in tool descriptors |
+| `many_shot` | v1.1 | Q/A pair stacks, turn-marker stacks, enumerated Q1/Q2 stacks (Anthropic 2024) |
+| `rag_poisoning` | v1.1 | Memory/RAG poisoning (canary-echo signal) |
+| `lethal_trifecta` | v1.1 | Co-located private-read + untrusted-fetch + egress |
+| `ai_supply_chain` | v1.1 | Hugging Face Hub flagged models, AI-package CVEs |
 
 ---
 
@@ -380,7 +442,20 @@ If verification fails, the system falls back to 10 hardcoded emergency patterns 
 
 ## 🔔 Vulnerability Intelligence
 
-Prompt Rejector can automatically scan vulnerability feeds (NVD and GitHub Security Advisories) for CVEs relevant to its detection categories, then generate candidate detection patterns using Gemini.
+Prompt Rejector can automatically scan vulnerability feeds for CVEs relevant to its detection categories, then generate candidate detection patterns using Gemini.
+
+### Feed Sources (as of v1.1.0)
+
+| Source | Added | Purpose |
+|---|---|---|
+| NVD CVE 2.0 | v1.0.2 | CWE-filtered general vulnerability feed (XSS, SQLi, Command Injection, Path Traversal, SSRF) |
+| GHSA REST | v1.0.2 | GitHub Security Advisories, ecosystem-aware |
+| **OSV.dev `/v1/querybatch`** | v1.1.0 | Open-source vuln DB filtered by an **AI-package allowlist** (langchain, transformers, litellm, mlflow, ollama, llama-index, autogen, crewai, langgraph, vllm, sglang, anthropic-sdk-python, openai-python, transformers-js, openai, anthropic) |
+| **GHSA GraphQL** | v1.1.0 | `securityVulnerabilities` query with ecosystem filter — richer metadata than REST, requires `GITHUB_TOKEN` |
+| **MITRE ATLAS taxonomy** | v1.1.0 | v5.4 STIX bundle for AI/LLM technique tags (`AML.T0051`, `AML.T0054`, `AML.T0024`, `AML.T0070`, `AML.T0071`); 7-day cache + offline fallback table |
+| **CISA KEV escalator** | v1.1.0 | Known-Exploited-Vulnerabilities catalog; auto-bumps severity by one level when a CVE is KEV-listed and attaches `inKev: true` |
+| **Hugging Face Hub `securityStatus`** | v1.1.0 | Per-model security signals (gated, unsafe-serialization, code-execution risk) consumed by `scan_skill`; 6h in-memory cache |
+
 
 ### How It Works
 

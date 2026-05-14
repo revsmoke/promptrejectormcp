@@ -7,6 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-05-14
+
+### 🚀 LLM/Agentic Threat Expansion
+
+A major coverage expansion adding **6 new MCP tools** and **5 new vulnerability-feed sources** to address the late-2025/2026 shift toward LLM-native attacks (Policy Puppetry, Unicode-tag smuggling, MCP tool poisoning, lethal trifecta, indirect injection, RAG/memory poisoning, many-shot jailbreaks). Delivered as 13 vertical-slice passes; every pass left the system fully runnable, tested, and committable.
+
+> **Defense in depth, not silver bullet.** A 2026 meta-study of 78 defense papers found that adaptive attacks still beat ~85% of state-of-the-art single defenses. Prompt Rejector v1.1.0 stacks five complementary layers (static patterns, semantic LLM analysis, taxonomy-tagged vulnerability feeds, lethal-trifecta capability analysis, and a sandboxed Taste-Tester dynamic detonator) but does not guarantee detection. Use it as one layer among many.
+
+### Added
+
+#### New MCP Tools
+
+- **`scan_mcp_tool`** — Hash + lint MCP tool descriptors for poisoning. Detects imperative override language, "ignore previous" phrases, hidden HTML comments, priority claims, authority claims, hidden Unicode-tag/zero-width chars, and drift vs a known-good SHA-256 hash.
+- **`check_lethal_trifecta`** — Static analyzer for Willison's lethal trifecta (private-data read + untrusted-content fetch + external egress). Returns *critical* when all three capabilities are co-located in one agent, *medium* on any 2-of-3.
+- **`query_cve`** — Unified CVE lookup across NVD, OSV, GHSA REST, GHSA GraphQL, CISA KEV, and MITRE ATLAS. Filters by keyword, ecosystem, severity, ATLAS technique, and KEV-only.
+- **`deploy_canary`** / **`verify_canary`** — Memory/RAG poisoning detection via UUIDv4 canary tokens. HMAC-signed state file, TTL-pruned, scan content for echoes returning `severity: critical` on match.
+- **`taste_test`** — User-designed dual-agent sandbox detonator (the "Taste-Tester"). Taster + Monitor architecture with structured zod-validated verdicts; gated behind `TASTE_TESTER_ENABLED`. See SPEC §5.
+
+#### New Detection Categories
+
+- **`unicode_smuggling`** — Unicode Tag block (U+E0000–U+E007F), zero-width characters (U+200B–U+200F, U+FEFF), bidirectional overrides (U+202A–U+202E, U+2066–U+2069); Sneaky Bits two-char encoder
+- **`policy_puppetry`** — XML/INI/JSON/YAML fake-policy wrappers per HiddenLayer (April 2025)
+- **`markdown_exfil`** — markdown image/link exfiltration plus `javascript:` and `data:text/html` URI schemes
+- **`mcp_tool_poisoning`** — imperatives, "ignore previous," HTML-comment side-channels in MCP tool descriptors
+- **`many_shot`** — Q/A pair stacks (≥20), turn-marker stacks (≥30), and enumerated `Q1:`/`Question 1:` stacks (≥15) per Anthropic 2024
+- **`prompt_injection`** — 8 hand-curated IOC patterns (ignore-previous, act-as, safety-bypass, system-prompt extraction, etc.)
+- **Obfuscation expansion** — Cyrillic homoglyphs, Base32 chunks (≥32 chars), hex chunks (≥60 chars)
+
+#### New Feed Sources
+
+- **OSV.dev `/v1/querybatch`** with an AI-package allowlist (langchain, transformers, litellm, mlflow, ollama, llama-index, autogen, crewai, langgraph, vllm, sglang, anthropic-sdk-python, openai-python, transformers-js, openai, anthropic)
+- **GHSA GraphQL** `securityVulnerabilities` query with ecosystem filter
+- **MITRE ATLAS v5.4 taxonomy** with 7-day cache and offline fallback table
+- **CISA KEV catalog** with 24h cache and severity escalator (`severity` bumps one level when CVE is KEV-listed; entry receives `inKev: true`)
+- **Hugging Face Hub `securityStatus`** with 6h in-memory cache
+
+#### New Architecture
+
+- **`TasteTesterService`** — dual-agent sandbox detonator with 8 pure-function mock tools, multi-turn loop, structured Monitor verdict, AbortController-driven timeouts, and an `anthropicFactory` injection seam for tests
+- **`TrifectaAnalyzer`** — rule-data-driven capability classifier with three buckets (private-read / untrusted-fetch / external-egress) and per-bucket signal tracing
+- **`AtlasService`**, **`KevFeedService`**, **`OsvFeedService`**, **`GhsaGraphQLService`**, **`HuggingFaceService`**, **`UnifiedCveCache`**, **`CanaryService`**, **`McpToolScanner`**
+- `PatternEntry.atlasTechnique?: string` — optional new field, additive only
+- `evaluatePattern()` shared helper factored out of `StaticCheckService` for use by both the static checker and the MCP-tool scanner
+
+### Changed
+
+- `PatternEntrySchema.source` enum extended with `"ghsa_graphql"` and `"osv"`
+- `VulnFeedResult` gains `perSource: { nvd, ghsaRest, ghsaGraphql, osv }` count breakdown
+- `SkillScanResult` gains `hasLethalTrifecta`, `trifectaResult`, `huggingFaceSecurityFlags`, `huggingFaceReports`, `atlasTechniques[]`
+- `SecurityReport` gains `atlasTechniques[]`
+- Threshold-mode pattern detection now properly honored (previously bypassed by a simple-match path on some entries)
+- Existing patterns regenerated with `atlasTechnique` field on relevant categories
+
+### Test coverage
+
+- **426 assertions / 0 failures across 16 suites** (up from 87 in v1.0.2)
+- 20-sample labeled Taste-Tester corpus in `src/test/fixtures/taste-tester-corpus.json` (20/20 pass against scripted-mock Taster flow; this measures Monitor verdict logic, not real-API predictive accuracy)
+- Mock `fetch` and mock Anthropic SDK helpers in `src/test/helpers/` keep all tests offline by default
+- Curated subset of Garak `promptinject` probes (Apache 2.0; provenance tracked in `PatternEntry.source`) shipped in `patterns/prompt-injection.json` — full adversarial regression baseline against `check_prompt` deferred to v1.2
+
+### Documentation
+
+- New `SPEC.md` — full v1.1 architecture, threat model, tool catalog, feed catalog, sandbox design, verification matrix, risk register
+- New `PLAN.md` — 13-pass vertical-slice execution plan with completed execution log
+- New `RESEARCH_THREATS.md`, `RESEARCH_FEEDS.md` — research notes underpinning the threat-model and feed-source choices
+- `README.md` extended with v1.1.0 tool/feed/env coverage and defense-in-depth disclaimer (existing structure preserved)
+- `SKILLS_SECURITY.md` extended with lethal-trifecta, Hugging Face security signals, and ATLAS taxonomy sections
+
+### Tooling
+
+- `scripts/smoke-v1.1.ts` — end-to-end MCP-client smoke test exercising all 11 tools (5 existing + 6 new). Tolerates network unavailability; non-network paths must pass even offline. Run:
+  ```bash
+  GEMINI_API_KEY=dummy CANARY_HMAC_SECRET=test-secret npx tsx scripts/smoke-v1.1.ts
+  ```
+
+### Configuration (new env vars, all optional with safe defaults)
+
+```env
+# Feeds
+GITHUB_TOKEN=...                  # also used for GHSA GraphQL
+HF_TOKEN=...                      # Hugging Face Hub security signals
+KEV_REFRESH_INTERVAL_HOURS=24
+ATLAS_REFRESH_INTERVAL_HOURS=168
+
+# Taste-Tester (opt-in)
+TASTE_TESTER_ENABLED=false
+TASTE_TESTER_MODEL=claude-sonnet-4-6
+TASTE_TESTER_MAX_TURNS=5
+TASTE_TESTER_MAX_TOKENS=4096
+TASTE_TESTER_TIMEOUT_MS=30000
+ANTHROPIC_API_KEY=...
+
+# Canary
+CANARY_HMAC_SECRET=...            # falls back to PATTERN_INTEGRITY_SECRET if unset
+CANARY_DEFAULT_TTL_SECONDS=86400
+```
+
+### Known limitations / risk register (carried from SPEC §13)
+
+See `SPEC.md` §13.1 for full status of each entry.
+
+- **CVE-2026-2796 (ClaudeBleed)** — `[unverified]` against NVD at release time; documented as runtime-exploit out of scope (project scope is prompts/skills, not Chrome-extension runtime).
+- **MemoryGraft arXiv ID `2512.16962`** — `[unverified]` arXiv ID; cited only for narrative context, no code path depends on the ID.
+- **ATLAS Feb-2026 technique IDs (`AML.T0070`, `AML.T0071`)** — `[unverified]` against live STIX bundle; fallback table tags note this. Real-bundle reconciliation deferred to v1.2.
+- **OWASP LLM Top 10 2026** — still draft; v2025 operative throughout this release.
+- **Taste-Tester `MAX_TURNS=5` default** — uncalibrated against real Anthropic API; scripted-mock baseline 20/20 (scripted, not predictive). Production users should calibrate against their own corpus.
+- **Garak adversarial regression** — full baseline against `check_prompt` not yet recorded; deferred to v1.2.
+
+---
+
 ## [1.0.0] - 2026-01-27
 
 ### 🎉 Initial Release
@@ -166,6 +276,7 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.1.0 | 2026-05-14 | LLM/agentic threat expansion: 6 new MCP tools, 5 new feed sources, Taste-Tester sandbox, lethal-trifecta analyzer |
 | 1.0.2 | 2026-02-08 | Pattern library, vuln feeds, skill scanning, code review fixes |
 | 1.0.1 | 2026-02-01 | MCP publishing setup |
 | 1.0.0 | 2026-01-27 | Initial release with dual-layer detection |
