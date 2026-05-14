@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T01:16:49.008Z",
+  "generatedAt": "2026-05-14T01:21:52.357Z",
   "files": {
     "custom.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -23,8 +23,8 @@
       "patternCount": 1
     },
     "policy-puppetry.json": {
-      "sha256": "3772556c68c799c9029b2f978c16e20db683a97d9dfdf449b473db72889b43fe",
-      "patternCount": 1
+      "sha256": "c6ca2c1fb2c38bd0bba0a906272a7a328713bd7d280735b8a56efff841bc9ce7",
+      "patternCount": 4
     },
     "prompt-injection.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -51,6 +51,6 @@
       "patternCount": 5
     }
   },
-  "rootHash": "10612868d1cb4651463aab2fd0f83675454eb30d0b51f2df3251223812f200b7",
+  "rootHash": "d34c8118ba0749158bf352a4c2da56407a08c4ce769a5c3111d934ff44067e16",
   "signature": ""
 }

@@ -5,7 +5,8 @@ export type StaticCheckCategory =
     | "sqli"
     | "shell_injection"
     | "directory_traversal"
-    | "unicode_smuggling";
+    | "unicode_smuggling"
+    | "policy_puppetry";
 
 export interface StrippedChar {
     index: number;
@@ -18,6 +19,7 @@ export interface StaticCheckResult {
     hasSQLi: boolean;
     hasShellInjection: boolean;
     hasObfuscation: boolean;
+    hasPolicyPuppetry: boolean;
     severity: "low" | "medium" | "high" | "critical";
     categories: StaticCheckCategory[];
     findings: string[];
@@ -148,6 +150,7 @@ export class StaticCheckService {
             hasSQLi: false,
             hasShellInjection: false,
             hasObfuscation: false,
+            hasPolicyPuppetry: false,
         };
 
         for (const [flagGroup, groupPatterns] of groups) {
@@ -208,6 +211,7 @@ export class StaticCheckService {
             hasSQLi: flags.hasSQLi,
             hasShellInjection: flags.hasShellInjection,
             hasObfuscation: flags.hasObfuscation,
+            hasPolicyPuppetry: flags.hasPolicyPuppetry,
             severity,
             categories,
             findings,
@@ -259,6 +263,7 @@ export class StaticCheckService {
             hasSQLi,
             hasShellInjection,
             hasObfuscation: false,
+            hasPolicyPuppetry: false,
             severity,
             categories,
             findings,
