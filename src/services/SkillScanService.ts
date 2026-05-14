@@ -1,6 +1,7 @@
 import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
+import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
 
 export interface SkillScanResult {
     safe: boolean;
@@ -17,6 +18,9 @@ export interface SkillScanResult {
         categories: string[];
         findings: string[];
     };
+    // Pass 5: Lethal-trifecta capability analysis (Willison).
+    hasLethalTrifecta: boolean;
+    trifectaResult: TrifectaResult;
     timestamp: string;
 }
 
@@ -42,11 +46,13 @@ export class SkillScanService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
     private patternService: PatternService | null;
+    private trifectaAnalyzer: TrifectaAnalyzer;
 
     constructor(patternService?: PatternService) {
         this.patternService = patternService ?? null;
         this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService(patternService);
+        this.trifectaAnalyzer = new TrifectaAnalyzer();
     }
 
     async scanSkill(skillContent: string): Promise<SkillScanResult> {
@@ -55,6 +61,9 @@ export class SkillScanService {
             Promise.resolve(this.staticCheckService.check(skillContent)),
             Promise.resolve(this.runSkillSpecificChecks(skillContent))
         ]);
+
+        // Pass 5: lethal-trifecta capability classification (sync, cheap).
+        const trifectaResult = this.trifectaAnalyzer.analyze({ skillContent });
 
         // Aggregate severity
         const geminiSevIdx = SEVERITIES.indexOf(geminiResult.severity);
@@ -87,6 +96,8 @@ export class SkillScanService {
             skillSpecific: skillSpecificResult,
             gemini: geminiResult,
             static: staticResult,
+            hasLethalTrifecta: trifectaResult.trifectaPresent,
+            trifectaResult,
             timestamp: new Date().toISOString()
         };
     }

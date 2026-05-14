@@ -163,6 +163,11 @@ export class PromptRejectorMCPServer {
                                     items: { type: "string" },
                                     description: "Optional list of capability strings (e.g., tool names).",
                                 },
+                                tools: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Optional list of tool names declared by the skill/agent.",
+                                },
                                 skillContent: {
                                     type: "string",
                                     description: "Optional raw SKILL.md content to analyze.",
@@ -317,8 +322,12 @@ export class PromptRejectorMCPServer {
             }
 
             if (name === "check_lethal_trifecta") {
-                const { capabilities, skillContent } = (args || {}) as { capabilities?: string[]; skillContent?: string };
-                const result = this.trifectaAnalyzer.analyze({ capabilities, skillContent });
+                const { capabilities, tools, skillContent } = (args || {}) as {
+                    capabilities?: string[];
+                    tools?: string[];
+                    skillContent?: string;
+                };
+                const result = this.trifectaAnalyzer.analyze({ capabilities, tools, skillContent });
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
