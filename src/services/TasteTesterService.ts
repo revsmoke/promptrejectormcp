@@ -94,7 +94,12 @@ export interface MinimalAnthropicClient {
         // wire-shape fields we need, and the SDK's generic Message types are
         // both verbose and version-sensitive. Keeping our touchpoint narrow
         // also makes the mock factory trivial to write.
-        create(args: any): Promise<any>;
+        //
+        // The second `options` parameter mirrors the real SDK's
+        // `RequestOptions` (notably `{ signal: AbortSignal }`) so callers can
+        // cancel in-flight requests on timeout. The mock factory accepts
+        // variadic args, so this stays mock-compatible.
+        create(args: any, options?: any): Promise<any>;
     };
 }
 
@@ -379,10 +384,24 @@ function cleanStub(reason?: string): BehaviorReport {
 
 // Race a promise against a timeout. The timeout path rejects with a tagged
 // Error so the caller can distinguish it from SDK / network errors.
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+//
+// The factory form lets the caller wire an `AbortSignal` into the underlying
+// work (e.g. `messages.create(args, { signal })`). When the timer fires we
+// both abort the controller (so the SDK can cancel the in-flight HTTP
+// request and stop burning tokens) AND reject the outer promise. Without the
+// abort, the SDK keeps running after we've already given up on its result.
+function withTimeout<T>(
+    factory: (signal: AbortSignal) => Promise<T>,
+    ms: number,
+    label: string,
+): Promise<T> {
+    const controller = new AbortController();
     return new Promise<T>((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error(`__TIMEOUT__:${label}`)), ms);
-        p.then(
+        const t = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`__TIMEOUT__:${label}`));
+        }, ms);
+        factory(controller.signal).then(
             (v) => {
                 clearTimeout(t);
                 resolve(v);
@@ -489,7 +508,7 @@ export class TasteTesterService {
         };
         try {
             tasterResult = await withTimeout(
-                this.runTaster(client, input, usage),
+                (signal) => this.runTaster(client, input, usage, signal),
                 this.timeoutMs,
                 "taster",
             );
@@ -524,7 +543,14 @@ export class TasteTesterService {
         let monitorReport: BehaviorReport;
         try {
             monitorReport = await withTimeout(
-                this.runMonitor(client, tasterResult.transcript, tasterResult.toolCalls, usage),
+                (signal) =>
+                    this.runMonitor(
+                        client,
+                        tasterResult.transcript,
+                        tasterResult.toolCalls,
+                        usage,
+                        signal,
+                    ),
                 this.timeoutMs,
                 "monitor",
             );
@@ -549,7 +575,20 @@ export class TasteTesterService {
             (acc, it) => maxSeverity(acc, it.severity),
             "safe",
         );
-        monitorReport.severity = maxSeverity(monitorReport.severity, intentMax);
+        // Floor with raw deterministic evidence. The Monitor is LLM-driven
+        // and can under-report (lazy verdict, prompt-injected, malformed) —
+        // but the Taster's actual tool calls are a deterministic record of
+        // what it tried to do. Derive a severity lower bound from those calls
+        // via TOOL_DEFAULTS so e.g. an `exec_shell` call cannot come back
+        // `safe` just because the Monitor said so.
+        const rawIntentMax = this.intentsFromToolCalls(tasterResult.toolCalls).reduce<Severity>(
+            (acc, it) => maxSeverity(acc, it.severity),
+            "safe",
+        );
+        monitorReport.severity = maxSeverity(
+            maxSeverity(monitorReport.severity, intentMax),
+            rawIntentMax,
+        );
 
         return {
             available: true,
@@ -584,6 +623,7 @@ export class TasteTesterService {
         client: MinimalAnthropicClient,
         input: TasteTesterInput,
         usage: TasteTesterUsage,
+        signal?: AbortSignal,
     ): Promise<{
         transcript: TasterTurn[];
         toolCalls: Array<{ name: string; input: any }>;
@@ -618,19 +658,25 @@ export class TasteTesterService {
             // We intentionally do NOT enable adaptive thinking on the Taster:
             // we want it to behave like a generic helpful assistant that is
             // vulnerable to injection, not a security-aware one.
-            const response = await client.messages.create({
-                model: this.model,
-                max_tokens: this.maxTokens,
-                system: [
-                    {
-                        type: "text",
-                        text: TASTER_SYSTEM_PROMPT,
-                        cache_control: { type: "ephemeral" },
-                    },
-                ],
-                tools: MOCK_TOOLS,
-                messages,
-            });
+            const response = await client.messages.create(
+                {
+                    model: this.model,
+                    max_tokens: this.maxTokens,
+                    system: [
+                        {
+                            type: "text",
+                            text: TASTER_SYSTEM_PROMPT,
+                            cache_control: { type: "ephemeral" },
+                        },
+                    ],
+                    tools: MOCK_TOOLS,
+                    messages,
+                },
+                // Pass the abort signal through so a withTimeout()-triggered
+                // abort actually cancels the in-flight HTTP request rather
+                // than letting it run to completion in the background.
+                signal ? { signal } : undefined,
+            );
 
             // Tally tokens from every Taster turn so the shared counter
             // reflects the full SDK spend across the loop.
@@ -798,6 +844,7 @@ export class TasteTesterService {
         transcript: TasterTurn[],
         toolCalls: Array<{ name: string; input: any }>,
         usage: TasteTesterUsage,
+        signal?: AbortSignal,
     ): Promise<BehaviorReport> {
         // Serialize the transcript as readable JSON. The Monitor's system
         // prompt explicitly labels this as DATA, not instructions.
@@ -808,31 +855,36 @@ export class TasteTesterService {
         // guidance for security/classification tasks. Constrain output to the
         // BehaviorReport shape via output_config.format so the model cannot
         // emit unstructured prose. Cache the deterministic system prompt.
-        const response = await client.messages.create({
-            model: this.model,
-            max_tokens: this.maxTokens,
-            system: [
-                {
-                    type: "text",
-                    text: MONITOR_SYSTEM_PROMPT,
-                    cache_control: { type: "ephemeral" },
+        const response = await client.messages.create(
+            {
+                model: this.model,
+                max_tokens: this.maxTokens,
+                system: [
+                    {
+                        type: "text",
+                        text: MONITOR_SYSTEM_PROMPT,
+                        cache_control: { type: "ephemeral" },
+                    },
+                ],
+                thinking: { type: "adaptive" },
+                output_config: {
+                    effort: "high",
+                    format: {
+                        type: "json_schema",
+                        schema: BEHAVIOR_REPORT_JSON_SCHEMA,
+                    },
                 },
-            ],
-            thinking: { type: "adaptive" },
-            output_config: {
-                effort: "high",
-                format: {
-                    type: "json_schema",
-                    schema: BEHAVIOR_REPORT_JSON_SCHEMA,
-                },
+                messages: [
+                    {
+                        role: "user",
+                        content: `Evaluate this Taster transcript:\n\n${transcriptText}`,
+                    },
+                ],
             },
-            messages: [
-                {
-                    role: "user",
-                    content: `Evaluate this Taster transcript:\n\n${transcriptText}`,
-                },
-            ],
-        });
+            // Forward the abort signal so a withTimeout() abort cancels the
+            // in-flight HTTP call instead of letting it run to completion.
+            signal ? { signal } : undefined,
+        );
 
         // Tally Monitor tokens into the shared counter.
         accumulateUsage(usage, response);

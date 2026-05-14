@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { PatternService } from "../services/PatternService.js";
+import { evaluatePattern } from "../services/StaticCheckService.js";
+import type { ActivePattern } from "../services/PatternService.js";
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, cpSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -320,6 +322,76 @@ async function runTests() {
         assert(svc.isFallbackActive(), "Should use fallback when directory doesn't exist");
         const all = svc.list();
         assert(all.length === 10, `Expected 10 fallback patterns, got ${all.length}`);
+    }
+
+    // Test 14: evaluatePattern resets lastIndex on global regexes so repeated calls
+    // against the same cached ActivePattern instance stay deterministic. Regression
+    // guard for the McpToolScanner / batch-scan path which reuses one regex across
+    // many input strings.
+    console.log("Test 14: evaluatePattern is lastIndex-safe across repeated calls");
+    {
+        // Simple-mode global regex — without the reset, the SECOND .test() call would
+        // start at lastIndex past the first match and incorrectly return false.
+        const simplePattern: ActivePattern = {
+            entry: {
+                id: "test-lastindex-simple",
+                name: "lastIndex simple guard",
+                pattern: "needle",
+                flags: "gi",
+                severity: "low",
+                category: "xss",
+                flagGroup: "hasXSS",
+                scope: "general",
+                detection: { mode: "simple" },
+                enabled: true,
+                cveRefs: [],
+                dateAdded: "2026-05-14",
+                whitelistedDomains: [],
+            } as any,
+            regex: new RegExp("needle", "gi"),
+        };
+        const text = "haystack needle haystack";
+        const first = evaluatePattern(text, simplePattern);
+        const second = evaluatePattern(text, simplePattern);
+        assert(first.matched === true, "Simple-mode: first call matches");
+        assert(second.matched === true, "Simple-mode: second call still matches (lastIndex reset)");
+
+        // Threshold-mode global regex — without the reset, matchAll() iterates from
+        // the polluted lastIndex and under-counts on the second call.
+        const thresholdPattern: ActivePattern = {
+            entry: {
+                id: "test-lastindex-threshold",
+                name: "lastIndex threshold guard",
+                pattern: "x",
+                flags: "g",
+                severity: "low",
+                category: "obfuscation",
+                flagGroup: "hasObfuscation",
+                scope: "general",
+                detection: { mode: "threshold", countThreshold: 3 },
+                enabled: true,
+                cveRefs: [],
+                dateAdded: "2026-05-14",
+                whitelistedDomains: [],
+            } as any,
+            regex: new RegExp("x", "g"),
+        };
+        const xxx = "xxxxx";
+        const t1 = evaluatePattern(xxx, thresholdPattern);
+        const t2 = evaluatePattern(xxx, thresholdPattern);
+        assert(t1.matchCount === 5, `Threshold first call counts 5, got ${t1.matchCount}`);
+        assert(t2.matchCount === 5, `Threshold second call still counts 5, got ${t2.matchCount}`);
+        assert(t1.matched && t2.matched, "Both threshold calls cross the threshold");
+
+        // Cross-text reuse: shared regex instance across two different texts must
+        // still detect both. This mirrors the McpToolScanner.walkStrings loop.
+        const reusable: ActivePattern = {
+            entry: simplePattern.entry,
+            regex: new RegExp("needle", "gi"),
+        };
+        const a = evaluatePattern("alpha needle omega", reusable);
+        const b = evaluatePattern("beta needle gamma", reusable);
+        assert(a.matched && b.matched, "Cross-text reuse: both calls match (no pollution)");
     }
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

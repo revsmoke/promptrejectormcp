@@ -241,7 +241,18 @@ async function runTests() {
                 let threw = false;
                 let msg = "";
                 try {
-                    await svc.refresh();
+                    // Hard outer guard: if the service's timeoutMs:1 path
+                    // regresses and refresh() never settles, fail fast with a
+                    // diagnostic message instead of hanging the runner.
+                    await Promise.race([
+                        svc.refresh(),
+                        new Promise<never>((_, reject) =>
+                            setTimeout(
+                                () => reject(new Error("test hard guard timeout (2000ms)")),
+                                2000,
+                            ),
+                        ),
+                    ]);
                 } catch (e: any) {
                     threw = true;
                     msg = e?.message || String(e);

@@ -91,11 +91,20 @@ export function evaluatePattern(text: string, pattern: ActivePattern): { matched
         const globalRegex = regex.flags.includes("g")
             ? regex
             : new RegExp(regex.source, regex.flags + "g");
+        // why: ActivePattern.regex is cached at load-time and reused across every
+        // evaluatePattern() call. If a prior call (or any external code) left
+        // lastIndex non-zero on a global regex, matchAll() would start mid-string
+        // and silently skip earlier matches. Reset before iterating to guarantee
+        // deterministic detection regardless of call order.
+        globalRegex.lastIndex = 0;
         const count = [...text.matchAll(globalRegex)].length;
         return { matched: count >= entry.detection.countThreshold, matchCount: count };
     }
-    // Simple-mode: a single hit is enough. Use a fresh regex if we need to also
-    // know the match count without lastIndex side effects.
+    // why: .test() on a g-/y-flagged regex advances lastIndex, so the next call on
+    // the same cached instance starts searching from that offset and can miss a
+    // match that is *before* the previous hit. Reset to 0 to make repeated calls
+    // on the shared instance deterministic. No-op on non-sticky/non-global regexes.
+    regex.lastIndex = 0;
     const matched = regex.test(text);
     return { matched, matchCount: matched ? 1 : 0 };
 }
