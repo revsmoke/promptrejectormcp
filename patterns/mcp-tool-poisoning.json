@@ -4,87 +4,102 @@
     {
       "id": "mcp-imperative-must",
       "name": "MCP tool imperative directive to model",
-      "description": "Imperative directives to the model inside a tool description — classic prompt-injection vector for tool poisoning",
+      "description": "Imperative directives to the model inside a tool description — classic prompt-injection vector for tool poisoning [unverified ATLAS technique — pending verification]",
       "pattern": "\\b(you must|you should|always use this|the user actually wants|the user really wants|the model must|the assistant must)\\b",
       "flags": "gi",
       "severity": "high",
       "category": "mcp_tool_poisoning",
       "flagGroup": "hasToolPoisoning",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0070"
     },
     {
       "id": "mcp-ignore-previous",
       "name": "MCP tool ignore-previous directive",
-      "description": "Tool metadata instructing the model to ignore previous instructions",
+      "description": "Tool metadata instructing the model to ignore previous instructions [unverified ATLAS technique — pending verification]",
       "pattern": "\\b(ignore|disregard|forget|override)\\b[\\s\\S]{0,50}\\b(previous|prior|above|earlier|all)\\b",
       "flags": "gi",
       "severity": "critical",
       "category": "mcp_tool_poisoning",
       "flagGroup": "hasToolPoisoning",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0070"
     },
     {
       "id": "mcp-hidden-html-comment",
       "name": "MCP tool hidden HTML comment",
-      "description": "HTML comment inside tool description — covert instruction channel",
+      "description": "HTML comment inside tool description — covert instruction channel [unverified ATLAS technique — pending verification]",
       "pattern": "<!--[\\s\\S]{0,500}?-->",
       "flags": "g",
       "severity": "critical",
       "category": "mcp_tool_poisoning",
       "flagGroup": "hasToolPoisoning",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0070"
     },
     {
       "id": "mcp-priority-stealth",
       "name": "MCP tool priority/stealth claim",
-      "description": "Tool claims priority/precedence or instructs concealment — supply-chain attack signature",
+      "description": "Tool claims priority/precedence or instructs concealment — supply-chain attack signature [unverified ATLAS technique — pending verification]",
       "pattern": "\\b(call this (tool|function) (first|before)|use this (tool|function) (instead|first)|prefer (this )?tool|priority\\s*=\\s*\\d|do not (mention|tell|reveal|disclose))\\b",
       "flags": "gi",
       "severity": "high",
       "category": "mcp_tool_poisoning",
       "flagGroup": "hasToolPoisoning",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0070"
     },
     {
       "id": "mcp-authority-claim",
       "name": "MCP tool authority/role claim",
-      "description": "Tool description claims elevated authority/role",
+      "description": "Tool description claims elevated authority/role [unverified ATLAS technique — pending verification]",
       "pattern": "\\b(as\\s+(an?\\s+)?(admin|administrator|root|superuser|developer|system)|on behalf of (the )?(user|admin|system)|with elevated (privileges|permissions))\\b",
       "flags": "gi",
       "severity": "high",
       "category": "mcp_tool_poisoning",
       "flagGroup": "hasToolPoisoning",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0070"
     }
   ]
 }

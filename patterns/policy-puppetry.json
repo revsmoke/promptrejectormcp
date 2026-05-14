@@ -11,12 +11,15 @@
       "category": "policy_puppetry",
       "flagGroup": "hasPolicyPuppetry",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     },
     {
       "id": "policy-puppetry-ini-section",
@@ -28,12 +31,15 @@
       "category": "policy_puppetry",
       "flagGroup": "hasPolicyPuppetry",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     },
     {
       "id": "policy-puppetry-json-role",
@@ -45,12 +51,15 @@
       "category": "policy_puppetry",
       "flagGroup": "hasPolicyPuppetry",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     },
     {
       "id": "policy-puppetry-yaml-policy",
@@ -62,12 +71,15 @@
       "category": "policy_puppetry",
       "flagGroup": "hasPolicyPuppetry",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     }
   ]
 }

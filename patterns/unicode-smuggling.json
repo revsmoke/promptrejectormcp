@@ -11,12 +11,16 @@
       "category": "unicode_smuggling",
       "flagGroup": "hasObfuscation",
       "scope": "general",
-      "detection": { "mode": "threshold", "countThreshold": 1 },
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 1
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "unicode-zero-width",
@@ -28,12 +32,16 @@
       "category": "unicode_smuggling",
       "flagGroup": "hasObfuscation",
       "scope": "general",
-      "detection": { "mode": "threshold", "countThreshold": 3 },
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 3
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "unicode-bidi-override",
@@ -45,12 +53,16 @@
       "category": "unicode_smuggling",
       "flagGroup": "hasObfuscation",
       "scope": "general",
-      "detection": { "mode": "threshold", "countThreshold": 1 },
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 1
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     }
   ]
 }

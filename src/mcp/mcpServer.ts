@@ -42,11 +42,21 @@ export class PromptRejectorMCPServer {
         this.patternService = new PatternService();
         this.securityService = new SecurityService(this.patternService);
         this.skillScanService = new SkillScanService(this.patternService);
-        this.vulnFeedService = new VulnFeedService(this.patternService);
         this.atlasService = new AtlasService();
         this.osvFeedService = new OsvFeedService();
         this.ghsaGraphQLService = new GhsaGraphQLService();
         this.kevFeedService = new KevFeedService();
+        // Pass 7: wire ATLAS + KEV into VulnFeedService so candidates pick up
+        // taxonomy tags and KEV-escalated severity at staging time.
+        this.vulnFeedService = new VulnFeedService(
+            this.patternService,
+            undefined,
+            undefined,
+            this.osvFeedService,
+            this.ghsaGraphQLService,
+            this.atlasService,
+            this.kevFeedService,
+        );
         this.huggingFaceService = new HuggingFaceService();
         this.trifectaAnalyzer = new TrifectaAnalyzer();
         this.canaryService = new CanaryService();

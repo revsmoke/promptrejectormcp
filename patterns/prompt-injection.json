@@ -11,12 +11,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "instruction-override-act-as",
@@ -28,12 +31,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "system-prompt-leak",
@@ -45,12 +51,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "untrusted-content-instruction",
@@ -62,12 +71,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "safety-bypass-claim",
@@ -79,12 +91,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "markdown-comment-injection",
@@ -96,12 +111,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "prompt-injection-payload-prefix",
@@ -113,12 +131,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     },
     {
       "id": "tool-result-spoofing",
@@ -130,12 +151,15 @@
       "category": "prompt_injection",
       "flagGroup": "hasPromptInjection",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
     }
   ]
 }

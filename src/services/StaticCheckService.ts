@@ -30,6 +30,12 @@ export interface StaticCheckResult {
     // Populated when Unicode smuggling characters are stripped/detected.
     // Allows callers to surface evidence to operators without re-scanning input.
     strippedChars?: StrippedChar[];
+    /**
+     * Pass 7: MITRE ATLAS technique IDs attached to matched patterns (deduped).
+     * Empty when no matched pattern declared `atlasTechnique`. Web vulns
+     * (xss/sqli/shell) pre-date ATLAS and stay unset by design.
+     */
+    atlasTechniques: string[];
 }
 
 // Returns fresh RegExp instances to avoid lastIndex pollution from global regexes
@@ -160,6 +166,7 @@ export class StaticCheckService {
     private checkWithPatternService(input: string): StaticCheckResult {
         const findings: string[] = [];
         const categories: StaticCheckCategory[] = [];
+        const atlasTechniques: string[] = [];
         let severity: "low" | "medium" | "high" | "critical" = "low";
 
         const patterns = this.patternService!.getActivePatterns("general");
@@ -198,6 +205,12 @@ export class StaticCheckService {
                     const cat = entry.category as StaticCheckCategory;
                     if (!categories.includes(cat)) {
                         categories.push(cat);
+                    }
+
+                    // Pass 7: surface MITRE ATLAS technique tag if the pattern has one.
+                    // Deduped so a category with multiple matching patterns reports once.
+                    if (entry.atlasTechnique && !atlasTechniques.includes(entry.atlasTechnique)) {
+                        atlasTechniques.push(entry.atlasTechnique);
                     }
 
                     if (severityIdx(entry.severity) > severityIdx(severity)) {
@@ -239,6 +252,7 @@ export class StaticCheckService {
             categories,
             findings,
             strippedChars: strippedChars.length > 0 ? strippedChars : undefined,
+            atlasTechniques,
         };
     }
 
@@ -292,6 +306,8 @@ export class StaticCheckService {
             severity,
             categories,
             findings,
+            // Hardcoded path covers pre-ATLAS web vulns only — no ATLAS mapping.
+            atlasTechniques: [],
         };
     }
 }

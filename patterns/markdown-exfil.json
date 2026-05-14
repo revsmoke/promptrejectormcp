@@ -11,12 +11,15 @@
       "category": "markdown_exfil",
       "flagGroup": "hasMarkdownExfil",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
     },
     {
       "id": "markdown-javascript-uri",
@@ -28,12 +31,15 @@
       "category": "markdown_exfil",
       "flagGroup": "hasMarkdownExfil",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
     },
     {
       "id": "markdown-data-html-uri",
@@ -45,12 +51,15 @@
       "category": "markdown_exfil",
       "flagGroup": "hasMarkdownExfil",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
     },
     {
       "id": "html-img-exfil-query",
@@ -62,12 +71,15 @@
       "category": "markdown_exfil",
       "flagGroup": "hasMarkdownExfil",
       "scope": "general",
-      "detection": { "mode": "simple" },
+      "detection": {
+        "mode": "simple"
+      },
       "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
     }
   ]
 }

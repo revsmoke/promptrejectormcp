@@ -5,6 +5,8 @@ import { PatternService } from "./PatternService.js";
 import { GeminiService } from "./GeminiService.js";
 import { OsvFeedService, type OsvVuln } from "./OsvFeedService.js";
 import { GhsaGraphQLService, type GhsaAdvisory } from "./GhsaGraphQLService.js";
+import { AtlasService } from "./AtlasService.js";
+import { KevFeedService } from "./KevFeedService.js";
 import { AI_PACKAGE_ALLOWLIST, ECOSYSTEMS_FOR_GHSA } from "./aiPackageAllowlist.js";
 import type { PatternEntry } from "../schemas/PatternSchemas.js";
 
@@ -19,6 +21,10 @@ interface StagedCandidate {
     cveId: string;
     source: "nvd" | "github_advisory" | "ghsa_graphql" | "osv";
     generatedAt: string;
+    /** True when cveId appears in CISA KEV; severity is bumped one level before set. */
+    inKev?: boolean;
+    /** MITRE ATLAS technique ID heuristically assigned from category. */
+    atlasTechnique?: string;
 }
 
 interface StagingFile {
@@ -92,6 +98,8 @@ export class VulnFeedService {
     private geminiService: GeminiService | null;
     private osvFeedService: OsvFeedService;
     private ghsaGraphqlService: GhsaGraphQLService;
+    private atlasService: AtlasService;
+    private kevFeedService: KevFeedService;
     private stagingPath: string;
     private githubToken: string | null;
     private nvdApiKey: string | null;
@@ -104,6 +112,8 @@ export class VulnFeedService {
         patternsDir?: string,
         osvFeedService?: OsvFeedService,
         ghsaGraphqlService?: GhsaGraphQLService,
+        atlasService?: AtlasService,
+        kevFeedService?: KevFeedService,
     ) {
         this.patternService = patternService;
         // Lazy: only create GeminiService if provided or API key is available
@@ -117,6 +127,8 @@ export class VulnFeedService {
 
         this.osvFeedService = osvFeedService || new OsvFeedService();
         this.ghsaGraphqlService = ghsaGraphqlService || new GhsaGraphQLService();
+        this.atlasService = atlasService || new AtlasService();
+        this.kevFeedService = kevFeedService || new KevFeedService();
 
         this.githubToken = process.env.GITHUB_TOKEN || null;
         this.nvdApiKey = process.env.NVD_API_KEY || null;
@@ -154,6 +166,18 @@ export class VulnFeedService {
             errors: [],
             perSource: { nvd: 0, ghsaRest: 0, ghsaGraphql: 0, osv: 0 },
         };
+
+        // Pass 7: refresh ATLAS taxonomy + CISA KEV catalog before mining vulns.
+        // Both are best-effort — we log failures and fall back to cache / built-in
+        // table rather than aborting the whole feed run.
+        await Promise.allSettled([
+            this.atlasService.refresh().catch((err) => {
+                console.error("[VulnFeedService] ATLAS refresh failed:", err?.message || err);
+            }),
+            this.kevFeedService.refresh().catch((err) => {
+                console.error("[VulnFeedService] KEV refresh failed:", err?.message || err);
+            }),
+        ]);
 
         // Fetch from all four sources in parallel via allSettled — one failure
         // shouldn't kill the rest. Each branch returns its own typed payload.
@@ -203,6 +227,7 @@ export class VulnFeedService {
                     ) {
                         continue;
                     }
+                    this.enrichCandidate(candidate);
                     staging.candidates.push(candidate);
                     existingStagedPatterns.add(candidate.pattern);
                     existingStagedIds.add(candidate.id);
@@ -221,6 +246,7 @@ export class VulnFeedService {
         for (const v of osvVulns) {
             const cand = this.osvVulnToCandidate(v);
             if (cand && !existingStagedIds.has(cand.id)) {
+                this.enrichCandidate(cand);
                 staging.candidates.push(cand);
                 existingStagedIds.add(cand.id);
                 result.patternsGenerated++;
@@ -229,6 +255,7 @@ export class VulnFeedService {
         for (const a of ghsaGqlVulns) {
             const cand = this.ghsaAdvisoryToCandidate(a);
             if (cand && !existingStagedIds.has(cand.id)) {
+                this.enrichCandidate(cand);
                 staging.candidates.push(cand);
                 existingStagedIds.add(cand.id);
                 result.patternsGenerated++;
@@ -321,6 +348,52 @@ export class VulnFeedService {
             source: "ghsa_graphql",
             generatedAt: new Date().toISOString(),
         };
+    }
+
+    /**
+     * Pass 7: enrich a staged candidate with KEV-escalated severity and an ATLAS
+     * technique tag. Mutates the candidate in place. Called before the candidate
+     * is pushed onto staging.
+     *
+     * KEV escalator: if the CVE is on CISA's Known Exploited Vulnerabilities
+     * list, we bump severity by one level. This signals "stop and review" —
+     * a regex candidate against a KEV-listed CVE should be promoted with care.
+     *
+     * ATLAS tag: heuristic only at this stage. ai_supply_chain candidates map
+     * to AML.T0070 (Publish Poisoned AI Agent Tool). Pass 9's query_cve can
+     * refine this with real STIX data once cached.
+     */
+    private enrichCandidate(c: StagedCandidate): void {
+        // KEV escalation.
+        if (c.cveId && this.kevFeedService.isInKev(c.cveId)) {
+            c.inKev = true;
+            c.severity = this.bumpSeverity(c.severity);
+        }
+        // ATLAS heuristic. Web-vuln categories (xss/sqli/shell/ssrf/traversal)
+        // pre-date ATLAS — we leave them unset rather than force a bad mapping.
+        if (c.category === "ai_supply_chain") {
+            c.atlasTechnique = "AML.T0070";
+        }
+    }
+
+    /**
+     * Single-step severity bump used by the KEV escalator. low→medium→high→
+     * critical→critical (clamped at top). Centralized so query_cve in Pass 9
+     * can reuse the same ladder.
+     */
+    private bumpSeverity(sev: string): string {
+        switch (sev.toLowerCase()) {
+            case "low":
+                return "medium";
+            case "medium":
+                return "high";
+            case "high":
+                return "critical";
+            case "critical":
+                return "critical";
+            default:
+                return sev;
+        }
     }
 
     /** Map OSV severity array to our 4-level scale. Best-effort; defaults to medium. */

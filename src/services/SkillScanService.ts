@@ -17,10 +17,13 @@ export interface SkillScanResult {
         severity: "low" | "medium" | "high" | "critical";
         categories: string[];
         findings: string[];
+        atlasTechniques?: string[];
     };
     // Pass 5: Lethal-trifecta capability analysis (Willison).
     hasLethalTrifecta: boolean;
     trifectaResult: TrifectaResult;
+    /** Pass 7: Aggregated MITRE ATLAS technique IDs across all sub-checks. */
+    atlasTechniques: string[];
     timestamp: string;
 }
 
@@ -40,6 +43,28 @@ const SEVERITIES: readonly ("low" | "medium" | "high" | "critical")[] = ["low", 
 
 function severityIdx(s: string): number {
     return SEVERITIES.indexOf(s as any);
+}
+
+/**
+ * Pass 7: map Gemini's category vocabulary to MITRE ATLAS technique IDs.
+ * Mirrors SPEC §7. Categories that pre-date ATLAS or aren't AI-specific
+ * (xss, sqli, shell, social_engineering, multilingual) are intentionally
+ * absent — we'd rather report no tag than a misleading one.
+ */
+export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
+    const map: Record<string, string> = {
+        unicode_smuggling: "AML.T0051",
+        policy_puppetry: "AML.T0054",
+        markdown_exfil: "AML.T0024",
+        prompt_injection: "AML.T0051",
+        obfuscation: "AML.T0051",
+    };
+    const out = new Set<string>();
+    for (const c of categories) {
+        const id = map[c];
+        if (id) out.add(id);
+    }
+    return Array.from(out);
 }
 
 export class SkillScanService {
@@ -88,6 +113,13 @@ export class SkillScanService {
 
         const safe = !isDangerous;
 
+        // Pass 7: aggregate ATLAS techniques across static + Gemini (skill-specific
+        // checks don't carry pattern entries today; future ATLAS hooks can fold in here).
+        const atlasTechniques = Array.from(new Set([
+            ...(staticResult.atlasTechniques || []),
+            ...mapGeminiCategoriesToAtlas(geminiResult.categories || []),
+        ]));
+
         return {
             safe,
             geminiConfidence: geminiResult.confidence,
@@ -98,6 +130,7 @@ export class SkillScanService {
             static: staticResult,
             hasLethalTrifecta: trifectaResult.trifectaPresent,
             trifectaResult,
+            atlasTechniques,
             timestamp: new Date().toISOString()
         };
     }

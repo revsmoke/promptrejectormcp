@@ -33,6 +33,12 @@ export const PatternEntrySchema = z.object({
     dateAdded: z.string(),
     /** Informational only — whitelisting is baked into regex negative lookaheads, not enforced at runtime */
     whitelistedDomains: z.array(z.string()).default([]),
+    /**
+     * MITRE ATLAS technique ID (e.g. "AML.T0051" LLM Prompt Injection). Optional —
+     * not every pattern maps to ATLAS (xss/sqli/shell are pre-ATLAS web vulns).
+     * Format: AML.[T|M]NNNN (T = technique, M = mitigation).
+     */
+    atlasTechnique: z.string().regex(/^AML\.[TM][0-9]{4}$/).optional(),
 });
 
 export type PatternEntry = z.infer<typeof PatternEntrySchema>;
