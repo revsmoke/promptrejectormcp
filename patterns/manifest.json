@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T01:07:46.104Z",
+  "generatedAt": "2026-05-14T01:16:49.008Z",
   "files": {
     "custom.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -43,14 +43,14 @@
       "patternCount": 5
     },
     "unicode-smuggling.json": {
-      "sha256": "4e3feee9aef9460bc9af5f5afecb81e50718c999fba1c605b353f203486b3a06",
-      "patternCount": 1
+      "sha256": "9ce0d4a8e6395e3d8cb53081e9e447697af3532bdae4ab16eaa0bea4b0ff8ccc",
+      "patternCount": 3
     },
     "xss.json": {
       "sha256": "3f49de1b9fb221eeedb7992c546c7eda1aade469927ddea4f1e8f97a8c4c2956",
       "patternCount": 5
     }
   },
-  "rootHash": "a43e7674ecf0b6034de68badb031b0d2f61401b63c8a3ee341126c7551520865",
+  "rootHash": "10612868d1cb4651463aab2fd0f83675454eb30d0b51f2df3251223812f200b7",
   "signature": ""
 }
