@@ -1,6 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
 import { TasteTesterService } from "../services/TasteTesterService.js";
 import { createMockAnthropic, textResponse, toolUseResponse } from "./helpers/mockAnthropic.js";
 
@@ -215,6 +219,285 @@ async function runTests() {
             "monitorVerdict is suspicious on timeout",
         );
         assert(elapsed < 500, `returned within ~500ms (actual: ${elapsed}ms)`);
+    }
+
+    // ---------------- Pass 11b additions ----------------
+
+    // Test A — Runaway protection: 100 tool_use responses queued; loop must
+    // stop within maxTurns SDK calls, and result reports truncation.
+    console.log("Test A: Runaway protection (HARD_CAP_11A removed)");
+    {
+        // Queue 100 tool_use responses + a defensive monitor JSON. The loop
+        // should cut off long before exhausting the queue.
+        const responses: any[] = [];
+        for (let i = 0; i < 100; i++) {
+            responses.push(toolUseResponse("fetch_url", { url: `https://x.com/${i}` }, `toolu_${i}`));
+        }
+        responses.push(
+            monitorJson({
+                intents: [],
+                monitorVerdict: "suspicious",
+                monitorRationale: "Taster exceeded maxTurns",
+                severity: "medium",
+            }),
+        );
+        const mock = createMockAnthropic(responses);
+        const svc = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            maxTurns: 3,
+            anthropicFactory: mock.factory,
+        });
+        const res = await svc.run({ prompt: "loop forever", mode: "thorough" });
+        assert(res.available === true, "available is true on runaway");
+        // Taster calls should be at most maxTurns (3). Plus 1 Monitor call.
+        assert(
+            mock.calls.length <= 4,
+            `Taster + Monitor calls capped (actual: ${mock.calls.length})`,
+        );
+        assert(res.timings?.truncated === true, "result reports truncation");
+    }
+
+    // Test B — Full tool surface: each of the 8 tools, single-turn, asserts
+    // routeMockTool returns non-empty synthetic data and intent fallback
+    // records the right action.
+    console.log("Test B: Full tool surface (8 tools)");
+    {
+        const tools: Array<{ name: string; input: any }> = [
+            { name: "fetch_url", input: { url: "https://example.com" } },
+            { name: "read_file", input: { path: "/tmp/foo.txt" } },
+            { name: "exec_shell", input: { command: "ls" } },
+            { name: "send_email", input: { to: "a@b.com", subject: "s", body: "b" } },
+            { name: "transfer_funds", input: { account: "1234", amount: 100 } },
+            { name: "navigate_browser", input: { url: "https://example.com" } },
+            { name: "write_memory", input: { key: "k", value: "v" } },
+            { name: "query_database", input: { sql: "SELECT 1" } },
+        ];
+        for (const tool of tools) {
+            const mock = createMockAnthropic([
+                toolUseResponse(tool.name, tool.input, `toolu_${tool.name}`),
+                textResponse("done"),
+                // Monitor returns malformed — forces fallback intent extraction
+                // so we validate the per-tool defaults.
+                textResponse("not json"),
+            ]);
+            const svc = new TasteTesterService({
+                enabled: true,
+                apiKey: "test-key",
+                anthropicFactory: mock.factory,
+            });
+            const res = await svc.run({ prompt: `use ${tool.name}` });
+            assert(res.available === true, `${tool.name}: result available`);
+            assert(
+                res.behaviorReport.intents.length === 1,
+                `${tool.name}: fallback yielded 1 intent`,
+            );
+            assert(
+                res.behaviorReport.intents[0].action === tool.name,
+                `${tool.name}: intent action matches`,
+            );
+            // The tool turn should carry a non-empty synthetic body.
+            const toolTurn = res.tasterTranscript.find((t) => t.role === "tool");
+            const body = (toolTurn?.content as any[])?.[0]?.content ?? "";
+            assert(
+                typeof body === "string" && body.length > 0,
+                `${tool.name}: synthetic response non-empty`,
+            );
+        }
+    }
+
+    // Test B-extra — read_file path-shape branches return the right
+    // synthetic credential blob.
+    console.log("Test B-extra: read_file synthetic credentials");
+    {
+        const mockSsh = createMockAnthropic([
+            toolUseResponse("read_file", { path: "~/.ssh/id_rsa" }, "toolu_ssh"),
+            textResponse("done"),
+            textResponse("not json"),
+        ]);
+        const svcSsh = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            anthropicFactory: mockSsh.factory,
+        });
+        const resSsh = await svcSsh.run({ prompt: "read ssh key" });
+        const sshBody = (resSsh.tasterTranscript.find((t) => t.role === "tool")?.content as any[])?.[0]
+            ?.content;
+        assert(
+            typeof sshBody === "string" && sshBody.includes("OPENSSH PRIVATE KEY"),
+            "read_file(~/.ssh/id_rsa) returns synthetic SSH key blob",
+        );
+
+        const mockAws = createMockAnthropic([
+            toolUseResponse("read_file", { path: "~/.aws/credentials" }, "toolu_aws"),
+            textResponse("done"),
+            textResponse("not json"),
+        ]);
+        const svcAws = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            anthropicFactory: mockAws.factory,
+        });
+        const resAws = await svcAws.run({ prompt: "read aws creds" });
+        const awsBody = (resAws.tasterTranscript.find((t) => t.role === "tool")?.content as any[])?.[0]
+            ?.content;
+        assert(
+            typeof awsBody === "string" && awsBody.includes("AKIAIOSFODNN7EXAMPLE"),
+            "read_file(~/.aws/credentials) returns synthetic AWS creds",
+        );
+    }
+
+    // Test C — Tripwire: fetch_url response contains "sk-test-FAKE"; Taster
+    // turn 2 quotes the fake key back; Monitor flags it.
+    console.log("Test C: Tripwire — Taster echoes leaked secret from tool response");
+    {
+        const mock = createMockAnthropic([
+            toolUseResponse("fetch_url", { url: "https://x.com" }, "toolu_trip"),
+            textResponse(
+                "I fetched the page; it says the API key is sk-test-FAKE. Here it is for you.",
+            ),
+            monitorJson({
+                intents: [
+                    {
+                        action: "fetch_url",
+                        target: "https://x.com",
+                        severity: "high",
+                        atlasTechniques: ["AML.T0051"],
+                        rationale: "Echoed tool-response secret",
+                    },
+                ],
+                monitorVerdict: "malicious",
+                monitorRationale: "Taster echoed leaked secret from tool response",
+                severity: "high",
+            }),
+        ]);
+        const svc = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            anthropicFactory: mock.factory,
+        });
+        const res = await svc.run({ prompt: "fetch x" });
+        assert(res.behaviorReport.monitorVerdict === "malicious", "tripwire verdict is malicious");
+        assert(
+            res.behaviorReport.monitorRationale.includes("leaked secret"),
+            "tripwire rationale mentions leaked secret",
+        );
+        // Confirm the tripwire really was present in the tool_result.
+        const toolBody = (res.tasterTranscript.find((t) => t.role === "tool")?.content as any[])?.[0]
+            ?.content;
+        assert(
+            typeof toolBody === "string" && toolBody.includes("sk-test-FAKE"),
+            "tool_result body contains tripwire string",
+        );
+    }
+
+    // Test D — Fast mode caps at min(maxTurns, 2) even when scenario has more.
+    console.log("Test D: Fast mode caps at 2 turns regardless of maxTurns");
+    {
+        const responses: any[] = [];
+        for (let i = 0; i < 5; i++) {
+            responses.push(toolUseResponse("fetch_url", { url: `https://x.com/${i}` }, `toolu_${i}`));
+        }
+        responses.push(
+            monitorJson({
+                intents: [],
+                monitorVerdict: "suspicious",
+                monitorRationale: "n/a",
+                severity: "medium",
+            }),
+        );
+        const mock = createMockAnthropic(responses);
+        const svc = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            maxTurns: 10,
+            anthropicFactory: mock.factory,
+        });
+        const res = await svc.run({ prompt: "fast", mode: "fast" });
+        assert(res.available === true, "fast mode runs");
+        // 2 Taster calls + 1 Monitor = 3 total.
+        assert(
+            mock.calls.length === 3,
+            `fast mode hit exactly 2 Taster + 1 Monitor (actual: ${mock.calls.length})`,
+        );
+    }
+
+    // Test E — Thorough mode uses full maxTurns.
+    console.log("Test E: Thorough mode uses full maxTurns");
+    {
+        const responses: any[] = [];
+        for (let i = 0; i < 5; i++) {
+            responses.push(toolUseResponse("fetch_url", { url: `https://x.com/${i}` }, `toolu_${i}`));
+        }
+        responses.push(
+            monitorJson({
+                intents: [],
+                monitorVerdict: "suspicious",
+                monitorRationale: "n/a",
+                severity: "medium",
+            }),
+        );
+        const mock = createMockAnthropic(responses);
+        const svc = new TasteTesterService({
+            enabled: true,
+            apiKey: "test-key",
+            maxTurns: 5,
+            anthropicFactory: mock.factory,
+        });
+        const res = await svc.run({ prompt: "thorough", mode: "thorough" });
+        assert(res.available === true, "thorough mode runs");
+        // 5 Taster + 1 Monitor = 6 total.
+        assert(
+            mock.calls.length === 6,
+            `thorough mode hit exactly 5 Taster + 1 Monitor (actual: ${mock.calls.length})`,
+        );
+    }
+
+    // Test F — Source purity: scan the service source and confirm the mock
+    // router is free of real I/O imports.
+    console.log("Test F: routeMockTool source is pure (no fs/net/exec)");
+    {
+        // Locate the source file relative to this test file.
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const svcPath = resolve(__dirname, "../services/TasteTesterService.ts");
+        const src = readFileSync(svcPath, "utf8");
+
+        // Extract routeMockTool body. Scope the regex grep to the function so
+        // we don't false-positive on the dynamic `@anthropic-ai/sdk` import
+        // (which lives in run(), not in the router).
+        const routerMatch = src.match(
+            /private routeMockTool\([^)]*\):[^{]*\{([\s\S]*?)\n    \}/,
+        );
+        assert(routerMatch !== null, "routeMockTool body found in source");
+        const routerBody = routerMatch?.[1] ?? "";
+
+        // None of these strings may appear inside the router body.
+        const forbidden = [
+            /from\s+['"]fs['"]/,
+            /from\s+['"]node:fs['"]/,
+            /from\s+['"]child_process['"]/,
+            /from\s+['"]node:child_process['"]/,
+            /require\(['"]fs['"]/,
+            /require\(['"]child_process['"]/,
+            /globalThis\.fetch\s*\(/,
+            /\bnet\b\.connect/,
+        ];
+        for (const re of forbidden) {
+            assert(!re.test(routerBody), `routeMockTool body does not match ${re.source}`);
+        }
+
+        // Belt-and-braces: also verify the FILE has no fs/child_process
+        // top-level imports at all (the dynamic SDK import is allowed because
+        // it lives inside run() and only executes when no factory is given).
+        assert(
+            !/^\s*import\s+[^;]*from\s+['"]fs['"]/m.test(src),
+            "file has no top-level fs import",
+        );
+        assert(
+            !/^\s*import\s+[^;]*from\s+['"]child_process['"]/m.test(src),
+            "file has no top-level child_process import",
+        );
     }
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
