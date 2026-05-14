@@ -372,8 +372,8 @@ export class PromptRejectorMCPServer {
             }
 
             if (name === "verify_canary") {
-                const { content } = (args || {}) as { content: string; watchHandle?: string };
-                const result = this.canaryService.checkEcho(content);
+                const { content, watchHandle } = (args || {}) as { content: string; watchHandle?: string };
+                const result = this.canaryService.checkEcho(content, watchHandle);
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };

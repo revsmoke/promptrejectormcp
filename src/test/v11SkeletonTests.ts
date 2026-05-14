@@ -11,6 +11,8 @@ import { CanaryService } from "../services/CanaryService.js";
 import { McpToolScanner } from "../services/McpToolScanner.js";
 import { PatternService } from "../services/PatternService.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
+import { tmpdir } from "os";
+import { join } from "path";
 
 let passed = 0;
 let failed = 0;
@@ -39,7 +41,7 @@ async function runTests() {
             new KevFeedService();
             new HuggingFaceService();
             new TrifectaAnalyzer();
-            new CanaryService();
+            new CanaryService({ statePath: join(tmpdir(), `canary-skeleton-instantiate-${Date.now()}.json`) });
             new McpToolScanner(new PatternService());
             new TasteTesterService();
         } catch (err) {
@@ -113,14 +115,17 @@ async function runTests() {
     // Test 8: CanaryService.issueToken + checkEcho
     console.log("Test 8: CanaryService");
     {
-        const svc = new CanaryService();
+        // Pass 10: real implementation — use isolated state path to avoid
+        // polluting patterns/canary-state.json during the skeleton suite.
+        const statePath = join(tmpdir(), `canary-skeleton-${Date.now()}.json`);
+        const svc = new CanaryService({ statePath });
         const issued = svc.issueToken();
         assert(/^[0-9a-f-]+$/i.test(issued.token), "Token matches UUID-ish shape");
         assert(typeof issued.expiresAt === "string" && issued.expiresAt.length > 0, "expiresAt is a non-empty string");
         const echo = svc.checkEcho("benign string");
-        assert(echo.echoDetected === false, "Stub echoDetected is false");
-        assert(echo.severity === "safe", "Stub severity is 'safe'");
-        assert(Array.isArray(echo.matches) && echo.matches.length === 0, "Stub matches is []");
+        assert(echo.echoDetected === false, "Benign content: echoDetected is false");
+        assert(echo.severity === "safe", "Benign content: severity is 'safe'");
+        assert(Array.isArray(echo.matches) && echo.matches.length === 0, "Benign content: matches is []");
     }
 
     // Test 9: McpToolScanner.scan
