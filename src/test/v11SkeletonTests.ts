@@ -9,6 +9,7 @@ import { HuggingFaceService } from "../services/HuggingFaceService.js";
 import { TrifectaAnalyzer } from "../services/TrifectaAnalyzer.js";
 import { CanaryService } from "../services/CanaryService.js";
 import { McpToolScanner } from "../services/McpToolScanner.js";
+import { PatternService } from "../services/PatternService.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
 
 let passed = 0;
@@ -39,7 +40,7 @@ async function runTests() {
             new HuggingFaceService();
             new TrifectaAnalyzer();
             new CanaryService();
-            new McpToolScanner();
+            new McpToolScanner(new PatternService());
             new TasteTesterService();
         } catch (err) {
             console.error("  Instantiation threw:", err);
@@ -119,12 +120,12 @@ async function runTests() {
     // Test 9: McpToolScanner.scan
     console.log("Test 9: McpToolScanner.scan");
     {
-        const svc = new McpToolScanner();
+        const svc = new McpToolScanner(new PatternService());
         const res = svc.scan({ tool: { name: "test" } });
         assert(res.drift === false, "Stub drift is false");
         assert(/^[a-f0-9]{64}$/.test(res.hash), "Hash is 64-char hex");
-        assert(res.severity === "safe", "Stub severity is 'safe'");
-        assert(Array.isArray(res.findings) && res.findings.length === 0, "Stub findings is []");
+        assert(res.severity === "safe", "Benign descriptor severity is 'safe'");
+        assert(Array.isArray(res.findings) && res.findings.length === 0, "Benign descriptor findings is []");
     }
 
     // Test 10: TasteTesterService.run

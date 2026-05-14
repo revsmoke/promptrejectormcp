@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T01:32:14.903Z",
+  "generatedAt": "2026-05-14T01:38:11.817Z",
   "files": {
     "custom.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -19,8 +19,8 @@
       "patternCount": 4
     },
     "mcp-tool-poisoning.json": {
-      "sha256": "ea9a635276a31af10221db3e72ca2997bd1336f2283c7fed22077f996f1e5a29",
-      "patternCount": 1
+      "sha256": "828a52cea8c92155a09c92881b37fa26c564781e80002e4787098eebd7a67a1a",
+      "patternCount": 5
     },
     "policy-puppetry.json": {
       "sha256": "c6ca2c1fb2c38bd0bba0a906272a7a328713bd7d280735b8a56efff841bc9ce7",
@@ -51,6 +51,6 @@
       "patternCount": 5
     }
   },
-  "rootHash": "8bfdb836b9cce0239ebf6b99a2ca1eb1032ebbe4b7de041b7606db45df93364b",
+  "rootHash": "58257261c6f9e272ceecc46030c3fd25e267f8a7dcca54c6e5d871c8f8c5080d",
   "signature": ""
 }

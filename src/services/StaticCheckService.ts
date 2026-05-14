@@ -67,6 +67,30 @@ function severityIdx(s: string): number {
     return SEVERITIES.indexOf(s as any);
 }
 
+/**
+ * Evaluate a single ActivePattern against `text`, honoring simple vs threshold detection.
+ *
+ * why: factored out of StaticCheckService so any service that loads patterns
+ * (e.g. McpToolScanner) can run identical detection semantics without duplicating
+ * the threshold/count logic. Returns both whether the pattern matched and the
+ * raw match count — callers that care only about boolean detection can ignore
+ * the count.
+ */
+export function evaluatePattern(text: string, pattern: ActivePattern): { matched: boolean; matchCount: number } {
+    const { entry, regex } = pattern;
+    if (entry.detection.mode === "threshold" && entry.detection.countThreshold) {
+        const globalRegex = regex.flags.includes("g")
+            ? regex
+            : new RegExp(regex.source, regex.flags + "g");
+        const count = [...text.matchAll(globalRegex)].length;
+        return { matched: count >= entry.detection.countThreshold, matchCount: count };
+    }
+    // Simple-mode: a single hit is enough. Use a fresh regex if we need to also
+    // know the match count without lastIndex side effects.
+    const matched = regex.test(text);
+    return { matched, matchCount: matched ? 1 : 0 };
+}
+
 // why: classify a code-point against the three Unicode-smuggling families we care about.
 // Returns null when the code point is not a smuggling concern (the hot path for normal text).
 function classifySmugglingCodePoint(cp: number): "tag" | "zero-width" | "bidi" | null {
@@ -160,22 +184,13 @@ export class StaticCheckService {
         };
 
         for (const [flagGroup, groupPatterns] of groups) {
-            for (const { entry, regex } of groupPatterns) {
+            for (const ap of groupPatterns) {
+                const { entry } = ap;
                 // why: threshold-mode patterns (e.g. zero-width countThreshold:3) require
                 // counting matches; a bare .test() would mis-flag a single legitimate ZWJ
-                // inside an emoji sequence. matchAll gives us exact counts cheaply.
-                let matched = false;
-                if (entry.detection.mode === "threshold" && entry.detection.countThreshold) {
-                    // Ensure global flag so matchAll works; patterns in our files declare 'g'
-                    // already, but be defensive.
-                    const globalRegex = regex.flags.includes("g")
-                        ? regex
-                        : new RegExp(regex.source, regex.flags + "g");
-                    const count = [...input.matchAll(globalRegex)].length;
-                    matched = count >= entry.detection.countThreshold;
-                } else {
-                    matched = regex.test(input);
-                }
+                // inside an emoji sequence. Delegated to evaluatePattern() so the
+                // McpToolScanner can apply identical semantics.
+                const { matched } = evaluatePattern(input, ap);
 
                 if (matched) {
                     findings.push(`Potential ${entry.category} detected: ${entry.pattern}`);

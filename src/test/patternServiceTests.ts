@@ -69,7 +69,7 @@ async function runTests() {
         // Reload with valid manifest
         const svc2 = new PatternService(dir);
         const all = svc2.list();
-        assert(all.length === 61, `Expected 61 patterns, got ${all.length}`);
+        assert(all.length === 65, `Expected 65 patterns, got ${all.length}`);
         assert(!svc2.isFallbackActive(), "Should not be using fallback patterns");
         cleanup(dir);
     }
@@ -96,7 +96,7 @@ async function runTests() {
         svc.regenerateManifest();
         const svc2 = new PatternService(dir);
         const general = svc2.list({ scope: "general" });
-        assert(general.length === 35, `Expected 35 general patterns, got ${general.length}`);
+        assert(general.length === 39, `Expected 39 general patterns, got ${general.length}`);
         const skill = svc2.list({ scope: "skill" });
         assert(skill.length === 26, `Expected 26 skill patterns, got ${skill.length}`);
         cleanup(dir);
@@ -144,7 +144,7 @@ async function runTests() {
 
         // Verify it's in the list
         const all = svc2.list();
-        assert(all.length === 62, `Expected 62 patterns after add, got ${all.length}`);
+        assert(all.length === 66, `Expected 66 patterns after add, got ${all.length}`);
 
         // Verify manifest was updated
         const integrity = svc2.verify();

@@ -50,7 +50,7 @@ export class PromptRejectorMCPServer {
         this.huggingFaceService = new HuggingFaceService();
         this.trifectaAnalyzer = new TrifectaAnalyzer();
         this.canaryService = new CanaryService();
-        this.mcpToolScanner = new McpToolScanner();
+        this.mcpToolScanner = new McpToolScanner(this.patternService);
         this.tasteTesterService = new TasteTesterService();
         this.server = new Server(
             {
