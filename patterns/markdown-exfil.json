@@ -5,7 +5,7 @@
       "id": "markdown-image-exfil-query",
       "name": "Markdown image with suspicious query string",
       "description": "Markdown image with long opaque query value — common exfil vector (data leak via image-fetch)",
-      "pattern": "!\\[[^\\]]*\\]\\(https?://[^\\)\\s]+[?&][^=]+=[A-Za-z0-9_+/=%-]{16,}\\)",
+      "pattern": "!?\\[[^\\]]*\\]\\(https?://[^\\)\\s]+[?&][^=]+=[A-Za-z0-9_+/=%-]{16,}\\)",
       "flags": "gi",
       "severity": "critical",
       "category": "markdown_exfil",

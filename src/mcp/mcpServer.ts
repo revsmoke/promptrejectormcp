@@ -89,6 +89,13 @@ export class PromptRejectorMCPServer {
     }
 
     private setupTools() {
+        // Small helper to produce the standard MCP-shaped validation error response
+        // without throwing. MCP clients expect JSON-RPC-shaped error content, so all
+        // bad-input paths return a { content: [...] } object rather than throwing.
+        const validationError = (msg: string) => ({
+            content: [{ type: "text", text: JSON.stringify({ error: msg }, null, 2) }],
+        });
+
         // List available tools
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             return {
@@ -335,20 +342,46 @@ export class PromptRejectorMCPServer {
             }
 
             if (name === "scan_mcp_tool") {
-                const { tool, priorHash } = (args || {}) as { tool: object; priorHash?: string };
-                const result = this.mcpToolScanner.scan({ tool, priorHash });
+                const a = (args || {}) as { tool?: unknown; priorHash?: unknown };
+                // tool must be a non-null object (not array, not null, not primitive)
+                if (!a.tool || typeof a.tool !== "object" || Array.isArray(a.tool)) {
+                    return validationError("tool is required and must be a non-null object");
+                }
+                if (a.priorHash !== undefined && typeof a.priorHash !== "string") {
+                    return validationError("priorHash must be a string if provided");
+                }
+                const result = this.mcpToolScanner.scan({ tool: a.tool as object, priorHash: a.priorHash as string | undefined });
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
             if (name === "check_lethal_trifecta") {
-                const { capabilities, tools, skillContent } = (args || {}) as {
-                    capabilities?: string[];
-                    tools?: string[];
-                    skillContent?: string;
-                };
-                const result = this.trifectaAnalyzer.analyze({ capabilities, tools, skillContent });
+                const a = (args || {}) as { capabilities?: unknown; tools?: unknown; skillContent?: unknown };
+                // At least one of capabilities/tools/skillContent must be present.
+                if (a.capabilities === undefined && a.tools === undefined && a.skillContent === undefined) {
+                    return validationError("at least one of capabilities, tools, or skillContent is required");
+                }
+                if (a.capabilities !== undefined) {
+                    if (!Array.isArray(a.capabilities) || !a.capabilities.every((c) => typeof c === "string")) {
+                        return validationError("capabilities must be an array of strings if provided");
+                    }
+                }
+                if (a.tools !== undefined) {
+                    if (!Array.isArray(a.tools) || !a.tools.every((t) => typeof t === "string")) {
+                        return validationError("tools must be an array of strings if provided");
+                    }
+                }
+                if (a.skillContent !== undefined) {
+                    if (typeof a.skillContent !== "string" || a.skillContent.length > 500_000) {
+                        return validationError("skillContent must be a string of at most 500,000 characters if provided");
+                    }
+                }
+                const result = this.trifectaAnalyzer.analyze({
+                    capabilities: a.capabilities as string[] | undefined,
+                    tools: a.tools as string[] | undefined,
+                    skillContent: a.skillContent as string | undefined,
+                });
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
@@ -356,32 +389,95 @@ export class PromptRejectorMCPServer {
 
             if (name === "query_cve") {
                 // Pass 9: real implementation backed by UnifiedCveCache.
-                const filters = (args || {}) as QueryCveFilters;
-                const result = this.unifiedCveCache.query(filters);
+                const a = (args || {}) as Record<string, unknown>;
+                if (a.keyword !== undefined && typeof a.keyword !== "string") {
+                    return validationError("keyword must be a string if provided");
+                }
+                if (a.ecosystem !== undefined && typeof a.ecosystem !== "string") {
+                    return validationError("ecosystem must be a string if provided");
+                }
+                if (a.atlasTechnique !== undefined && typeof a.atlasTechnique !== "string") {
+                    return validationError("atlasTechnique must be a string if provided");
+                }
+                if (a.severity !== undefined && typeof a.severity !== "string") {
+                    return validationError("severity must be a string if provided");
+                }
+                if (a.inKev !== undefined && typeof a.inKev !== "boolean") {
+                    return validationError("inKev must be a boolean if provided");
+                }
+                if (a.limit !== undefined) {
+                    if (typeof a.limit !== "number" || !Number.isInteger(a.limit) || a.limit < 1 || a.limit > 200) {
+                        return validationError("limit must be an integer between 1 and 200 if provided");
+                    }
+                }
+                const result = this.unifiedCveCache.query(a as QueryCveFilters);
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
             if (name === "deploy_canary") {
-                const { context, ttlSeconds } = (args || {}) as { context?: string; ttlSeconds?: number };
-                const result = this.canaryService.issueToken({ context, ttlSeconds });
+                const a = (args || {}) as { context?: unknown; ttlSeconds?: unknown };
+                if (a.context !== undefined) {
+                    if (typeof a.context !== "string" || a.context.length > 1000) {
+                        return validationError("context must be a string of at most 1,000 characters if provided");
+                    }
+                }
+                // ttlSeconds: positive integer up to 30 days (86400 * 30 = 2,592,000)
+                const MAX_TTL_SECONDS = 86_400 * 30;
+                if (a.ttlSeconds !== undefined) {
+                    if (
+                        typeof a.ttlSeconds !== "number" ||
+                        !Number.isInteger(a.ttlSeconds) ||
+                        a.ttlSeconds < 1 ||
+                        a.ttlSeconds > MAX_TTL_SECONDS
+                    ) {
+                        return validationError(`ttlSeconds must be a positive integer up to ${MAX_TTL_SECONDS} (30 days) if provided`);
+                    }
+                }
+                const result = this.canaryService.issueToken({
+                    context: a.context as string | undefined,
+                    ttlSeconds: a.ttlSeconds as number | undefined,
+                });
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
             if (name === "verify_canary") {
-                const { content, watchHandle } = (args || {}) as { content: string; watchHandle?: string };
-                const result = this.canaryService.checkEcho(content, watchHandle);
+                const a = (args || {}) as { content?: unknown; watchHandle?: unknown };
+                if (typeof a.content !== "string" || a.content.length < 1 || a.content.length > 500_000) {
+                    return validationError("content is required and must be a string of 1-500,000 characters");
+                }
+                if (a.watchHandle !== undefined) {
+                    if (typeof a.watchHandle !== "string" || !/^[a-f0-9]{12}$/i.test(a.watchHandle)) {
+                        return validationError("watchHandle must be a 12-character hex string if provided");
+                    }
+                }
+                const result = this.canaryService.checkEcho(a.content, a.watchHandle as string | undefined);
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
             if (name === "taste_test") {
-                const { prompt, mode, context } = (args || {}) as { prompt: string; mode?: "fast" | "thorough"; context?: string };
-                const result = await this.tasteTesterService.run({ prompt, mode, context });
+                const a = (args || {}) as { prompt?: unknown; mode?: unknown; context?: unknown };
+                if (typeof a.prompt !== "string" || a.prompt.length < 1 || a.prompt.length > 100_000) {
+                    return validationError("prompt is required and must be a string of 1-100,000 characters");
+                }
+                if (a.mode !== undefined && a.mode !== "fast" && a.mode !== "thorough") {
+                    return validationError("mode must be 'fast' or 'thorough' if provided");
+                }
+                if (a.context !== undefined) {
+                    if (typeof a.context !== "string" || a.context.length > 100_000) {
+                        return validationError("context must be a string of at most 100,000 characters if provided");
+                    }
+                }
+                const result = await this.tasteTesterService.run({
+                    prompt: a.prompt,
+                    mode: a.mode as "fast" | "thorough" | undefined,
+                    context: a.context as string | undefined,
+                });
                 return {
                     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };

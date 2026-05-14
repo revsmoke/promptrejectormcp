@@ -82,6 +82,7 @@ Sources: https://layerxsecurity.com/blog/a-flaw-in-claudes-browser-extension-all
 | ClaudeBleed | May 2026 | Browser-agent hijack via extension trust boundary. |
 | CVE-2026-2796 | 2026 | Claude-specific exploit chain (details on red.anthropic.com). |
 | MemoryGraft | Dec 2025 | First persistent agent-memory poison via benign artifacts. |
+
 Sources: https://genai.owasp.org/llmrisk/llm01-prompt-injection/ ; https://atlas.mitre.org/ ; https://www.practical-devsecops.com/mitre-atlas-framework-guide-securing-ai-systems/
 
 ---

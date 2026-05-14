@@ -56,13 +56,14 @@ A major coverage expansion adding **6 new MCP tools** and **5 new vulnerability-
 - `PatternEntrySchema.source` enum extended with `"ghsa_graphql"` and `"osv"`
 - `VulnFeedResult` gains `perSource: { nvd, ghsaRest, ghsaGraphql, osv }` count breakdown
 - `SkillScanResult` gains `hasLethalTrifecta`, `trifectaResult`, `huggingFaceSecurityFlags`, `huggingFaceReports`, `atlasTechniques[]`
+- `scan_skill` now bubbles `trifectaResult` into `overallSeverity` and `isDangerous` — a skill with all three lethal-trifecta capabilities returns `safe: false` with severity `critical`. Previously the trifecta result was computed and reported on `hasLethalTrifecta` but did not influence the final risk decision. Pre-release fix (v1.1.0 lives only on `claude/hopeful-brahmagupta-338986` at time of writing); no shipped consumers affected.
 - `SecurityReport` gains `atlasTechniques[]`
 - Threshold-mode pattern detection now properly honored (previously bypassed by a simple-match path on some entries)
 - Existing patterns regenerated with `atlasTechnique` field on relevant categories
 
 ### Test coverage
 
-- **426 assertions / 0 failures across 16 suites** (up from 87 in v1.0.2)
+- **457 tests / 0 failures across 17 suites** at the v1.1.0 tag commit `31868ea` (up from 87 in v1.0.2). Post-tag cluster fixes adjust these totals further and will be reported in their own entry.
 - 20-sample labeled Taste-Tester corpus in `src/test/fixtures/taste-tester-corpus.json` (20/20 pass against scripted-mock Taster flow; this measures Monitor verdict logic, not real-API predictive accuracy)
 - Mock `fetch` and mock Anthropic SDK helpers in `src/test/helpers/` keep all tests offline by default
 - Curated subset of Garak `promptinject` probes (Apache 2.0; provenance tracked in `PatternEntry.source`) shipped in `patterns/prompt-injection.json` — full adversarial regression baseline against `check_prompt` deferred to v1.2

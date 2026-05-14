@@ -450,7 +450,7 @@ Prompt Rejector can automatically scan vulnerability feeds for CVEs relevant to 
 |---|---|---|
 | NVD CVE 2.0 | v1.0.2 | CWE-filtered general vulnerability feed (XSS, SQLi, Command Injection, Path Traversal, SSRF) |
 | GHSA REST | v1.0.2 | GitHub Security Advisories, ecosystem-aware |
-| **OSV.dev `/v1/querybatch`** | v1.1.0 | Open-source vuln DB filtered by an **AI-package allowlist** (langchain, transformers, litellm, mlflow, ollama, llama-index, autogen, crewai, langgraph, vllm, sglang, anthropic-sdk-python, openai-python, transformers-js, openai, anthropic) |
+| **OSV.dev `/v1/querybatch`** | v1.1.0 | Open-source vuln DB filtered by an **AI-package allowlist** spanning PyPI (`langchain`, `langgraph`, `transformers`, `litellm`, `mlflow`, `llama-index`, `vllm`, `openai`, `anthropic`, …) and npm (`@langchain/core`, `@huggingface/transformers`, `@anthropic-ai/sdk`, `openai`, `llamaindex`, …). Full list in `src/services/aiPackageAllowlist.ts`. |
 | **GHSA GraphQL** | v1.1.0 | `securityVulnerabilities` query with ecosystem filter — richer metadata than REST, requires `GITHUB_TOKEN` |
 | **MITRE ATLAS taxonomy** | v1.1.0 | v5.4 STIX bundle for AI/LLM technique tags (`AML.T0051`, `AML.T0054`, `AML.T0024`, `AML.T0070`, `AML.T0071`); 7-day cache + offline fallback table |
 | **CISA KEV escalator** | v1.1.0 | Known-Exploited-Vulnerabilities catalog; auto-bumps severity by one level when a CVE is KEV-listed and attaches `inKev: true` |

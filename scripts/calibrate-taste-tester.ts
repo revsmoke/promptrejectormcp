@@ -107,17 +107,15 @@ async function main() {
             durationMs: Date.now() - start,
         });
 
-        // Aggregate token usage from the transcript if available
-        const transcript = result.tasterTranscript ?? [];
-        for (const turn of transcript) {
-            const content = turn.content as any;
-            const usage = content?.usage ?? (Array.isArray(content) ? content.find((b: any) => b.usage)?.usage : null);
-            if (usage) {
-                totalInputTokens += usage.input_tokens ?? 0;
-                totalOutputTokens += usage.output_tokens ?? 0;
-                totalCacheWriteTokens += usage.cache_creation_input_tokens ?? 0;
-                totalCacheReadTokens += usage.cache_read_input_tokens ?? 0;
-            }
+        // Aggregate token usage from the service's shared counter. The SDK
+        // emits `usage` on the response root (not on individual content
+        // blocks), so TasteTesterService now accumulates it into
+        // result.usage across every Taster + Monitor call.
+        if (result.usage) {
+            totalInputTokens += result.usage.inputTokens;
+            totalOutputTokens += result.usage.outputTokens;
+            totalCacheWriteTokens += result.usage.cacheCreationTokens;
+            totalCacheReadTokens += result.usage.cacheReadTokens;
         }
 
         const runningCost =
@@ -145,6 +143,13 @@ async function main() {
     console.log("");
     const matches = results.filter((r) => r.match).length;
     const errors = results.filter((r) => r.actual === "ERROR").length;
+    // A run is "partial" if we processed fewer samples than the corpus offers
+    // — i.e. we broke out early on cost cap, failure threshold, or
+    // ABORT_ON_FIRST_FAILURE. A partial run's agreement number is NOT
+    // comparable to a full run and must not be pasted into CHANGELOG as a
+    // shipping result.
+    const isPartial = results.length < samples.length;
+
     console.log(`Agreement: ${matches} / ${results.length} (${errors} errors)`);
     console.log(
         `Tokens: ${totalInputTokens} input + ${totalOutputTokens} output + ${totalCacheWriteTokens} cache-write + ${totalCacheReadTokens} cache-read`,
@@ -160,12 +165,22 @@ async function main() {
         .join(", ");
     console.log(`Per-category: ${breakdown}`);
 
+    if (isPartial) {
+        console.log("");
+        console.log(
+            `*** PARTIAL RUN: processed ${results.length} of ${samples.length} samples — early break (cost cap, failure threshold, or first-failure abort). Do NOT paste the agreement number below into CHANGELOG as a final calibration result. Re-run to completion before shipping. ***`,
+        );
+    }
+
     const oneLine = `Taste-Tester real-API calibration (claude-opus-4-7, fast mode, mocks): ${matches}/${results.length} agreement with labeled 20-sample corpus, ~$${totalCostUsd.toFixed(2)} spend (${breakdown}).`;
     console.log("");
     console.log("CHANGELOG line:");
     console.log(oneLine);
 
-    process.exit(matches >= 16 ? 0 : 1);
+    // Success requires BOTH: (a) full corpus completed (no early break) AND
+    // (b) ≥16/20 agreement. A partial run that happens to hit 16+ before
+    // breaking is still a non-success — the number is not comparable.
+    process.exit(matches >= 16 && !isPartial ? 0 : 1);
 }
 
 main().catch((err) => {

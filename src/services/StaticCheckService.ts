@@ -194,6 +194,13 @@ export class StaticCheckService {
             hasManyShot: false,
         };
 
+        // why: previously this loop `break`ed on the first match per flagGroup, which
+        // under-reported severity when a later pattern in the same group had a higher
+        // severity ceiling (e.g. Sneaky Bits paired ZWNJ/ZWJ first hits `unicode-zero-width`
+        // at "high" and skips `obfuscation-sneaky-bits` at "critical"). We now scan every
+        // pattern in the group, aggregate all matched-pattern findings/categories/ATLAS
+        // tags, and let max-severity emerge from the per-pattern compare further down.
+        // The boolean flag still latches once per group (truth never un-sets).
         for (const [flagGroup, groupPatterns] of groups) {
             for (const ap of groupPatterns) {
                 const { entry } = ap;
@@ -203,30 +210,30 @@ export class StaticCheckService {
                 // McpToolScanner can apply identical semantics.
                 const { matched } = evaluatePattern(input, ap);
 
-                if (matched) {
-                    findings.push(`Potential ${entry.category} detected: ${entry.pattern}`);
+                if (!matched) continue;
 
-                    const cat = entry.category as StaticCheckCategory;
-                    if (!categories.includes(cat)) {
-                        categories.push(cat);
-                    }
+                findings.push(`Potential ${entry.category} detected: ${entry.pattern}`);
 
-                    // Pass 7: surface MITRE ATLAS technique tag if the pattern has one.
-                    // Deduped so a category with multiple matching patterns reports once.
-                    if (entry.atlasTechnique && !atlasTechniques.includes(entry.atlasTechnique)) {
-                        atlasTechniques.push(entry.atlasTechnique);
-                    }
-
-                    if (severityIdx(entry.severity) > severityIdx(severity)) {
-                        severity = entry.severity;
-                    }
-
-                    if (flagGroup in flags) {
-                        flags[flagGroup] = true;
-                    }
-
-                    break; // first match per flag group, then move on
+                const cat = entry.category as StaticCheckCategory;
+                if (!categories.includes(cat)) {
+                    categories.push(cat);
                 }
+
+                // Pass 7: surface MITRE ATLAS technique tag if the pattern has one.
+                // Deduped so a category with multiple matching patterns reports once.
+                if (entry.atlasTechnique && !atlasTechniques.includes(entry.atlasTechnique)) {
+                    atlasTechniques.push(entry.atlasTechnique);
+                }
+
+                if (severityIdx(entry.severity) > severityIdx(severity)) {
+                    severity = entry.severity;
+                }
+
+                if (flagGroup in flags) {
+                    flags[flagGroup] = true;
+                }
+                // No `break` — continue scanning so higher-severity siblings in the
+                // same flagGroup still register their finding/category/ATLAS tag.
             }
         }
 

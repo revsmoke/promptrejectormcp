@@ -152,9 +152,10 @@ async function runTests() {
             result.hasObfuscation === true,
             `hasObfuscation should be true`,
         );
-        // Note: StaticCheckService breaks on first match per flagGroup, so the
-        // first hasObfuscation hit (zero-width, severity high) wins the severity slot.
-        // We assert >= high; that's still a strong signal for operators.
+        // Note: StaticCheckService now scans every pattern within a flagGroup
+        // (no early break), so the higher-severity `obfuscation-sneaky-bits`
+        // pattern ("critical") wins over the first-hit `unicode-zero-width`
+        // pattern ("high"). We still allow either as a safety floor.
         assert(
             result.severity === "high" || result.severity === "critical",
             `severity should be >= high (got ${result.severity})`,

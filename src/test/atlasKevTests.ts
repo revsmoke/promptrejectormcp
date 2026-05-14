@@ -215,6 +215,46 @@ async function runTests() {
         cleanup(cacheDir);
     }
 
+    console.log("Test B3: KevFeedService.refresh aborts on timeout");
+    {
+        const cacheDir = freshDir("kev-timeout");
+        // Handler never resolves on its own — it waits for the abort signal
+        // from the AbortController. If timeout plumbing is broken, the test
+        // hangs (and the surrounding runner will catch it eventually).
+        await withMockedFetch(
+            (_url: string, init?: RequestInit) =>
+                new Promise<Response>((_resolve, reject) => {
+                    const signal = init?.signal;
+                    if (signal) {
+                        signal.addEventListener("abort", () => {
+                            // Surface as AbortError so KevFeedService's catch
+                            // path classifies it as a timeout.
+                            const err = new Error("aborted");
+                            err.name = "AbortError";
+                            reject(err);
+                        });
+                    }
+                }),
+            async () => {
+                const svc = new KevFeedService({ cacheDir, timeoutMs: 1 });
+                const start = Date.now();
+                let threw = false;
+                let msg = "";
+                try {
+                    await svc.refresh();
+                } catch (e: any) {
+                    threw = true;
+                    msg = e?.message || String(e);
+                }
+                const elapsed = Date.now() - start;
+                assert(threw, "refresh threw on timeout");
+                assert(/timeout/i.test(msg), `error message mentions timeout (got: ${msg})`);
+                assert(elapsed < 500, `refresh aborted promptly (elapsed=${elapsed}ms)`);
+            },
+        );
+        cleanup(cacheDir);
+    }
+
     // --- KEV escalator in VulnFeedService ---
     console.log("Test C1: VulnFeedService escalates severity for CVEs in KEV");
     {

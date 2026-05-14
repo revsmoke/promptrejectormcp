@@ -39,7 +39,7 @@ Out-of-scope for v1.1.0 (deferred): image/audio OCR, agent-runtime exploits, ven
 
 ## 3. Architecture overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                          MCP CLIENT (Claude, etc.)                      │
 └────────────────────────────────┬────────────────────────────────────────┘
@@ -133,7 +133,7 @@ output: {
 #### `check_lethal_trifecta`
 Static analysis of agent/skill capability set. Returns `critical` when all three are present.
 ```ts
-input: { capabilities: string[] | skillContent: string }
+input: { capabilities?: string[]; tools?: string[]; skillContent?: string }
 output: {
   privateDataRead: { present: boolean, evidence: string[] },
   untrustedContentFetch: { present: boolean, evidence: string[] },
@@ -263,7 +263,7 @@ See [RESEARCH_FEEDS.md](RESEARCH_FEEDS.md) for full per-source fact-sheets.
 | 2 | GitHub Advisories (REST) | optional token | 5000/hr auth | Existing CWE loop | Existing — kept for fallback |
 | 3 | GHSA GraphQL | token (recommended) | 5000/hr auth | `securityVulnerabilities(ecosystem: PIP)` + AI-package allowlist | New — Pass 6 |
 | 4 | OSV.dev `/v1/querybatch` | none | unmetered (P95≤6s) | AI-package allowlist across PyPI/npm/Go | New — Pass 6 |
-| 5 | MITRE ATLAS (stix bundle) | none | static file | Pull `dist/stix-atlas.json`; cache 24h | New — Pass 7 (taxonomy) |
+| 5 | MITRE ATLAS (stix bundle) | none | static file | Pull `dist/stix-atlas.json`; cache 7 days | New — Pass 7 (taxonomy) |
 | 6 | CISA KEV catalog | none | static daily JSON | Cross-reference all staged CVEs; severity escalator | New — Pass 7 |
 | 7 | Hugging Face Hub | HF token | high | `securityStatus` for referenced models | New — Pass 8 |
 | 8 | Garak probe corpus | none (OSS Apache 2.0) | clone-once | Adversarial regression corpus | New — Pass 3 + Pass 13 |

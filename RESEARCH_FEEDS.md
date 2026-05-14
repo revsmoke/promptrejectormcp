@@ -1,10 +1,5 @@
 # RESEARCH_FEEDS — Vulnerability & Threat-Intel Sources for PromptRejectorMCP
 
-**Status:** Plan-mode output. The user requested this be written to
-`/Users/twoedge/Dev/promptrejectormcp/.claude/worktrees/hopeful-brahmagupta-338986/RESEARCH_FEEDS.md`,
-but plan mode restricts edits to this plan file only. Copy the section below
-verbatim once plan mode is exited.
-
 **Baseline (what the project already pulls):** `src/services/VulnFeedService.ts`
 already integrates **NVD CVE 2.0** (`services.nvd.nist.gov/rest/json/cves/2.0`,
 keyword-driven: xss / sqli / command injection / path traversal / ssrf) and

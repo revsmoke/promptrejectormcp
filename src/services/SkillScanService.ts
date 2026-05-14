@@ -134,34 +134,53 @@ export class SkillScanService {
         }
 
         // Aggregate severity
+        // why: TrifectaAnalyzer reports its own severity ladder ("safe" | "medium" | "critical").
+        // SPEC §2 + §7 list lethal_trifecta as a composite critical-severity category, so the
+        // final rollup must fold the trifecta result in — otherwise a 3-of-3 skill (read+fetch+egress)
+        // can slip through as `safe: true` when no other sub-check fires high/critical.
+        const TRIFECTA_TO_SKILL_SEV: Record<TrifectaResult["severity"], "low" | "medium" | "high" | "critical"> = {
+            safe: "low",
+            medium: "medium",
+            critical: "critical",
+        };
+        const trifectaSeverityMapped = TRIFECTA_TO_SKILL_SEV[trifectaResult.severity];
         const geminiSevIdx = SEVERITIES.indexOf(geminiResult.severity);
         const staticSevIdx = SEVERITIES.indexOf(staticResult.severity);
         const skillSevIdx = SEVERITIES.indexOf(skillSpecificResult.severity);
         const hfSevIdx = SEVERITIES.indexOf(hfSeverity);
-        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx, hfSevIdx)];
+        const trifectaSevIdx = SEVERITIES.indexOf(trifectaSeverityMapped);
+        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx, hfSevIdx, trifectaSevIdx)];
 
-        // Aggregate categories
+        // Aggregate categories. When trifectaPresent we add a synthetic
+        // `lethal_trifecta` category so downstream consumers can see *why* the
+        // composite severity bumped to critical without re-running the analyzer.
         const categories = Array.from(new Set([
             ...geminiResult.categories,
             ...staticResult.categories,
-            ...skillSpecificResult.categories
+            ...skillSpecificResult.categories,
+            ...(trifectaResult.trifectaPresent ? ["lethal_trifecta"] : []),
         ]));
 
-        // Decide "safe" status
+        // Decide "safe" status. trifectaPresent OR'd in so all-three-buckets
+        // forces dangerous even when each sub-check on its own stayed low/medium.
         const isDangerous =
             overallSeverity === "critical" ||
             overallSeverity === "high" ||
             (geminiResult.isInjection && geminiResult.confidence > 0.6) ||
             skillSpecificResult.hasDangerousToolUsage ||
-            skillSpecificResult.hasNetworkExfiltration;
+            skillSpecificResult.hasNetworkExfiltration ||
+            trifectaResult.trifectaPresent;
 
         const safe = !isDangerous;
 
         // Pass 7: aggregate ATLAS techniques across static + Gemini (skill-specific
         // checks don't carry pattern entries today; future ATLAS hooks can fold in here).
+        // SPEC §7 maps `lethal_trifecta → AML.T0024 + AML.T0051` (composite). Add both
+        // when the trifecta is present; Set dedup handles overlap with other sub-checks.
         const atlasTechniques = Array.from(new Set([
             ...(staticResult.atlasTechniques || []),
             ...mapGeminiCategoriesToAtlas(geminiResult.categories || []),
+            ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : []),
         ]));
 
         return {

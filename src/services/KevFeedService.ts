@@ -25,11 +25,13 @@ export interface KevFeedServiceOptions {
     cacheDir?: string;
     feedUrl?: string;
     ttlMs?: number;
+    timeoutMs?: number;
 }
 
 const DEFAULT_FEED_URL =
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_TIMEOUT_MS = 30_000; // 30 seconds — match OsvFeedService default.
 
 /**
  * Wraps the CISA KEV catalog as an O(1) lookup. We don't ship a fallback
@@ -42,19 +44,27 @@ export class KevFeedService {
     private cachePath: string;
     private feedUrl: string;
     private ttlMs: number;
+    private timeoutMs: number;
     private entries: Map<string, KevEntry> = new Map();
 
     constructor(opts: KevFeedServiceOptions = {}) {
         this.feedUrl = opts.feedUrl || DEFAULT_FEED_URL;
         this.ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
+        this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
         if (opts.cacheDir) {
             this.cacheDir = opts.cacheDir;
         } else {
             const thisFile = fileURLToPath(import.meta.url);
             let dir = dirname(thisFile);
-            while (dir !== "/" && !existsSync(join(dir, "package.json"))) {
-                dir = dirname(dir);
+            // Walk up looking for package.json. Stop when dirname() no longer
+            // changes — on POSIX dirname("/") === "/", on Windows
+            // dirname("C:\\") === "C:\\". The previous `dir !== "/"` check
+            // would loop forever on Windows-style roots.
+            while (!existsSync(join(dir, "package.json"))) {
+                const parent = dirname(dir);
+                if (parent === dir) break;
+                dir = parent;
             }
             this.cacheDir = join(dir, "patterns", "feed-cache");
         }
@@ -124,15 +134,26 @@ export class KevFeedService {
             return { count: this.entries.size, fetchedAt: new Date().toISOString() };
         }
 
+        // Bounded fetch — CISA endpoint stalls would otherwise hang refresh().
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
         let body: any;
         try {
-            const resp = await fetch(this.feedUrl);
+            const resp = await fetch(this.feedUrl, { signal: controller.signal });
             if (!resp.ok) {
                 throw new Error(`KEV catalog fetch failed: HTTP ${resp.status}`);
             }
             body = await resp.json();
         } catch (err: any) {
+            // AbortError surfaces with a clear timeout message; everything else
+            // bubbles up with its underlying detail.
+            if (err?.name === "AbortError") {
+                throw new Error(`KEV refresh failed: timeout after ${this.timeoutMs}ms`);
+            }
             throw new Error(`KEV refresh failed: ${err?.message || err}`);
+        } finally {
+            clearTimeout(timer);
         }
 
         if (!existsSync(this.cacheDir)) {
