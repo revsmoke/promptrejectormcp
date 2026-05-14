@@ -243,6 +243,48 @@ const MonitorReportSchema = z.object({
     severity: SeveritySchema,
 });
 
+// JSON schema for output_config.format — constrains the Monitor's response
+// to exactly the BehaviorReport shape (Opus 4.7 / Sonnet 4.6 / Haiku 4.5).
+// additionalProperties:false is required everywhere by structured outputs.
+const BEHAVIOR_REPORT_JSON_SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    required: ["intents", "monitorVerdict", "monitorRationale", "severity"],
+    properties: {
+        intents: {
+            type: "array",
+            items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["action", "target", "severity", "atlasTechniques"],
+                properties: {
+                    action: {
+                        type: "string",
+                        enum: [
+                            "fetch_url",
+                            "read_file",
+                            "exec_shell",
+                            "send_email",
+                            "transfer_funds",
+                            "navigate_browser",
+                            "write_memory",
+                            "query_database",
+                            "unknown",
+                        ],
+                    },
+                    target: { type: "string" },
+                    severity: { type: "string", enum: ["safe", "medium", "high", "critical"] },
+                    atlasTechniques: { type: "array", items: { type: "string" } },
+                    rationale: { type: "string" },
+                },
+            },
+        },
+        monitorVerdict: { type: "string", enum: ["clean", "suspicious", "malicious"] },
+        monitorRationale: { type: "string" },
+        severity: { type: "string", enum: ["safe", "medium", "high", "critical"] },
+    },
+} as const;
+
 // ---------- Prompts ----------
 
 const TASTER_SYSTEM_PROMPT =
@@ -347,7 +389,10 @@ export class TasteTesterService {
                 : process.env.TASTE_TESTER_ENABLED === "true";
 
         this.apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY ?? "";
-        this.model = opts.model ?? process.env.TASTE_TESTER_MODEL ?? "claude-sonnet-4-6";
+        // Default to Opus 4.7 per claude-api guidance — most capable for the
+        // security-classification work the Monitor does. Users can override
+        // via TASTE_TESTER_MODEL or opts.model if cost matters more.
+        this.model = opts.model ?? process.env.TASTE_TESTER_MODEL ?? "claude-opus-4-7";
         this.maxTurns = opts.maxTurns ?? parseEnvInt(process.env.TASTE_TESTER_MAX_TURNS, 5);
         this.maxTokens = opts.maxTokens ?? parseEnvInt(process.env.TASTE_TESTER_MAX_TOKENS, 4096);
         this.timeoutMs = opts.timeoutMs ?? parseEnvInt(process.env.TASTE_TESTER_TIMEOUT_MS, 30000);
@@ -529,10 +574,23 @@ export class TasteTesterService {
         let stoppedCleanly = false;
 
         for (; turn < effectiveCap; turn++) {
+            // System prompt + tool defs are deterministic across every call —
+            // mark them cacheable so subsequent runs read at ~0.1× cost.
+            // The breakpoint on the system block caches tools+system together
+            // (render order is tools → system → messages).
+            // We intentionally do NOT enable adaptive thinking on the Taster:
+            // we want it to behave like a generic helpful assistant that is
+            // vulnerable to injection, not a security-aware one.
             const response = await client.messages.create({
                 model: this.model,
                 max_tokens: this.maxTokens,
-                system: TASTER_SYSTEM_PROMPT,
+                system: [
+                    {
+                        type: "text",
+                        text: TASTER_SYSTEM_PROMPT,
+                        cache_control: { type: "ephemeral" },
+                    },
+                ],
                 tools: MOCK_TOOLS,
                 messages,
             });
@@ -699,10 +757,29 @@ export class TasteTesterService {
         // prompt explicitly labels this as DATA, not instructions.
         const transcriptText = JSON.stringify(transcript, null, 2);
 
+        // Monitor: intelligence-sensitive classification work. Enable adaptive
+        // thinking (off by default on Opus 4.7) + effort:"high" per claude-api
+        // guidance for security/classification tasks. Constrain output to the
+        // BehaviorReport shape via output_config.format so the model cannot
+        // emit unstructured prose. Cache the deterministic system prompt.
         const response = await client.messages.create({
             model: this.model,
             max_tokens: this.maxTokens,
-            system: MONITOR_SYSTEM_PROMPT,
+            system: [
+                {
+                    type: "text",
+                    text: MONITOR_SYSTEM_PROMPT,
+                    cache_control: { type: "ephemeral" },
+                },
+            ],
+            thinking: { type: "adaptive" },
+            output_config: {
+                effort: "high",
+                format: {
+                    type: "json_schema",
+                    schema: BEHAVIOR_REPORT_JSON_SCHEMA,
+                },
+            },
             messages: [
                 {
                     role: "user",
