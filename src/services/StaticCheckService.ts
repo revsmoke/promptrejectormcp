@@ -6,7 +6,9 @@ export type StaticCheckCategory =
     | "shell_injection"
     | "directory_traversal"
     | "unicode_smuggling"
-    | "policy_puppetry";
+    | "policy_puppetry"
+    | "markdown_exfil"
+    | "prompt_injection";
 
 export interface StrippedChar {
     index: number;
@@ -20,6 +22,8 @@ export interface StaticCheckResult {
     hasShellInjection: boolean;
     hasObfuscation: boolean;
     hasPolicyPuppetry: boolean;
+    hasMarkdownExfil: boolean;
+    hasPromptInjection: boolean;
     severity: "low" | "medium" | "high" | "critical";
     categories: StaticCheckCategory[];
     findings: string[];
@@ -151,6 +155,8 @@ export class StaticCheckService {
             hasShellInjection: false,
             hasObfuscation: false,
             hasPolicyPuppetry: false,
+            hasMarkdownExfil: false,
+            hasPromptInjection: false,
         };
 
         for (const [flagGroup, groupPatterns] of groups) {
@@ -212,6 +218,8 @@ export class StaticCheckService {
             hasShellInjection: flags.hasShellInjection,
             hasObfuscation: flags.hasObfuscation,
             hasPolicyPuppetry: flags.hasPolicyPuppetry,
+            hasMarkdownExfil: flags.hasMarkdownExfil,
+            hasPromptInjection: flags.hasPromptInjection,
             severity,
             categories,
             findings,
@@ -264,6 +272,8 @@ export class StaticCheckService {
             hasShellInjection,
             hasObfuscation: false,
             hasPolicyPuppetry: false,
+            hasMarkdownExfil: false,
+            hasPromptInjection: false,
             severity,
             categories,
             findings,
