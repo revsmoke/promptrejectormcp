@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "mcp-tool-poisoning-placeholder",
+      "name": "MCP tool poisoning placeholder",
+      "description": "Disabled placeholder; real detectors land in Pass 4.",
+      "pattern": "___NEVER_MATCH_PLACEHOLDER___",
+      "flags": "g",
+      "severity": "low",
+      "category": "mcp_tool_poisoning",
+      "flagGroup": "hasToolPoisoning",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": false,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    }
+  ]
+}

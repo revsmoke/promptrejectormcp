@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "policy-puppetry-placeholder",
+      "name": "Policy puppetry placeholder",
+      "description": "Disabled placeholder; real detectors land in Pass 2.",
+      "pattern": "___NEVER_MATCH_PLACEHOLDER___",
+      "flags": "g",
+      "severity": "low",
+      "category": "policy_puppetry",
+      "flagGroup": "hasPolicyPuppetry",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": false,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "llm-threats-placeholder",
+      "name": "LLM threats placeholder",
+      "description": "Disabled placeholder; real detectors land in later passes.",
+      "pattern": "___NEVER_MATCH_PLACEHOLDER___",
+      "flags": "g",
+      "severity": "low",
+      "category": "llm_threats",
+      "flagGroup": "hasLlmThreats",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": false,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    }
+  ]
+}

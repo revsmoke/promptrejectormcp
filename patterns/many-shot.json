@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "many-shot-placeholder",
+      "name": "Many-shot placeholder",
+      "description": "Disabled placeholder; real detectors land in Pass 12.",
+      "pattern": "___NEVER_MATCH_PLACEHOLDER___",
+      "flags": "g",
+      "severity": "low",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": { "mode": "simple" },
+      "enabled": false,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    }
+  ]
+}

@@ -28,7 +28,20 @@ function createTestDir(): string {
     const projectPatterns = join(process.cwd(), "patterns");
 
     // Copy all pattern files
-    const files = ["xss.json", "sqli.json", "shell-injection.json", "skill-threats.json", "prompt-injection.json", "custom.json"];
+    const files = [
+        "xss.json",
+        "sqli.json",
+        "shell-injection.json",
+        "skill-threats.json",
+        "prompt-injection.json",
+        "custom.json",
+        "unicode-smuggling.json",
+        "policy-puppetry.json",
+        "markdown-exfil.json",
+        "mcp-tool-poisoning.json",
+        "many-shot.json",
+        "llm-threats.json",
+    ];
     for (const f of files) {
         const src = join(projectPatterns, f);
         if (existsSync(src)) {
@@ -56,7 +69,7 @@ async function runTests() {
         // Reload with valid manifest
         const svc2 = new PatternService(dir);
         const all = svc2.list();
-        assert(all.length === 39, `Expected 39 patterns, got ${all.length}`);
+        assert(all.length === 45, `Expected 45 patterns, got ${all.length}`);
         assert(!svc2.isFallbackActive(), "Should not be using fallback patterns");
         cleanup(dir);
     }
@@ -83,7 +96,7 @@ async function runTests() {
         svc.regenerateManifest();
         const svc2 = new PatternService(dir);
         const general = svc2.list({ scope: "general" });
-        assert(general.length === 13, `Expected 13 general patterns, got ${general.length}`);
+        assert(general.length === 19, `Expected 19 general patterns, got ${general.length}`);
         const skill = svc2.list({ scope: "skill" });
         assert(skill.length === 26, `Expected 26 skill patterns, got ${skill.length}`);
         cleanup(dir);
@@ -131,7 +144,7 @@ async function runTests() {
 
         // Verify it's in the list
         const all = svc2.list();
-        assert(all.length === 40, `Expected 40 patterns after add, got ${all.length}`);
+        assert(all.length === 46, `Expected 46 patterns after add, got ${all.length}`);
 
         // Verify manifest was updated
         const integrity = svc2.verify();
