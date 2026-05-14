@@ -41,7 +41,10 @@ export class PromptRejectorMCPServer {
     constructor() {
         this.patternService = new PatternService();
         this.securityService = new SecurityService(this.patternService);
-        this.skillScanService = new SkillScanService(this.patternService);
+        // Pass 8: instantiate HF service before SkillScanService so the same
+        // instance (and its in-memory cache) is shared by every scan.
+        this.huggingFaceService = new HuggingFaceService();
+        this.skillScanService = new SkillScanService(this.patternService, this.huggingFaceService);
         this.atlasService = new AtlasService();
         this.osvFeedService = new OsvFeedService();
         this.ghsaGraphQLService = new GhsaGraphQLService();
@@ -57,7 +60,6 @@ export class PromptRejectorMCPServer {
             this.atlasService,
             this.kevFeedService,
         );
-        this.huggingFaceService = new HuggingFaceService();
         this.trifectaAnalyzer = new TrifectaAnalyzer();
         this.canaryService = new CanaryService();
         this.mcpToolScanner = new McpToolScanner(this.patternService);

@@ -85,11 +85,17 @@ async function runTests() {
     }
 
     // Test 6: HuggingFaceService.checkModel
+    // Pass 8 wired this to the real HF API. We don't mock fetch here (this is
+    // the skeleton smoke test, not the HF-specific suite), so the call will
+    // either succeed against the live API or degrade to lookup_failed. Both
+    // are acceptable; we only assert the report shape is well-formed.
     console.log("Test 6: HuggingFaceService.checkModel");
     {
-        const svc = new HuggingFaceService();
+        const svc = new HuggingFaceService({ timeoutMs: 1500 });
         const res = await svc.checkModel("test/model");
-        assert(Array.isArray(res.flags) && res.flags.length === 0, "Stub returns empty flags");
+        assert(Array.isArray(res.flags), "checkModel returns a report with .flags array");
+        assert(typeof res.modelId === "string" && res.modelId === "test/model", "report.modelId echoes input");
+        assert(typeof res.severity === "string", "report.severity is a string");
     }
 
     // Test 7: TrifectaAnalyzer.analyze

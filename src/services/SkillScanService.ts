@@ -2,6 +2,7 @@ import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
 import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
+import { HuggingFaceService, type HuggingFaceModelFlag, type HuggingFaceModelReport } from "./HuggingFaceService.js";
 
 export interface SkillScanResult {
     safe: boolean;
@@ -24,6 +25,10 @@ export interface SkillScanResult {
     trifectaResult: TrifectaResult;
     /** Pass 7: Aggregated MITRE ATLAS technique IDs across all sub-checks. */
     atlasTechniques: string[];
+    /** Pass 8: Flat list of HF security findings across all detected model IDs. */
+    huggingFaceSecurityFlags: HuggingFaceModelFlag[];
+    /** Pass 8: Per-model reports for richer downstream consumers. */
+    huggingFaceReports: HuggingFaceModelReport[];
     timestamp: string;
 }
 
@@ -72,29 +77,68 @@ export class SkillScanService {
     private staticCheckService: StaticCheckService;
     private patternService: PatternService | null;
     private trifectaAnalyzer: TrifectaAnalyzer;
+    private huggingFaceService: HuggingFaceService;
 
-    constructor(patternService?: PatternService) {
+    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService) {
         this.patternService = patternService ?? null;
         this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService(patternService);
         this.trifectaAnalyzer = new TrifectaAnalyzer();
+        // Pass 8: HF security signals. Default keeps existing call sites working;
+        // mcpServer passes a shared instance so the in-memory cache is reused
+        // across scans.
+        this.huggingFaceService = huggingFaceService ?? new HuggingFaceService();
     }
 
     async scanSkill(skillContent: string): Promise<SkillScanResult> {
-        const [geminiResult, staticResult, skillSpecificResult] = await Promise.all([
+        // Pass 8: extract HF model ids first (sync, cheap) so we can fan out
+        // network requests in parallel with the LLM + static checks.
+        const modelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const hfCheckPromise = modelIds.length === 0
+            ? Promise.resolve([] as HuggingFaceModelReport[])
+            : Promise.allSettled(modelIds.map((id) => this.huggingFaceService.checkModel(id)))
+                  .then((settled) =>
+                      settled
+                          .filter((s): s is PromiseFulfilledResult<HuggingFaceModelReport> => s.status === "fulfilled")
+                          .map((s) => s.value),
+                  );
+
+        const [geminiResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
             this.geminiService.checkPrompt(skillContent),
             Promise.resolve(this.staticCheckService.check(skillContent)),
-            Promise.resolve(this.runSkillSpecificChecks(skillContent))
+            Promise.resolve(this.runSkillSpecificChecks(skillContent)),
+            hfCheckPromise,
         ]);
 
         // Pass 5: lethal-trifecta capability classification (sync, cheap).
         const trifectaResult = this.trifectaAnalyzer.analyze({ skillContent });
 
+        // Pass 8: flatten HF flags + compute their severity contribution.
+        const huggingFaceSecurityFlags: HuggingFaceModelFlag[] = [];
+        for (const r of hfReports) huggingFaceSecurityFlags.push(...r.flags);
+        // Map HF severity ladder (safe/low/medium/high/critical) onto the
+        // 4-level skill scan ladder. "safe" → "low" (we don't have a safer level).
+        const HF_TO_SKILL_SEV: Record<HuggingFaceModelReport["severity"], "low" | "medium" | "high" | "critical"> = {
+            safe: "low",
+            low: "low",
+            medium: "medium",
+            high: "high",
+            critical: "critical",
+        };
+        let hfSeverity: "low" | "medium" | "high" | "critical" = "low";
+        for (const r of hfReports) {
+            const mapped = HF_TO_SKILL_SEV[r.severity];
+            if (SEVERITIES.indexOf(mapped) > SEVERITIES.indexOf(hfSeverity)) {
+                hfSeverity = mapped;
+            }
+        }
+
         // Aggregate severity
         const geminiSevIdx = SEVERITIES.indexOf(geminiResult.severity);
         const staticSevIdx = SEVERITIES.indexOf(staticResult.severity);
         const skillSevIdx = SEVERITIES.indexOf(skillSpecificResult.severity);
-        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx)];
+        const hfSevIdx = SEVERITIES.indexOf(hfSeverity);
+        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx, hfSevIdx)];
 
         // Aggregate categories
         const categories = Array.from(new Set([
@@ -131,6 +175,8 @@ export class SkillScanService {
             hasLethalTrifecta: trifectaResult.trifectaPresent,
             trifectaResult,
             atlasTechniques,
+            huggingFaceSecurityFlags,
+            huggingFaceReports: hfReports,
             timestamp: new Date().toISOString()
         };
     }
