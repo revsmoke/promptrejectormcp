@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T02:58:12.110Z",
+  "generatedAt": "2026-05-14T03:49:02.062Z",
   "files": {
     "custom.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -11,8 +11,8 @@
       "patternCount": 1
     },
     "many-shot.json": {
-      "sha256": "921056a503aebf6bc4fdb76c4d105d4f29070fd8f88046a9ff56ee5e7fe5e229",
-      "patternCount": 1
+      "sha256": "927cf6ca653807431b287b785de8cb24033ec27e38155c97fda48ba0e8fe84e9",
+      "patternCount": 2
     },
     "markdown-exfil.json": {
       "sha256": "24bcca34251c972d7be8f80fda5c6b10da78e296f9e6566ad883f5037c3273de",
@@ -43,14 +43,14 @@
       "patternCount": 5
     },
     "unicode-smuggling.json": {
-      "sha256": "8975fcbbce8e49674ee12ffcb51d87b4e98ddca8af2729aa7885039c88255ca4",
-      "patternCount": 3
+      "sha256": "f798d7135e9e602d69cfab958735b0e74e242615430d63e2a77b473409dfeae3",
+      "patternCount": 7
     },
     "xss.json": {
       "sha256": "3f49de1b9fb221eeedb7992c546c7eda1aade469927ddea4f1e8f97a8c4c2956",
       "patternCount": 5
     }
   },
-  "rootHash": "18a2909da2a2e8fdaadd0328277ab2af7f18d96c6fea01f71f3e0bf02c99f79d",
+  "rootHash": "cc28dd72f177cc45052f913bb329e02cb2234e41fa89a5a8d55e861550fe1e2d",
   "signature": ""
 }

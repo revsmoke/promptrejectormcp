@@ -2,21 +2,46 @@
   "version": 1,
   "patterns": [
     {
-      "id": "many-shot-placeholder",
-      "name": "Many-shot placeholder",
-      "description": "Disabled placeholder; real detectors land in Pass 12.",
-      "pattern": "___NEVER_MATCH_PLACEHOLDER___",
-      "flags": "g",
-      "severity": "low",
+      "id": "many-shot-qa-pairs",
+      "name": "Many-shot Q/A pair stacking",
+      "description": "Many-shot jailbreak heuristic — counts Q/A pairs in user content; 20+ alternating turns is suspicious context-saturation (Anthropic 2024)",
+      "pattern": "^\\s*(Q|Question|Human|User|H)\\s*[:\\.]\\s+[\\s\\S]{1,300}?^\\s*(A|Answer|Assistant|AI|Bot)\\s*[:\\.]",
+      "flags": "gim",
+      "severity": "high",
       "category": "many_shot",
       "flagGroup": "hasManyShot",
       "scope": "general",
-      "detection": { "mode": "simple" },
-      "enabled": false,
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 20
+      },
+      "enabled": true,
       "source": "original",
       "cveRefs": [],
       "dateAdded": "2026-05-13",
-      "whitelistedDomains": []
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
+    },
+    {
+      "id": "many-shot-transcript",
+      "name": "Many-shot transcript-style stacking",
+      "description": "Many-shot heuristic — counts 'turn N:' / 'round N:' markers; 30+ is suspicious context-saturation",
+      "pattern": "\\b(turn|round|exchange|step)\\s+\\d+\\s*[:\\.]",
+      "flags": "gi",
+      "severity": "medium",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 30
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
     }
   ]
 }

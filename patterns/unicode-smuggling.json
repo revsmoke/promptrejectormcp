@@ -63,6 +63,85 @@
       "dateAdded": "2026-05-13",
       "whitelistedDomains": [],
       "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "obfuscation-sneaky-bits",
+      "name": "Sneaky Bits two-char encoder",
+      "description": "Sneaky Bits two-char encoder — paired ZWNJ/ZWJ used to smuggle binary data via invisible chars (2025)",
+      "pattern": "(\\u200C\\u200C|\\u200D\\u200D|\\u200C\\u200D|\\u200D\\u200C)",
+      "flags": "gu",
+      "severity": "critical",
+      "category": "unicode_smuggling",
+      "flagGroup": "hasObfuscation",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 6
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "obfuscation-cyrillic-homoglyph",
+      "name": "Cyrillic-confusable homoglyphs",
+      "description": "Cyrillic homoglyphs (а/о/р/е/х/с/у/ы/і) — visual spoofing for command injection",
+      "pattern": "[\\u0430\\u043E\\u0440\\u0435\\u0445\\u0441\\u0443\\u044B\\u0456\\u04CF\\u051C]",
+      "flags": "gu",
+      "severity": "high",
+      "category": "obfuscation",
+      "flagGroup": "hasObfuscation",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 5
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    },
+    {
+      "id": "obfuscation-base32-long",
+      "name": "Long Base32 chunk",
+      "description": "Long Base32 chunk (≥32 chars, A-Z + 2-7) — encoded payload",
+      "pattern": "\\b[A-Z2-7]{32,}={0,6}\\b",
+      "flags": "g",
+      "severity": "high",
+      "category": "obfuscation",
+      "flagGroup": "hasObfuscation",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
+    },
+    {
+      "id": "obfuscation-hex-long",
+      "name": "Long hex chunked payload",
+      "description": "Long hex chunk (≥60 chars) — encoded payload or smuggled binary",
+      "pattern": "\\b[0-9a-fA-F]{60,}\\b",
+      "flags": "g",
+      "severity": "medium",
+      "category": "obfuscation",
+      "flagGroup": "hasObfuscation",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": []
     }
   ]
 }
