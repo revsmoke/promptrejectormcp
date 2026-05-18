@@ -1,6 +1,6 @@
 {
   "name": "prompt-rejector",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Security gateway for AI agents: detects prompt injections, jailbreaks, and common vulnerabilities.",
   "main": "dist/index.js",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
-    "test": "npx tsx src/test/patternServiceTests.ts && npx tsx src/test/integrationTests.ts && npx tsx src/test/vulnFeedTests.ts",
+    "test": "npx tsx src/test/patternServiceTests.ts && npx tsx src/test/integrationTests.ts && npx tsx src/test/vulnFeedTests.ts && npx tsx src/test/vulnFeed2Tests.ts && npx tsx src/test/v11SkeletonTests.ts && npx tsx src/test/unicodeSmugglingTests.ts && npx tsx src/test/policyPuppetryTests.ts && npx tsx src/test/markdownExfilTests.ts && npx tsx src/test/mcpToolScannerTests.ts && npx tsx src/test/trifectaTests.ts && npx tsx src/test/atlasKevTests.ts && npx tsx src/test/huggingFaceTests.ts && npx tsx src/test/queryCveTests.ts && npx tsx src/test/canaryTests.ts && npx tsx src/test/tasteTesterTests.ts && npx tsx src/test/tasteTesterCorpusTests.ts && npx tsx src/test/manyShotObfuscationTests.ts",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -41,6 +41,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "cors": "^2.8.6",
@@ -63,7 +64,7 @@
     {
       "registry_type": "npm",
       "identifier": "prompt-rejector",
-      "version": "1.0.2"
+      "version": "1.1.0"
     }
   ]
 }

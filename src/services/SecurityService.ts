@@ -1,5 +1,6 @@
 import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService, StaticCheckResult } from "./StaticCheckService.js";
+import { mapGeminiCategoriesToAtlas } from "./SkillScanService.js";
 import type { PatternService } from "./PatternService.js";
 
 export interface SecurityReport {
@@ -10,6 +11,8 @@ export interface SecurityReport {
     geminiAvailable: boolean;
     gemini: GeminiCheckResult;
     static: StaticCheckResult;
+    /** Pass 7: MITRE ATLAS technique IDs aggregated across static + Gemini. */
+    atlasTechniques: string[];
     timestamp: string;
 }
 
@@ -46,6 +49,13 @@ export class SecurityService {
 
         const safe = !isDangerous;
 
+        // Pass 7: union ATLAS techniques from static-pattern matches and the
+        // Gemini-category heuristic mapping. Deduped via Set.
+        const atlasTechniques = Array.from(new Set([
+            ...(staticResult.atlasTechniques || []),
+            ...mapGeminiCategoriesToAtlas(geminiResult.categories || []),
+        ]));
+
         return {
             safe,
             overallConfidence: geminiResult.confidence,
@@ -54,6 +64,7 @@ export class SecurityService {
             geminiAvailable: !geminiResult.error,
             gemini: geminiResult,
             static: staticResult,
+            atlasTechniques,
             timestamp: new Date().toISOString()
         };
     }

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "markdown-image-exfil-query",
+      "name": "Markdown image with suspicious query string",
+      "description": "Markdown image with long opaque query value — common exfil vector (data leak via image-fetch)",
+      "pattern": "!?\\[[^\\]]*\\]\\(https?://[^\\)\\s]+[?&][^=]+=[A-Za-z0-9_+/=%-]{16,}\\)",
+      "flags": "gi",
+      "severity": "critical",
+      "category": "markdown_exfil",
+      "flagGroup": "hasMarkdownExfil",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
+    },
+    {
+      "id": "markdown-javascript-uri",
+      "name": "Markdown link/image with javascript: URI",
+      "description": "Markdown link/image with javascript: URI — XSS + agent-hijack vector",
+      "pattern": "!?\\[[^\\]]*\\]\\(\\s*javascript:[^\\)]+\\)",
+      "flags": "gi",
+      "severity": "critical",
+      "category": "markdown_exfil",
+      "flagGroup": "hasMarkdownExfil",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
+    },
+    {
+      "id": "markdown-data-html-uri",
+      "name": "Markdown link/image with data:text/html URI",
+      "description": "Markdown link/image with data:text/html URI — XSS chain in renderers",
+      "pattern": "!?\\[[^\\]]*\\]\\(\\s*data:text/html[^\\)]+\\)",
+      "flags": "gi",
+      "severity": "high",
+      "category": "markdown_exfil",
+      "flagGroup": "hasMarkdownExfil",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
+    },
+    {
+      "id": "html-img-exfil-query",
+      "name": "HTML img tag with long suspicious src query",
+      "description": "Raw HTML img with long opaque src query — exfil bypass for permissive renderers",
+      "pattern": "<img\\b[^>]*\\bsrc\\s*=\\s*[\"']https?://[^\"'\\s]+[?&][^=]+=[A-Za-z0-9_+/=%-]{16,}[\"'][^>]*>",
+      "flags": "gi",
+      "severity": "high",
+      "category": "markdown_exfil",
+      "flagGroup": "hasMarkdownExfil",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0024"
+    }
+  ]
+}

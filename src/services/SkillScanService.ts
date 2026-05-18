@@ -1,6 +1,8 @@
 import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
+import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
+import { HuggingFaceService, type HuggingFaceModelFlag, type HuggingFaceModelReport } from "./HuggingFaceService.js";
 
 export interface SkillScanResult {
     safe: boolean;
@@ -16,7 +18,17 @@ export interface SkillScanResult {
         severity: "low" | "medium" | "high" | "critical";
         categories: string[];
         findings: string[];
+        atlasTechniques?: string[];
     };
+    // Pass 5: Lethal-trifecta capability analysis (Willison).
+    hasLethalTrifecta: boolean;
+    trifectaResult: TrifectaResult;
+    /** Pass 7: Aggregated MITRE ATLAS technique IDs across all sub-checks. */
+    atlasTechniques: string[];
+    /** Pass 8: Flat list of HF security findings across all detected model IDs. */
+    huggingFaceSecurityFlags: HuggingFaceModelFlag[];
+    /** Pass 8: Per-model reports for richer downstream consumers. */
+    huggingFaceReports: HuggingFaceModelReport[];
     timestamp: string;
 }
 
@@ -38,46 +50,138 @@ function severityIdx(s: string): number {
     return SEVERITIES.indexOf(s as any);
 }
 
+/**
+ * Pass 7: map Gemini's category vocabulary to MITRE ATLAS technique IDs.
+ * Mirrors SPEC §7. Categories that pre-date ATLAS or aren't AI-specific
+ * (xss, sqli, shell, social_engineering, multilingual) are intentionally
+ * absent — we'd rather report no tag than a misleading one.
+ */
+export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
+    const map: Record<string, string> = {
+        unicode_smuggling: "AML.T0051",
+        policy_puppetry: "AML.T0054",
+        markdown_exfil: "AML.T0024",
+        prompt_injection: "AML.T0051",
+        obfuscation: "AML.T0051",
+    };
+    const out = new Set<string>();
+    for (const c of categories) {
+        const id = map[c];
+        if (id) out.add(id);
+    }
+    return Array.from(out);
+}
+
 export class SkillScanService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
     private patternService: PatternService | null;
+    private trifectaAnalyzer: TrifectaAnalyzer;
+    private huggingFaceService: HuggingFaceService;
 
-    constructor(patternService?: PatternService) {
+    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService) {
         this.patternService = patternService ?? null;
         this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService(patternService);
+        this.trifectaAnalyzer = new TrifectaAnalyzer();
+        // Pass 8: HF security signals. Default keeps existing call sites working;
+        // mcpServer passes a shared instance so the in-memory cache is reused
+        // across scans.
+        this.huggingFaceService = huggingFaceService ?? new HuggingFaceService();
     }
 
     async scanSkill(skillContent: string): Promise<SkillScanResult> {
-        const [geminiResult, staticResult, skillSpecificResult] = await Promise.all([
+        // Pass 8: extract HF model ids first (sync, cheap) so we can fan out
+        // network requests in parallel with the LLM + static checks.
+        const modelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const hfCheckPromise = modelIds.length === 0
+            ? Promise.resolve([] as HuggingFaceModelReport[])
+            : Promise.allSettled(modelIds.map((id) => this.huggingFaceService.checkModel(id)))
+                  .then((settled) =>
+                      settled
+                          .filter((s): s is PromiseFulfilledResult<HuggingFaceModelReport> => s.status === "fulfilled")
+                          .map((s) => s.value),
+                  );
+
+        const [geminiResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
             this.geminiService.checkPrompt(skillContent),
             Promise.resolve(this.staticCheckService.check(skillContent)),
-            Promise.resolve(this.runSkillSpecificChecks(skillContent))
+            Promise.resolve(this.runSkillSpecificChecks(skillContent)),
+            hfCheckPromise,
         ]);
 
+        // Pass 5: lethal-trifecta capability classification (sync, cheap).
+        const trifectaResult = this.trifectaAnalyzer.analyze({ skillContent });
+
+        // Pass 8: flatten HF flags + compute their severity contribution.
+        const huggingFaceSecurityFlags: HuggingFaceModelFlag[] = [];
+        for (const r of hfReports) huggingFaceSecurityFlags.push(...r.flags);
+        // Map HF severity ladder (safe/low/medium/high/critical) onto the
+        // 4-level skill scan ladder. "safe" → "low" (we don't have a safer level).
+        const HF_TO_SKILL_SEV: Record<HuggingFaceModelReport["severity"], "low" | "medium" | "high" | "critical"> = {
+            safe: "low",
+            low: "low",
+            medium: "medium",
+            high: "high",
+            critical: "critical",
+        };
+        let hfSeverity: "low" | "medium" | "high" | "critical" = "low";
+        for (const r of hfReports) {
+            const mapped = HF_TO_SKILL_SEV[r.severity];
+            if (SEVERITIES.indexOf(mapped) > SEVERITIES.indexOf(hfSeverity)) {
+                hfSeverity = mapped;
+            }
+        }
+
         // Aggregate severity
+        // why: TrifectaAnalyzer reports its own severity ladder ("safe" | "medium" | "critical").
+        // SPEC §2 + §7 list lethal_trifecta as a composite critical-severity category, so the
+        // final rollup must fold the trifecta result in — otherwise a 3-of-3 skill (read+fetch+egress)
+        // can slip through as `safe: true` when no other sub-check fires high/critical.
+        const TRIFECTA_TO_SKILL_SEV: Record<TrifectaResult["severity"], "low" | "medium" | "high" | "critical"> = {
+            safe: "low",
+            medium: "medium",
+            critical: "critical",
+        };
+        const trifectaSeverityMapped = TRIFECTA_TO_SKILL_SEV[trifectaResult.severity];
         const geminiSevIdx = SEVERITIES.indexOf(geminiResult.severity);
         const staticSevIdx = SEVERITIES.indexOf(staticResult.severity);
         const skillSevIdx = SEVERITIES.indexOf(skillSpecificResult.severity);
-        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx)];
+        const hfSevIdx = SEVERITIES.indexOf(hfSeverity);
+        const trifectaSevIdx = SEVERITIES.indexOf(trifectaSeverityMapped);
+        const overallSeverity = SEVERITIES[Math.max(geminiSevIdx, staticSevIdx, skillSevIdx, hfSevIdx, trifectaSevIdx)];
 
-        // Aggregate categories
+        // Aggregate categories. When trifectaPresent we add a synthetic
+        // `lethal_trifecta` category so downstream consumers can see *why* the
+        // composite severity bumped to critical without re-running the analyzer.
         const categories = Array.from(new Set([
             ...geminiResult.categories,
             ...staticResult.categories,
-            ...skillSpecificResult.categories
+            ...skillSpecificResult.categories,
+            ...(trifectaResult.trifectaPresent ? ["lethal_trifecta"] : []),
         ]));
 
-        // Decide "safe" status
+        // Decide "safe" status. trifectaPresent OR'd in so all-three-buckets
+        // forces dangerous even when each sub-check on its own stayed low/medium.
         const isDangerous =
             overallSeverity === "critical" ||
             overallSeverity === "high" ||
             (geminiResult.isInjection && geminiResult.confidence > 0.6) ||
             skillSpecificResult.hasDangerousToolUsage ||
-            skillSpecificResult.hasNetworkExfiltration;
+            skillSpecificResult.hasNetworkExfiltration ||
+            trifectaResult.trifectaPresent;
 
         const safe = !isDangerous;
+
+        // Pass 7: aggregate ATLAS techniques across static + Gemini (skill-specific
+        // checks don't carry pattern entries today; future ATLAS hooks can fold in here).
+        // SPEC §7 maps `lethal_trifecta → AML.T0024 + AML.T0051` (composite). Add both
+        // when the trifecta is present; Set dedup handles overlap with other sub-checks.
+        const atlasTechniques = Array.from(new Set([
+            ...(staticResult.atlasTechniques || []),
+            ...mapGeminiCategoriesToAtlas(geminiResult.categories || []),
+            ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : []),
+        ]));
 
         return {
             safe,
@@ -87,6 +191,11 @@ export class SkillScanService {
             skillSpecific: skillSpecificResult,
             gemini: geminiResult,
             static: staticResult,
+            hasLethalTrifecta: trifectaResult.trifectaPresent,
+            trifectaResult,
+            atlasTechniques,
+            huggingFaceSecurityFlags,
+            huggingFaceReports: hfReports,
             timestamp: new Date().toISOString()
         };
     }

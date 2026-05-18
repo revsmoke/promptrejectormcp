@@ -1,4 +1,165 @@
 {
   "version": 1,
-  "patterns": []
+  "patterns": [
+    {
+      "id": "ignore-previous-instructions",
+      "name": "Ignore/override previous instructions",
+      "description": "Classic indirect-injection IOC: imperative to ignore/disregard/override prior instructions, rules, or safety.",
+      "pattern": "\\b(ignore|disregard|forget|override)\\s+(all\\s+|the\\s+|your\\s+|any\\s+|previous\\s+|prior\\s+|above\\s+)+(instructions?|rules?|prompts?|guidelines?|directives?|safety|policy)\\b",
+      "flags": "i",
+      "severity": "critical",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "instruction-override-act-as",
+      "name": "Act-as jailbreak persona",
+      "description": "Asks the model to act/behave/pretend as an unrestricted/jailbroken/DAN/developer-mode persona.",
+      "pattern": "\\b(act|behave|pretend|roleplay|role[- ]?play)\\s+as\\s+(an?\\s+)?(unrestricted|uncensored|jailbroken|DAN|developer\\s+mode|admin|root|system)",
+      "flags": "i",
+      "severity": "high",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "system-prompt-leak",
+      "name": "System-prompt leak request",
+      "description": "Direct attempt to extract the system prompt / initial instructions / hidden developer message.",
+      "pattern": "\\b(reveal|show|print|output|display|repeat)\\s+(your\\s+)?(system\\s+prompt|initial\\s+instructions|hidden\\s+prompt|original\\s+instructions|developer\\s+message)\\b",
+      "flags": "i",
+      "severity": "high",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "untrusted-content-instruction",
+      "name": "Untrusted-content authority claim",
+      "description": "Indirect-injection IOC: untrusted content opens with a SYSTEM/ADMIN/URGENT label and asserts must/always/never directives.",
+      "pattern": "^(SYSTEM|ADMIN|IMPORTANT|URGENT|HUMAN[-_ ]?OVERRIDE)\\s*:[\\s\\S]{0,300}\\b(must|always|never)\\b",
+      "flags": "im",
+      "severity": "high",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "safety-bypass-claim",
+      "name": "Claim that safety is disabled",
+      "description": "Asserts safety is off / unfiltered / developer-mode-enabled / sudo-mode — common jailbreak preamble.",
+      "pattern": "\\b(safety\\s+(disabled|off|bypassed)|no\\s+restrictions?|unfiltered\\s+mode|developer\\s+mode\\s+enabled|sudo\\s+mode)\\b",
+      "flags": "i",
+      "severity": "critical",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "markdown-comment-injection",
+      "name": "Hidden injection inside HTML/Markdown comment",
+      "description": "Indirect-injection IOC: HTML/Markdown comment carries imperative override/ignore/jailbreak instructions invisible in rendered text.",
+      "pattern": "<!--[\\s\\S]{0,500}?\\b(ignore|override|bypass|system|admin|jailbreak)\\b[\\s\\S]{0,500}?-->",
+      "flags": "i",
+      "severity": "high",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "prompt-injection-payload-prefix",
+      "name": "Closing-bracket escape into new instructions",
+      "description": "Closing-bracket escape pattern (]]}>) followed by override/system/new-instruction keywords — a structured-output break attempt.",
+      "pattern": "\\]\\]\\}>\\s*\\n?\\s*(ignore|override|system|new instructions)",
+      "flags": "i",
+      "severity": "critical",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    },
+    {
+      "id": "tool-result-spoofing",
+      "name": "Spoofed tool/function result",
+      "description": "Fake tool-result/function-call/search-result block carrying override/ignore/error directives — agent-hijack IOC.",
+      "pattern": "\\b(tool[-_ ]?result|function[-_ ]?call|search[-_ ]?result)\\s*:\\s*\\{[\\s\\S]{0,200}?\\b(error|override|ignore)\\b",
+      "flags": "i",
+      "severity": "high",
+      "category": "prompt_injection",
+      "flagGroup": "hasPromptInjection",
+      "scope": "general",
+      "detection": {
+        "mode": "simple"
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0051"
+    }
+  ]
 }

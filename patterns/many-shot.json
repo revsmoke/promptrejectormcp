@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "many-shot-qa-pairs",
+      "name": "Many-shot Q/A pair stacking",
+      "description": "Many-shot jailbreak heuristic — counts Q/A pairs in user content; 20+ alternating turns is suspicious context-saturation (Anthropic 2024)",
+      "pattern": "^\\s*(Q|Question|Human|User|H)\\s*[:\\.]\\s+[\\s\\S]{1,300}?^\\s*(A|Answer|Assistant|AI|Bot)\\s*[:\\.]",
+      "flags": "gim",
+      "severity": "high",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 20
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
+    },
+    {
+      "id": "many-shot-transcript",
+      "name": "Many-shot transcript-style stacking",
+      "description": "Many-shot heuristic — counts 'turn N:' / 'round N:' markers; 30+ is suspicious context-saturation",
+      "pattern": "\\b(turn|round|exchange|step)\\s+\\d+\\s*[:\\.]",
+      "flags": "gi",
+      "severity": "medium",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 30
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-13",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
+    },
+    {
+      "id": "many-shot-enumerated-qa",
+      "name": "Many-shot enumerated Q/A stacking",
+      "description": "Many-shot heuristic — counts enumerated 'Q1:' / 'Question 1:' / 'Human 12:' markers; 15+ is suspicious context-saturation (Pass 12 follow-up: the enumerated variant Pass 12's non-enumerated heuristic missed)",
+      "pattern": "^\\s*(Q|Question|Human|User)\\s*\\d+\\s*[:\\.]",
+      "flags": "gim",
+      "severity": "high",
+      "category": "many_shot",
+      "flagGroup": "hasManyShot",
+      "scope": "general",
+      "detection": {
+        "mode": "threshold",
+        "countThreshold": 15
+      },
+      "enabled": true,
+      "source": "original",
+      "cveRefs": [],
+      "dateAdded": "2026-05-14",
+      "whitelistedDomains": [],
+      "atlasTechnique": "AML.T0054"
+    }
+  ]
+}

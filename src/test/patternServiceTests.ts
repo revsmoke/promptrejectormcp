@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { PatternService } from "../services/PatternService.js";
+import { evaluatePattern } from "../services/StaticCheckService.js";
+import type { ActivePattern } from "../services/PatternService.js";
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, cpSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -28,7 +30,20 @@ function createTestDir(): string {
     const projectPatterns = join(process.cwd(), "patterns");
 
     // Copy all pattern files
-    const files = ["xss.json", "sqli.json", "shell-injection.json", "skill-threats.json", "prompt-injection.json", "custom.json"];
+    const files = [
+        "xss.json",
+        "sqli.json",
+        "shell-injection.json",
+        "skill-threats.json",
+        "prompt-injection.json",
+        "custom.json",
+        "unicode-smuggling.json",
+        "policy-puppetry.json",
+        "markdown-exfil.json",
+        "mcp-tool-poisoning.json",
+        "many-shot.json",
+        "llm-threats.json",
+    ];
     for (const f of files) {
         const src = join(projectPatterns, f);
         if (existsSync(src)) {
@@ -56,7 +71,7 @@ async function runTests() {
         // Reload with valid manifest
         const svc2 = new PatternService(dir);
         const all = svc2.list();
-        assert(all.length === 39, `Expected 39 patterns, got ${all.length}`);
+        assert(all.length === 71, `Expected 71 patterns, got ${all.length}`);
         assert(!svc2.isFallbackActive(), "Should not be using fallback patterns");
         cleanup(dir);
     }
@@ -83,7 +98,7 @@ async function runTests() {
         svc.regenerateManifest();
         const svc2 = new PatternService(dir);
         const general = svc2.list({ scope: "general" });
-        assert(general.length === 13, `Expected 13 general patterns, got ${general.length}`);
+        assert(general.length === 45, `Expected 45 general patterns, got ${general.length}`);
         const skill = svc2.list({ scope: "skill" });
         assert(skill.length === 26, `Expected 26 skill patterns, got ${skill.length}`);
         cleanup(dir);
@@ -131,7 +146,7 @@ async function runTests() {
 
         // Verify it's in the list
         const all = svc2.list();
-        assert(all.length === 40, `Expected 40 patterns after add, got ${all.length}`);
+        assert(all.length === 72, `Expected 72 patterns after add, got ${all.length}`);
 
         // Verify manifest was updated
         const integrity = svc2.verify();
@@ -307,6 +322,76 @@ async function runTests() {
         assert(svc.isFallbackActive(), "Should use fallback when directory doesn't exist");
         const all = svc.list();
         assert(all.length === 10, `Expected 10 fallback patterns, got ${all.length}`);
+    }
+
+    // Test 14: evaluatePattern resets lastIndex on global regexes so repeated calls
+    // against the same cached ActivePattern instance stay deterministic. Regression
+    // guard for the McpToolScanner / batch-scan path which reuses one regex across
+    // many input strings.
+    console.log("Test 14: evaluatePattern is lastIndex-safe across repeated calls");
+    {
+        // Simple-mode global regex — without the reset, the SECOND .test() call would
+        // start at lastIndex past the first match and incorrectly return false.
+        const simplePattern: ActivePattern = {
+            entry: {
+                id: "test-lastindex-simple",
+                name: "lastIndex simple guard",
+                pattern: "needle",
+                flags: "gi",
+                severity: "low",
+                category: "xss",
+                flagGroup: "hasXSS",
+                scope: "general",
+                detection: { mode: "simple" },
+                enabled: true,
+                cveRefs: [],
+                dateAdded: "2026-05-14",
+                whitelistedDomains: [],
+            } as any,
+            regex: new RegExp("needle", "gi"),
+        };
+        const text = "haystack needle haystack";
+        const first = evaluatePattern(text, simplePattern);
+        const second = evaluatePattern(text, simplePattern);
+        assert(first.matched === true, "Simple-mode: first call matches");
+        assert(second.matched === true, "Simple-mode: second call still matches (lastIndex reset)");
+
+        // Threshold-mode global regex — without the reset, matchAll() iterates from
+        // the polluted lastIndex and under-counts on the second call.
+        const thresholdPattern: ActivePattern = {
+            entry: {
+                id: "test-lastindex-threshold",
+                name: "lastIndex threshold guard",
+                pattern: "x",
+                flags: "g",
+                severity: "low",
+                category: "obfuscation",
+                flagGroup: "hasObfuscation",
+                scope: "general",
+                detection: { mode: "threshold", countThreshold: 3 },
+                enabled: true,
+                cveRefs: [],
+                dateAdded: "2026-05-14",
+                whitelistedDomains: [],
+            } as any,
+            regex: new RegExp("x", "g"),
+        };
+        const xxx = "xxxxx";
+        const t1 = evaluatePattern(xxx, thresholdPattern);
+        const t2 = evaluatePattern(xxx, thresholdPattern);
+        assert(t1.matchCount === 5, `Threshold first call counts 5, got ${t1.matchCount}`);
+        assert(t2.matchCount === 5, `Threshold second call still counts 5, got ${t2.matchCount}`);
+        assert(t1.matched && t2.matched, "Both threshold calls cross the threshold");
+
+        // Cross-text reuse: shared regex instance across two different texts must
+        // still detect both. This mirrors the McpToolScanner.walkStrings loop.
+        const reusable: ActivePattern = {
+            entry: simplePattern.entry,
+            regex: new RegExp("needle", "gi"),
+        };
+        const a = evaluatePattern("alpha needle omega", reusable);
+        const b = evaluatePattern("beta needle gamma", reusable);
+        assert(a.matched && b.matched, "Cross-text reuse: both calls match (no pollution)");
     }
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
