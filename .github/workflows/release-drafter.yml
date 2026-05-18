@@ -1,3 +1,14 @@
+# Release Drafter — maintains a rolling draft GitHub Release from merged PRs.
+#
+# Invokes `release-drafter/release-drafter@v6` which reads its categorisation
+# rules from `.github/release-drafter.yml` (default config path). On push to
+# `main` and on PR lifecycle events it updates the next-version draft. The
+# `workflow_dispatch` trigger lets a maintainer regenerate the draft manually.
+#
+# Required secrets:
+#   - GITHUB_TOKEN  Auto-provided by GitHub Actions. The `contents: write`
+#                   permission below is required so the action can create /
+#                   update the release draft. No additional secrets needed.
 name: Release Drafter
 
 on:

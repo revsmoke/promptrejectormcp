@@ -143,27 +143,50 @@ npm run dev
 ```
 promptrejectormcp/
 ├── src/
-│   ├── index.ts                  # Entry point
+│   ├── index.ts                       # Entry point — picks mode, redirects stdout under MCP
 │   ├── api/
-│   │   └── server.ts             # REST API (Express)
+│   │   └── server.ts                  # REST API (Express)
 │   ├── mcp/
-│   │   └── mcpServer.ts          # MCP server
-│   └── services/
-│       ├── SecurityService.ts    # Main aggregator
-│       ├── GeminiService.ts      # LLM-based detection
-│       └── StaticCheckService.ts # Regex pattern detection
-├── dist/                         # Compiled output
-├── test/                         # Test files (to be added)
-└── docs/                         # Additional documentation
+│   │   └── mcpServer.ts               # MCP server (11 tools)
+│   ├── schemas/
+│   │   └── PatternSchemas.ts          # Zod schemas for the pattern library
+│   ├── services/
+│   │   ├── SecurityService.ts         # Main aggregator (check_prompt)
+│   │   ├── SkillScanService.ts        # scan_skill aggregator
+│   │   ├── GeminiService.ts           # LLM-based semantic detection
+│   │   ├── StaticCheckService.ts      # Regex pattern detection
+│   │   ├── PatternService.ts          # File-based pattern library + integrity
+│   │   ├── VulnFeedService.ts         # NVD + GHSA scanning → staged patterns
+│   │   ├── KevFeedService.ts          # CISA KEV catalog ingest (v1.1)
+│   │   ├── OsvFeedService.ts          # OSV/deps.dev feed ingest (v1.1)
+│   │   ├── GhsaGraphQLService.ts      # GitHub Advisory GraphQL client (v1.1)
+│   │   ├── UnifiedCveCache.ts         # Cross-feed CVE de-duplication (v1.1)
+│   │   ├── AtlasService.ts            # MITRE ATLAS taxonomy lookup (v1.1)
+│   │   ├── TrifectaAnalyzer.ts        # Lethal-Trifecta detector (v1.1)
+│   │   ├── HuggingFaceService.ts      # HF Hub security-flag lookup (v1.1)
+│   │   ├── McpToolScanner.ts          # MCP-tool-manifest scanner (v1.1)
+│   │   ├── CanaryService.ts           # Canary-token issue/verify (v1.1)
+│   │   ├── TasteTesterService.ts      # Dual-agent sandbox detonator (v1.1)
+│   │   ├── fallbackPatterns.ts        # Hardcoded emergency patterns
+│   │   └── aiPackageAllowlist.ts      # Trusted-package allowlist for HF/PyPI checks
+│   └── test/                          # Standalone test scripts (run via npx tsx)
+├── patterns/                          # JSON pattern library + manifest
+├── dist/                              # Compiled output
+└── docs/                              # Additional documentation
 ```
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `SecurityService.ts` | Orchestrates both detection layers, aggregates results |
+| `SecurityService.ts` | Orchestrates Gemini + static layers for `check_prompt` |
+| `SkillScanService.ts` | Aggregates Gemini + static + skill-specific + trifecta + HF for `scan_skill` |
 | `GeminiService.ts` | Semantic analysis via Gemini API |
 | `StaticCheckService.ts` | Fast regex-based pattern matching |
+| `TrifectaAnalyzer.ts` | Detects co-location of private-read / untrusted-fetch / external-egress |
+| `HuggingFaceService.ts` | Looks up model security flags via the HF Hub API |
+| `AtlasService.ts` | Maps findings to MITRE ATLAS technique IDs |
+| `TasteTesterService.ts` | Dual-agent (Anthropic) dynamic detonator for suspicious prompts |
 | `server.ts` | REST API endpoints |
 | `mcpServer.ts` | MCP protocol implementation |
 
@@ -233,19 +256,32 @@ try {
 2. **Integration Tests** - Test the full API flow
 3. **Attack Vector Tests** - Verify detection of known attacks
 
-### Test Categories
+### Test Suites
 
-When adding or modifying detection logic, test against these categories:
+Tests are standalone scripts in `src/test/` — there is no test runner. The `npm test` chain (see `package.json`) runs every offline suite sequentially. Suites that hit a real API (Gemini, Anthropic, Hugging Face) are excluded from `npm test` and must be invoked explicitly with the relevant API key set.
 
-| Category | Example |
-|----------|---------|
-| Benign inputs | Normal user questions |
-| Classic injections | "Ignore previous instructions..." |
-| Obfuscated attacks | Base64, Unicode, ROT13 |
-| Multilingual attacks | Non-English injection attempts |
-| Social engineering | Role-play, fake authority |
-| Traditional vulns | XSS, SQLi, shell injection |
-| Edge cases | Empty strings, very long inputs |
+| Suite | Covers | Online? |
+|-------|--------|---------|
+| `patternServiceTests.ts` | Pattern CRUD, integrity manifest, HMAC | offline |
+| `integrationTests.ts` | End-to-end regression on the refactored services | offline |
+| `vulnFeedTests.ts` / `vulnFeed2Tests.ts` | NVD + GHSA ingest with mocked HTTP | offline |
+| `v11SkeletonTests.ts` | v1.1 service wiring smoke test | offline |
+| `unicodeSmugglingTests.ts` | Zero-width / tag-char / homoglyph payloads | offline |
+| `policyPuppetryTests.ts` | XML/JSON role-puppetry jailbreaks | offline |
+| `markdownExfilTests.ts` | Image/link-based exfil patterns | offline |
+| `mcpToolScannerTests.ts` | MCP-tool-manifest scanner | offline |
+| `trifectaTests.ts` | Lethal-Trifecta analyzer | offline |
+| `atlasKevTests.ts` | ATLAS + KEV feed ingest and lookup | offline |
+| `huggingFaceTests.ts` | HF Hub security-flag parser | offline |
+| `queryCveTests.ts` | Unified CVE cache + `query_cve` MCP tool | offline |
+| `canaryTests.ts` | Canary-token issue/verify lifecycle | offline |
+| `tasteTesterTests.ts` | Taste-Tester unit tests with stubs | offline |
+| `tasteTesterCorpusTests.ts` | Real-API Taste-Tester calibration corpus | requires `ANTHROPIC_API_KEY` |
+| `manyShotObfuscationTests.ts` | Many-shot jailbreak corpus | offline |
+| `advancedTests.ts` | 7 attack-vector scenarios | requires `GEMINI_API_KEY` |
+| `skillScanTests.ts` | 7 SKILL.md scan scenarios | requires `GEMINI_API_KEY` |
+
+When adding new detection logic, prefer extending one of these suites. New behavior should at minimum be exercised by an offline suite so it lands in `npm test`.
 
 ### Writing Tests
 
@@ -270,15 +306,18 @@ describe('StaticCheckService', () => {
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all offline suites (recommended before opening a PR)
 npm test
 
-# Run with coverage
-npm run test:coverage
+# Run a single suite directly (use npx tsx, not ts-node — ESM compat)
+npx tsx src/test/trifectaTests.ts
 
-# Run specific test file
-npm test -- --grep "StaticCheckService"
+# Run the online suites — set the relevant key first
+GEMINI_API_KEY=... npx tsx src/test/advancedTests.ts
+ANTHROPIC_API_KEY=... npx tsx src/test/tasteTesterCorpusTests.ts
 ```
+
+There is no coverage tool wired up yet.
 
 ---
 

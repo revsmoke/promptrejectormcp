@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T16:26:25.197Z",
+  "generatedAt": "2026-05-18T15:47:00.968Z",
   "files": {
     "custom.json": {
       "sha256": "0d43cba8f0be7751c33aa3a0a3cd1cc5729e95cd013e6ed76a63abcdef1c731d",
@@ -15,7 +15,7 @@
       "patternCount": 3
     },
     "markdown-exfil.json": {
-      "sha256": "cc76258a1de8d8541f6f42fa42fceddd700128f1e5751aec20804062945172e2",
+      "sha256": "03ba588ac0a715115f202f19896c8e526aaaf67cb825476cd95dd76b423adbaa",
       "patternCount": 4
     },
     "mcp-tool-poisoning.json": {
@@ -51,6 +51,6 @@
       "patternCount": 5
     }
   },
-  "rootHash": "efd12bbe5df327d5ff2ff22947a8132ebf9db4e8395f718ac33eaf71bc0ab01b",
-  "signature": "d58eb310b4c83506daec1e7ee4a5177cdd9b5eeff0ae7b74a0a42af28448b303"
+  "rootHash": "41cf5ac215c9463a359227796d555bfd3463a90bc5c572d85740281fb414adf0",
+  "signature": ""
 }

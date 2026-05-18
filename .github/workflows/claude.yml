@@ -1,4 +1,21 @@
-name: Claude Code
+# Claude Code — `@claude` mention handler.
+#
+# Triggers on issue/PR comments, review comments, submitted reviews, and newly
+# opened/assigned issues whose body or title contains "@claude". Dispatches the
+# request to `anthropics/claude-code-action@v1`, which interprets the comment
+# and may push commits or comment back on the thread.
+#
+# Required secrets:
+#   - CLAUDE_CODE_OAUTH_TOKEN  Mandatory. OAuth token issued by Anthropic for
+#                              the claude-code-action. Without it the action
+#                              fails fast with an auth error.
+#
+# Notes:
+#   - GitHub's built-in GITHUB_TOKEN provides repo/issue read access; no
+#     extra PAT is needed for the default permissions block below.
+#   - `additional_permissions: actions: read` lets Claude see CI results when
+#     responding on PRs.
+name: Claude Code (@claude mention handler)
 
 on:
   issue_comment:

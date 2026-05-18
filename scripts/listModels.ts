@@ -1,3 +1,21 @@
+// scripts/listModels.ts
+//
+// Probes Google Generative AI to discover which Gemini model IDs are
+// currently reachable with the configured API key. Iterates a hard-coded
+// list of candidate IDs (gemini-1.5-flash, gemini-3-flash-preview, etc.) and
+// issues a one-token generateContent call against each, printing AVAILABLE
+// or UNAVAILABLE per model. Useful when picking / migrating GEMINI_MODEL.
+//
+// Required env vars:
+//   GEMINI_API_KEY  Mandatory. Loaded via dotenv from .env in cwd. Without
+//                   it the script prints "No API key" and returns (no error
+//                   thrown — exit code stays 0).
+//
+// Run with:
+//   npx tsx scripts/listModels.ts
+//
+// Exit codes:
+//   0  Always (per-model failures are reported inline, not thrown).
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 

@@ -177,7 +177,7 @@ ATLAS_REFRESH_INTERVAL_HOURS=168
 
 # Taste-Tester sandbox (opt-in dual-agent detonator; off by default)
 TASTE_TESTER_ENABLED=false
-TASTE_TESTER_MODEL=claude-sonnet-4-6
+TASTE_TESTER_MODEL=claude-opus-4-7
 TASTE_TESTER_MAX_TURNS=5
 TASTE_TESTER_MAX_TOKENS=4096
 TASTE_TESTER_TIMEOUT_MS=30000
@@ -399,7 +399,7 @@ The skill scanner checks for:
 
 ## 📚 Pattern Library
 
-All detection patterns (39 total) are stored as JSON files in the `patterns/` directory, replacing the previously hardcoded regex arrays. Patterns can be listed, added, updated, and removed at runtime without redeploying.
+All detection patterns (~71 total across 11 active pattern files as of v1.1.0) are stored as JSON files in the `patterns/` directory, replacing the previously hardcoded regex arrays. Patterns can be listed, added, updated, and removed at runtime without redeploying.
 
 ### Pattern Files
 
@@ -407,9 +407,15 @@ All detection patterns (39 total) are stored as JSON files in the `patterns/` di
 |------|----------|-------|-------------|
 | `xss.json` | 5 | general | XSS detection (script tags, event handlers, JS protocols) |
 | `sqli.json` | 5 | general | SQL injection (keyword pairs, tautologies, comment injection) |
-| `shell-injection.json` | 4 | general | Shell injection and directory traversal |
-| `skill-threats.json` | 25 | skill | Hidden instructions, dangerous commands, obfuscation, social engineering, data exfiltration |
-| `prompt-injection.json` | 0+ | general | CVE-sourced patterns (populated by vulnerability feeds) |
+| `shell-injection.json` | 3 | general | Shell injection and directory traversal |
+| `skill-threats.json` | 26 | skill | Hidden instructions, dangerous commands, obfuscation, social engineering, data exfiltration |
+| `prompt-injection.json` | 8 | general | Hand-curated IOC patterns + CVE-sourced patterns (populated by vulnerability feeds) |
+| `unicode-smuggling.json` | 7 | general | Unicode Tag block, zero-width, bidi overrides, Sneaky Bits (v1.1) |
+| `policy-puppetry.json` | 4 | general | XML/INI/JSON/YAML fake-policy wrappers (v1.1) |
+| `markdown-exfil.json` | 4 | general | Markdown image/link exfil; `javascript:` / `data:text/html` URIs (v1.1) |
+| `mcp-tool-poisoning.json` | 5 | general | Imperatives, "ignore previous," hidden HTML-comment channels (v1.1) |
+| `many-shot.json` | 3 | general | Q/A pair, turn-marker, enumerated Q1/Q2 stacks (v1.1) |
+| `llm-threats.json` | 1 | general | Additional LLM-specific threat patterns (v1.1) |
 | `custom.json` | 0+ | any | User-defined patterns |
 
 ### Listing Patterns
@@ -556,7 +562,7 @@ Prompt Rejector was rigorously tested against 14 attack vectors. Here are the re
 | 13 | Educational query about prompt injection | ✅ `true` | low | — | ✅ Correct (not a false positive) |
 | 14 | DAN jailbreak (classic) | ❌ `false` | critical | prompt_injection, social_engineering | ✅ Caught |
 
-**Result: 14/14 tests passed** — All attacks detected, no false positives on legitimate queries.
+**Result: 14/14 tests passed** for this v1.0 attack-vector subset — All attacks detected, no false positives on legitimate queries. The full v1.1.0 regression suite covers **457 tests across 17 suites** (Skill Scanner, lethal-trifecta, ATLAS/KEV, MCP-tool poisoning, Taste-Tester, etc.); see [CHANGELOG.md](CHANGELOG.md) for the post-v1.1 numbers and `npm test` to run them.
 
 ### Sample Attack Detections
 
@@ -1099,20 +1105,43 @@ promptrejectormcp/
 │   │   ├── StaticCheckService.ts # Pattern matching
 │   │   ├── SkillScanService.ts   # Skill-specific scanning
 │   │   ├── PatternService.ts     # Pattern CRUD + integrity
-│   │   ├── VulnFeedService.ts    # CVE feed scanner
+│   │   ├── VulnFeedService.ts    # CVE feed scanner (NVD + GHSA REST)
+│   │   ├── OsvFeedService.ts     # v1.1: OSV.dev querybatch
+│   │   ├── GhsaGraphQLService.ts # v1.1: GHSA GraphQL feed
+│   │   ├── KevFeedService.ts     # v1.1: CISA KEV escalator
+│   │   ├── AtlasService.ts       # v1.1: MITRE ATLAS taxonomy
+│   │   ├── HuggingFaceService.ts # v1.1: HF Hub securityStatus
+│   │   ├── UnifiedCveCache.ts    # v1.1: cross-source CVE cache
+│   │   ├── TrifectaAnalyzer.ts   # v1.1: lethal-trifecta classifier
+│   │   ├── McpToolScanner.ts     # v1.1: MCP-tool descriptor scanner
+│   │   ├── CanaryService.ts      # v1.1: memory/RAG canary tokens
+│   │   ├── TasteTesterService.ts # v1.1: dual-agent sandbox detonator
+│   │   ├── aiPackageAllowlist.ts # v1.1: AI-ecosystem package allowlist
 │   │   └── fallbackPatterns.ts   # Emergency hardcoded patterns
-│   └── test/
-│       ├── advancedTests.ts      # Attack vector tests
-│       ├── skillScanTests.ts     # Skill scanning tests
-│       ├── patternServiceTests.ts # Pattern CRUD + integrity tests
-│       ├── vulnFeedTests.ts      # Feed scanner tests (mocked)
-│       └── integrationTests.ts   # Regression tests
+│   └── test/                     # 17 test suites (~457 tests)
+│       ├── advancedTests.ts      # Attack vector tests (online; needs GEMINI_API_KEY)
+│       ├── skillScanTests.ts     # Skill scanning tests (online)
+│       ├── patternServiceTests.ts # Pattern CRUD + integrity tests (offline)
+│       ├── vulnFeedTests.ts      # NVD + GHSA REST feed tests (mocked)
+│       ├── integrationTests.ts   # Cross-service regression tests
+│       ├── v11SkeletonTests.ts   # v1.1 walking-skeleton smoke
+│       ├── unicodeSmugglingTests.ts, policyPuppetryTests.ts, markdownExfilTests.ts
+│       ├── mcpToolScannerTests.ts, trifectaTests.ts, atlasKevTests.ts
+│       ├── huggingFaceTests.ts, queryCveTests.ts, canaryTests.ts
+│       ├── tasteTesterTests.ts, tasteTesterCorpusTests.ts
+│       └── manyShotObfuscationTests.ts
 ├── patterns/
 │   ├── xss.json                  # XSS detection patterns
 │   ├── sqli.json                 # SQL injection patterns
 │   ├── shell-injection.json      # Shell/traversal patterns
 │   ├── skill-threats.json        # Skill-specific patterns
-│   ├── prompt-injection.json     # CVE-sourced patterns
+│   ├── prompt-injection.json     # Hand-curated IOCs + CVE-sourced patterns
+│   ├── unicode-smuggling.json    # v1.1: Unicode-tag/zero-width/bidi
+│   ├── policy-puppetry.json      # v1.1: fake-policy wrappers
+│   ├── markdown-exfil.json       # v1.1: markdown exfil channels
+│   ├── mcp-tool-poisoning.json   # v1.1: MCP tool descriptor poisoning
+│   ├── many-shot.json            # v1.1: many-shot jailbreak stacks
+│   ├── llm-threats.json          # v1.1: LLM-specific threats
 │   ├── custom.json               # User-defined patterns
 │   ├── manifest.json             # Integrity manifest (SHA-256 + HMAC)
 │   └── staging/

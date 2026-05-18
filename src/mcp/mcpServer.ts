@@ -164,7 +164,7 @@ export class PromptRejectorMCPServer {
                     },
                     {
                         name: "scan_mcp_tool",
-                        description: "Scan an MCP tool descriptor for tool-poisoning signals (imperative override language, hidden Unicode, descriptor drift).",
+                        description: "Lint an MCP tool descriptor for tool-poisoning signals (imperative override language, hidden Unicode) and compute a canonical SHA-256 hash; reports descriptor drift when a priorHash is supplied.",
                         inputSchema: {
                             type: "object",
                             properties: {

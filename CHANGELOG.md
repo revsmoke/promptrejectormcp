@@ -37,7 +37,7 @@ A major coverage expansion adding **6 new MCP tools** and **5 new vulnerability-
 
 #### New Feed Sources
 
-- **OSV.dev `/v1/querybatch`** with an AI-package allowlist (langchain, transformers, litellm, mlflow, ollama, llama-index, autogen, crewai, langgraph, vllm, sglang, anthropic-sdk-python, openai-python, transformers-js, openai, anthropic)
+- **OSV.dev `/v1/querybatch`** with an AI-package allowlist (PyPI: langchain, langchain-core, langchain-community, langgraph, llama-index, autogen, crewai, transformers, vllm, sglang, litellm, mlflow, ollama, openai, anthropic; npm: @langchain/core, @langchain/community, langchain, @huggingface/transformers, @anthropic-ai/sdk, openai, ollama, llamaindex). Full list in `src/services/aiPackageAllowlist.ts`.
 - **GHSA GraphQL** `securityVulnerabilities` query with ecosystem filter
 - **MITRE ATLAS v5.4 taxonomy** with 7-day cache and offline fallback table
 - **CISA KEV catalog** with 24h cache and severity escalator (`severity` bumps one level when CVE is KEV-listed; entry receives `inKev: true`)
@@ -94,7 +94,7 @@ ATLAS_REFRESH_INTERVAL_HOURS=168
 
 # Taste-Tester (opt-in)
 TASTE_TESTER_ENABLED=false
-TASTE_TESTER_MODEL=claude-sonnet-4-6
+TASTE_TESTER_MODEL=claude-opus-4-7
 TASTE_TESTER_MAX_TURNS=5
 TASTE_TESTER_MAX_TOKENS=4096
 TASTE_TESTER_TIMEOUT_MS=30000
@@ -109,10 +109,10 @@ CANARY_DEFAULT_TTL_SECONDS=86400
 
 See `SPEC.md` §13.1 for full status of each entry.
 
-- **CVE-2026-2796 (ClaudeBleed)** — `[unverified]` against NVD at release time; documented as runtime-exploit out of scope (project scope is prompts/skills, not Chrome-extension runtime).
-- **MemoryGraft arXiv ID `2512.16962`** — `[unverified]` arXiv ID; cited only for narrative context, no code path depends on the ID.
-- **ATLAS Feb-2026 technique IDs (`AML.T0070`, `AML.T0071`)** — `[unverified]` against live STIX bundle; fallback table tags note this. Real-bundle reconciliation deferred to v1.2.
-- **OWASP LLM Top 10 2026** — still draft; v2025 operative throughout this release.
+- **CVE-2026-2796 (ClaudeBleed)** — **2026-05-18 verification:** the CVE ID exists in NVD but maps to a Firefox/Thunderbird WebAssembly JIT bug (Mozilla source), **not** the claimed Chrome-extension Claude-in-Chrome hijack. The "ClaudeBleed" narrative is preserved as advisory only; consumers should not cite this CVE ID for that claim. Project scope is prompts/skills, not Chrome-extension runtime, so no detection rule depends on this ID. See SPEC §13.1 row 1.
+- **MemoryGraft arXiv ID `2512.16962`** — **2026-05-18 verified.** Paper exists ("MemoryGraft: Persistent Compromise of LLM Agents via Poisoned Experience Retrieval"; Srivastava & He, 2025-12-18). Cited for narrative context; no code path depends on the ID.
+- **ATLAS Feb-2026 technique IDs (`AML.T0070`, `AML.T0071`)** — `[unverified]` against live STIX bundle; the `atlas.mitre.org` 404'd both pages on 2026-05-18 and the bundle response truncated before the matching `attack-pattern` objects. Fallback table tags note this. Real-bundle reconciliation deferred to v1.2.
+- **OWASP LLM Top 10 2026** — **2026-05-18 verified.** genai.owasp.org lists the 2025 list as operative; no 2026 release. Project design choice to track v2025 stands.
 - **Taste-Tester real-API calibration (2026-05-14, claude-opus-4-7, fast mode, 20-sample corpus): 10/20 agreement.** Perfect benign classification (10/10) but zero direct-malicious detection (0/9, 0/1 suspicious — `mal-crescendo` was the closest miss at `suspicious`). The Taster's safety training refused most direct-attack prompts, producing clean transcripts that the Monitor correctly graded as clean. **The Taste-Tester catches *enacted* malicious behavior, not *refused* malicious intent** — its real value is for subtle indirect-injection payloads that bypass static + semantic + safety-training filters, not for re-detecting attacks the base model already refuses. The pre-release scripted-mock baseline (20/20) measured Monitor verdict propagation under canned transcripts, not real-API behavior — these are different things and the gap is precisely why a real calibration was warranted. A v1.2 corpus should focus on indirect-injection via tool-result tripwires (the `SYNTHETIC_FETCH_BODY` `sk-test-FAKE` flow) rather than direct user-prompt attacks. Calibration script: `scripts/calibrate-taste-tester.ts`.
 - **Garak adversarial regression** — full baseline against `check_prompt` not yet recorded; deferred to v1.2.
 

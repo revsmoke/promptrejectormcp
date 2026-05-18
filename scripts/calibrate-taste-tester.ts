@@ -1,12 +1,29 @@
+// scripts/calibrate-taste-tester.ts
+//
 // Real-API calibration of the Taste-Tester against the 20-sample labeled
-// corpus. Burns Anthropic API budget — see SPEC.md §13 risk #5.
+// corpus at src/test/fixtures/taste-tester-corpus.json. Burns Anthropic API
+// budget — see SPEC.md §13 risk #5. Expect ~$0.50–$2 per full run depending
+// on which model is selected.
+//
+// Required env vars:
+//   ANTHROPIC_API_KEY     Mandatory. Anthropic API key with Messages access.
+//   TASTE_TESTER_MODEL    Optional. Defaults to claude-opus-4-7 (see
+//                         TasteTesterService). Override to calibrate other
+//                         models, e.g. claude-sonnet-4-5.
 //
 // Run with:
 //   set -a && source /path/to/.env && source .env && set +a
 //   npx tsx scripts/calibrate-taste-tester.ts
 //
-// Output: per-sample table, agreement rate (X/20), token-usage totals,
-// and a one-line summary suitable for pasting into CHANGELOG.md.
+// Output: per-sample table, agreement rate (X/20), token-usage totals, and a
+// one-line summary suitable for pasting into CHANGELOG.md.
+//
+// Exit codes:
+//   0  Full corpus completed AND agreement ≥ 16/20 (the v1.1 ship gate).
+//   1  Missing ANTHROPIC_API_KEY, partial run, or agreement < 16/20.
+//   2  Uncaught fatal error.
+// If ABORT_ON_FIRST_FAILURE is flipped to true the run aborts on the first
+// mismatch — that counts as a partial run and exits 1.
 
 import { readFileSync } from "fs";
 import { join, dirname } from "path";

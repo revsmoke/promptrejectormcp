@@ -1,3 +1,20 @@
+# Publish MCP server — releases the package to npm and the public MCP Registry.
+#
+# Fires on any pushed tag matching `v*` (e.g. `v1.1.0`). The job:
+#   1. Builds the TypeScript bundle.
+#   2. Validates server.json against the MCP server.schema.json.
+#   3. Audits the `npm pack` contents for accidentally-included secrets.
+#   4. Syncs server.json `.version` to match the tag.
+#   5. Publishes to npm as `io.github.revsmoke/promptrejectormcp` (see package.json).
+#   6. Authenticates to the MCP Registry via GitHub OIDC (no static token).
+#   7. Publishes the server entry to https://registry.modelcontextprotocol.io.
+#
+# Required secrets:
+#   - NPM_TOKEN     Mandatory. npm automation token with publish rights for
+#                   the `io.github.revsmoke` scope. Without it step
+#                   "Publish to npm" fails.
+#   - GITHUB_TOKEN  Auto-provided. Used implicitly for OIDC auth to the MCP
+#                   Registry (`id-token: write` permission below).
 name: Publish MCP server (npm + MCP Registry)
 
 on:

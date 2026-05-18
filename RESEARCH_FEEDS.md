@@ -102,7 +102,7 @@ biased**; no LLM/AI-specific signal currently enters the system.
   JSON in `patterns/taxonomy/owasp-llm-top10-2025.json` and add a
   `owaspLlm` tag to pattern metadata.
 - License: CC-BY-SA 4.0.
-- **Recommendation: integrate as static taxonomy file (not a live feed).**
+- **Recommendation: integrate as static taxonomy file (not a live feed).** `[did not ship in v1.1.0 — OWASP LLM Top 10 not vendored as a taxonomy file]`
 
 ## 7. AI Incident Database (AIID) — optional, low immediate utility
 
@@ -146,12 +146,12 @@ biased**; no LLM/AI-specific signal currently enters the system.
 
 | Tool | Source | What's downloadable | Recommendation |
 |---|---|---|---|
-| **Garak** (NVIDIA) | `github.com/NVIDIA/garak` | 150+ probes, 3000+ prompt templates, Apache 2.0. Probes live in `garak/probes/*.py`. Static prompt corpora in `garak/data/`. | **Integrate** — vendor `garak/data/*.txt` prompt seeds; convert to regex/string-match patterns. Highest single source of LLM-attack signatures. |
-| **PyRIT** (Microsoft) | `github.com/microsoft/PyRIT` | Datasets `pyrit/datasets/*.yaml` + loaders for SimpleSafetyTests, SALAD-Bench, BeaverTails, HarmfulQA, PromptIntel, etc. MIT. | **Integrate** — pull a curated subset of YAML seed prompts. |
-| **Promptfoo** | `github.com/promptfoo/promptfoo` | Red-team plugin set (MIT). Strategy & plugin JSONs under `src/redteam/`. | **Optional** — useful test corpus, less useful as runtime signatures. |
-| **Rebuff** | `github.com/protectai/rebuff` | Heuristic regex list in repo + canary-token scheme, Apache 2.0. | **Integrate (heuristic regex set only)** — small, high signal-to-noise. |
-| **Lakera** open data | `huggingface.co/datasets/Lakera/mosscap_prompt_injection`, `lakeraai/pint-benchmark` | ~1k injection prompts (MIT), 4314-item PINT benchmark. | **Integrate** — direct prompt-injection training/eval corpus. |
-| **Protect AI / huntr** | `huntr.com` (hacktivity feed) | Public reports go live at day-90; **no documented public API** (verified). Aggregated via OSV/GHSA/NVD downstream. | **Skip the direct feed** — wait for downstream aggregation, or scrape if a future need arises. |
+| **Garak** (NVIDIA) | `github.com/NVIDIA/garak` | 150+ probes, 3000+ prompt templates, Apache 2.0. Probes live in `garak/probes/*.py`. Static prompt corpora in `garak/data/`. | **Integrate** — vendor `garak/data/*.txt` prompt seeds; convert to regex/string-match patterns. Highest single source of LLM-attack signatures. `[did not ship in v1.1.0]` |
+| **PyRIT** (Microsoft) | `github.com/microsoft/PyRIT` | Datasets `pyrit/datasets/*.yaml` + loaders for SimpleSafetyTests, SALAD-Bench, BeaverTails, HarmfulQA, PromptIntel, etc. MIT. | **Integrate** — pull a curated subset of YAML seed prompts. `[did not ship in v1.1.0]` |
+| **Promptfoo** | `github.com/promptfoo/promptfoo` | Red-team plugin set (MIT). Strategy & plugin JSONs under `src/redteam/`. | **Optional** — useful test corpus, less useful as runtime signatures. `[did not ship in v1.1.0]` |
+| **Rebuff** | `github.com/protectai/rebuff` | Heuristic regex list in repo + canary-token scheme, Apache 2.0. | **Integrate (heuristic regex set only)** — small, high signal-to-noise. `[did not ship in v1.1.0]` |
+| **Lakera** open data | `huggingface.co/datasets/Lakera/mosscap_prompt_injection`, `lakeraai/pint-benchmark` | ~1k injection prompts (MIT), 4314-item PINT benchmark. | **Integrate** — direct prompt-injection training/eval corpus. `[did not ship in v1.1.0 — Lakera PINT/mosscap corpora not integrated]` |
+| **Protect AI / huntr** | `huntr.com` (hacktivity feed) | Public reports go live at day-90; **no documented public API** (verified). Aggregated via OSV/GHSA/NVD downstream. | **Skip the direct feed** — wait for downstream aggregation, or scrape if a future need arises. *(Matches v1.1.0 shipped behavior — huntr direct feed not integrated.)* |
 
 ## 11. Vendor security bulletins (Anthropic / OpenAI / Google) — skip
 
@@ -186,16 +186,16 @@ Scored: **Signal (LLM-relevance)** × **Ease** × **License** (1–5 each, 125 m
 | 1 | **OSV.dev `/v1/querybatch`** | 5 | 5 | 5 CC-BY | **125** | new | One call → all AI-package CVEs across ecosystems |
 | 2 | **MITRE ATLAS STIX/YAML** | 5 | 5 | 4 ASL2 | **100** | new | Adversarial-ML taxonomy, static file |
 | 3 | **GHSA GraphQL (ecosystem)** | 5 | 4 | 5 CC-BY | **100** | partial | REST already in; GraphQL is the upgrade |
-| 4 | **Garak probe corpora** | 5 | 4 | 5 Apache2 | **100** | new | 3000+ LLM attack prompts |
+| 4 | **Garak probe corpora** | 5 | 4 | 5 Apache2 | **100** | new | 3000+ LLM attack prompts `[did not ship in v1.1.0]` |
 | 5 | **HuggingFace `securityStatus`** | 5 | 5 | 4 ToS | **100** | new | Model-supply-chain scans |
-| 6 | **OWASP LLM Top 10 (curated)** | 4 | 5 | 5 CC-BY-SA | **100** | new | Ship as static JSON |
-| 7 | **Lakera PINT + mosscap** | 5 | 5 | 4 MIT/CC | **100** | new | Prompt-injection corpus |
+| 6 | **OWASP LLM Top 10 (curated)** | 4 | 5 | 5 CC-BY-SA | **100** | new | Ship as static JSON `[did not ship in v1.1.0]` |
+| 7 | **Lakera PINT + mosscap** | 5 | 5 | 4 MIT/CC | **100** | new | Prompt-injection corpus `[did not ship in v1.1.0]` |
 | 8 | **CISA KEV** | 3 | 5 | 5 PD | **75** | new | Escalator signal only |
-| 9 | **PyRIT datasets** | 4 | 4 | 4 MIT | **64** | new | Larger but noisier |
+| 9 | **PyRIT datasets** | 4 | 4 | 4 MIT | **64** | new | Larger but noisier `[did not ship in v1.1.0]` |
 | 10 | **NVD (LLM-tuned)** | 3 | 5 | 5 PD | **75** | tune | Add AI keywords + CWE-502/1039 |
-| 11 | **Rebuff heuristics** | 4 | 4 | 4 Apache2 | **64** | new | Small regex set |
-| 12 | **Promptfoo plugins** | 3 | 3 | 4 MIT | **36** | opt | Test-time, not runtime |
-| 13 | **AIID GraphQL** | 2 | 4 | 4 CC-BY | **32** | opt | Context, no signatures |
+| 11 | **Rebuff heuristics** | 4 | 4 | 4 Apache2 | **64** | new | Small regex set `[did not ship in v1.1.0]` |
+| 12 | **Promptfoo plugins** | 3 | 3 | 4 MIT | **36** | opt | Test-time, not runtime `[did not ship in v1.1.0]` |
+| 13 | **AIID GraphQL** | 2 | 4 | 4 CC-BY | **32** | opt | Context, no signatures `[did not ship in v1.1.0]` |
 | 14 | MITRE cveawg | 2 | 4 | 5 | 40 | skip | Duplicates NVD |
 | 15 | Huntr direct | 4 | 1 | 1 | 4 | skip | No public API |
 | 16 | Vendor RSS (Anthropic/OAI/G) | 2 | 1 | 3 | 6 | skip | No structured feed |
@@ -213,7 +213,7 @@ Scored: **Signal (LLM-relevance)** × **Ease** × **License** (1–5 each, 125 m
    `scan_huggingface_repo`.
 5. **Static bundles**: OWASP LLM Top 10 JSON, Garak prompts, Lakera PINT,
    Rebuff heuristics — vendored under `patterns/external/` with a
-   refresh script.
+   refresh script. `[did not ship in v1.1.0]`
 6. **CISA KEV daily sync** → `kev: true` overlay flag.
 7. **NVD tuning**: extend `NVD_SEARCH_KEYWORDS` and `TARGET_CWES`; switch
    to `lastModStartDate` incremental sync.

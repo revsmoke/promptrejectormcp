@@ -30,8 +30,8 @@ Confirmed 2025–2026 attack classes Prompt Rejector v1.0.2 cannot reliably catc
 | RAG/memory poisoning (MemoryGraft, MINJA, 84.3% ASR) | Persisted benign-artifact grafts | None | Pass 10 (canary tokens) |
 | Many-shot / Crescendo jailbreaks | 100k+ token context floods, multi-turn escalation | None | Pass 12 |
 | Multimodal typographic injection (up to 64% ASR on GPT-4V/Claude/Gemini) | Text rendered in images | Out of scope for v1.1 (no image OCR pipeline) | Deferred to v1.2 |
-| AI-package CVEs (LiteLLM CVE-2026-42208 in KEV April 2026) | Vulnerable agent frameworks | Partial (CWE-79/89/78/22/918 filter misses AI CWEs) | Pass 6 + Pass 7 + Pass 9 |
-| Agent runtime exploit (ClaudeBleed CVE-2026-2796, May 2026) [unverified in NVD] | Chrome-extension hijack of Claude-in-Chrome | None — out of scope (runtime, not prompt) | Documented only |
+| AI-package CVEs (LiteLLM CVE-2026-42208 in KEV May 2026) | Vulnerable agent frameworks | Partial (CWE-79/89/78/22/918 filter misses AI CWEs) | Pass 6 + Pass 7 + Pass 9 |
+| Agent runtime exploit ("ClaudeBleed") — see §13.1 [unverified] | Chrome-extension hijack of Claude-in-Chrome | None — out of scope (runtime, not prompt) | Documented only |
 
 Out-of-scope for v1.1.0 (deferred): image/audio OCR, agent-runtime exploits, vendor-specific commercial signature feeds (Lakera Guard / HiddenLayer / Protect AI proprietary).
 
@@ -65,6 +65,11 @@ Out-of-scope for v1.1.0 (deferred): image/audio OCR, agent-runtime exploits, ven
     │         │        │        │         │        │       │
     │         │        │        │         │        │       └─► Anthropic SDK (Taster + Monitor)
     │         │        │        │         │        │
+    │         │        │        │         │        │      ┌───────────────────────────┐
+    │         │        │        │         │        │      │ AUX SERVICES (v1.1.0)     │
+    │         │        │        │         │        │      │  McpToolScanner           │
+    │         │        │        │         │        │      │  UnifiedCveCache          │
+    │         │        │        │         │        │      └───────────────────────────┘
     │         │        │        ▼         │        │
     │         │        │   ┌──────────────────────────────────────┐
     │         │        │   │ FEED LAYER (new in v1.1.0)           │
@@ -230,6 +235,11 @@ The mock router is enforced at the SDK tool-callback layer — no real I/O reach
 
 **Monitor** — second separate SDK invocation, different system prompt (the "grader"). Receives the Taster's full transcript + intent log. Emits structured `BehaviorReport` JSON (zod-validated). Monitor cannot be reached by the Taster's output (one-way pipe).
 
+**SDK best-practices applied (post-`bc541bb` refactor):**
+- **Structured output** — Monitor invocations set `output_config.format` (JSON Schema mirroring the `BehaviorReport` zod schema) so the model cannot emit free-form text that escapes the parser.
+- **Prompt caching** — system-prompt and tool-definition blocks are tagged with `cache_control: { type: "ephemeral" }` so repeated detonations within the cache TTL pay only the cheap cache-hit rate.
+- **Shipped mock tool count** — 8 tools (matches §5.2 list above): `fetch_url`, `read_file`, `exec_shell`, `send_email`, `transfer_funds`, `navigate_browser`, `write_memory`, `query_database`.
+
 ### 5.3 Threat model for the Taste-Tester itself
 
 | Threat | Mitigation |
@@ -244,7 +254,7 @@ The mock router is enforced at the SDK tool-callback layer — no real I/O reach
 
 ```env
 TASTE_TESTER_ENABLED=true              # opt-in gate
-TASTE_TESTER_MODEL=claude-sonnet-4-6   # Taster + Monitor model
+TASTE_TESTER_MODEL=claude-opus-4-7     # Taster + Monitor model (default)
 TASTE_TESTER_MAX_TURNS=5
 TASTE_TESTER_MAX_TOKENS=4096
 TASTE_TESTER_TIMEOUT_MS=30000
@@ -358,13 +368,16 @@ New env vars introduced in v1.1.0:
 ```env
 # Feeds
 GITHUB_TOKEN=...                  # also used for GHSA GraphQL (existing)
+NVD_API_KEY=...                   # raises NVD rate limit (5/30s → 50/30s)
 HF_TOKEN=...                      # Hugging Face Hub security signals
-KEV_REFRESH_INTERVAL_HOURS=24
-ATLAS_REFRESH_INTERVAL_HOURS=168
+# Note: KEV (24h) and ATLAS (7d) TTLs are baked into KevFeedService /
+# AtlasService as constructor defaults. No KEV_REFRESH_INTERVAL_HOURS /
+# ATLAS_REFRESH_INTERVAL_HOURS env vars are read in v1.1.0; documented
+# here as a v1.2 follow-up.
 
 # Taste-Tester
 TASTE_TESTER_ENABLED=false        # opt-in
-TASTE_TESTER_MODEL=claude-sonnet-4-6
+TASTE_TESTER_MODEL=claude-opus-4-7
 TASTE_TESTER_MAX_TURNS=5
 TASTE_TESTER_MAX_TOKENS=4096
 TASTE_TESTER_TIMEOUT_MS=30000
@@ -425,10 +438,10 @@ All new env vars are **optional with safe defaults**; missing keys gracefully de
 
 Tracked here so reviewers can challenge before implementation:
 
-1. **CVE-2026-2796 (ClaudeBleed)** — Anthropic acknowledged on red.anthropic.com but NVD entry not yet confirmed at authoring time. Treat as `[unverified]` in user-facing docs.
-2. **MemoryGraft arXiv ID `2512.16962`** — arXiv IDs ≥ 2510 require verification; cited in research but unconfirmed.
-3. **OWASP LLM Top 10 2026** — still draft as of May 2026; v2025 is operative. SPEC references 2025.
-4. **ATLAS technique IDs** for the Feb 2026 additions (AI Agent Context Poisoning, Publish Poisoned AI Agent Tool) — IDs `AML.T0070` and `AML.T0071` cited; **must be confirmed against the live ATLAS bundle in Pass 7**. If different, all `atlasTechnique` references in pattern files must be updated.
+1. **CVE-2026-2796 (ClaudeBleed)** — Anthropic acknowledged on red.anthropic.com but NVD entry not yet confirmed at authoring time. Treat as `[unverified]` in user-facing docs. **(2026-05-18 verification — see §13.1: the CVE ID exists in NVD but maps to a Firefox/WebAssembly JIT bug, NOT the claimed Chrome-extension ClaudeBleed runtime exploit.)**
+2. **MemoryGraft arXiv ID `2512.16962`** — arXiv IDs ≥ 2510 require verification; cited in research but unconfirmed. **(2026-05-18 verification — confirmed; see §13.1.)**
+3. **OWASP LLM Top 10 2026** — still draft as of May 2026; v2025 is operative. SPEC references 2025. **(2026-05-18 verification — no 2026 edition; 2025 is current; see §13.1.)**
+4. **ATLAS technique IDs** for the Feb 2026 additions (AI Agent Context Poisoning, Publish Poisoned AI Agent Tool) — IDs `AML.T0070` and `AML.T0071` cited; **must be confirmed against the live ATLAS bundle in Pass 7**. If different, all `atlasTechnique` references in pattern files must be updated. **(2026-05-18 verification — could not be reproduced against authoritative source; see §13.1.)**
 5. **Taster cost ceiling** — `MAX_TURNS=5` is a guess. Calibrate against a labeled corpus in Pass 11b and adjust.
 
 ---
@@ -439,10 +452,10 @@ Status of each §13 risk register entry as of the v1.1.0 release.
 
 | # | Risk | Status as of v1.1.0 |
 |---|---|---|
-| 1 | CVE-2026-2796 (ClaudeBleed) NVD unverified | **Deferred to runtime documentation.** Project scope is prompt/skill screening, not Chrome-extension runtime exploits. Documented as out-of-scope in CHANGELOG known-limitations. |
-| 2 | MemoryGraft arXiv ID `2512.16962` unverified | **Narrative citation only.** No code path or detection rule depends on the exact arXiv ID. Cited only for context in `RESEARCH_THREATS.md`. |
-| 3 | OWASP LLM Top 10 2026 still draft | **Resolved — using v2025 by design.** All references in SPEC and code use the operative v2025 taxonomy. |
-| 4 | ATLAS Feb 2026 technique IDs (`AML.T0070`, `AML.T0071`) unconfirmed | **Partially mitigated.** `AtlasService` attempts to fetch the live ATLAS STIX bundle on first use and falls back to a hand-maintained table when offline. Fallback table entries for `AML.T0070`/`AML.T0071` are flagged `[unverified]` in their description string so consumers can distinguish authoritative vs fallback tags. Real-bundle reconciliation deferred to v1.2 when STIX endpoint stabilizes. |
+| 1 | CVE-2026-2796 (ClaudeBleed) NVD unverified | **Verified against NVD 2026-05-18 — claim does not match.** CVE-2026-2796 is published (CVSS 9.8, CWE-843) but its description is "JIT miscompilation in the JavaScript: WebAssembly component … fixed in Firefox 148 and Thunderbird 148" (Mozilla source). It is **not** the Chrome-extension Claude-in-Chrome hijack ("ClaudeBleed") claimed in §2 and `RESEARCH_THREATS.md`. The narrative is preserved as advisory `[unverified]`; consumers should not cite this CVE ID for the ClaudeBleed claim. Project scope remains prompt/skill screening; no detection rule depends on this ID. |
+| 2 | MemoryGraft arXiv ID `2512.16962` unverified | **Verified against arXiv 2026-05-18.** Paper exists: "MemoryGraft: Persistent Compromise of LLM Agents via Poisoned Experience Retrieval" by Srivastava & He, submitted 2025-12-18. The arXiv ID, title, and threat-model framing in `RESEARCH_THREATS.md` are accurate. Cited only narratively; no code path depends on the ID. |
+| 3 | OWASP LLM Top 10 2026 still draft | **Verified against genai.owasp.org 2026-05-18.** No 2026 edition is published; the operative document remains "LLM Top 10 for 2025". All SPEC and code references already use the 2025 taxonomy by design. Resolution stands. |
+| 4 | ATLAS Feb 2026 technique IDs (`AML.T0070`, `AML.T0071`) unconfirmed | **Could not be verified against authoritative source as of 2026-05-18.** Both `https://atlas.mitre.org/techniques/AML.T0070` and `…/AML.T0071` returned HTTP 404, and a fetch of `dist/stix-atlas.json` from `mitre-atlas/atlas-navigator-data` was truncated before the matching `attack-pattern` objects could be inspected. Treat as advisory reference; consumers should cross-check independently. **Partially mitigated:** `AtlasService` ships a hand-maintained fallback table where `AML.T0070`/`AML.T0071` are flagged `[unverified]` in description text so downstream tooling can distinguish authoritative vs fallback tags. **Cluster-E follow-up:** if a future bundle reconciliation reveals a different canonical ID for "Publish Poisoned AI Agent Tool" / "AI Agent Context Poisoning", the `atlasTechnique` field in `patterns/*.json` (currently referencing `AML.T0070`; `AML.T0071` is not yet referenced in shipped patterns per `grep`) must be updated alongside the §7 mapping table. |
 | 5 | Taster `MAX_TURNS=5` uncalibrated | **Resolved with adverse finding.** Real-API calibration run 2026-05-14 (`scripts/calibrate-taste-tester.ts`, claude-opus-4-7, fast mode, 20-sample corpus): **10/20 agreement** — benign classification 10/10, direct-malicious 0/9 (`mal-crescendo` `suspicious` was the closest miss). The Taster refuses most direct-attack prompts at the model-safety layer, so transcripts contain no malicious tool calls and the Monitor correctly grades them clean. **Working as designed for what it can do (catch enacted bad behavior), not predictive for the corpus we built (which tests refused intent).** The Taste-Tester complements rather than replaces static + semantic + safety-training filtering — its niche is detonating subtle indirect-injection payloads that bypass earlier layers and trick the Taster into actually using a tool. A v1.2 corpus rebuild should swap direct-attack user prompts for indirect-injection-via-tool-result scenarios (the `SYNTHETIC_FETCH_BODY` tripwire flow) where the Taster is more likely to engage. Hard caps continue to prevent cost-runaway. |
 | 6 | Mock tool router I/O leak | **Resolved.** All mock tools in `TasteTesterService` are pure functions returning canned strings; verified by inspection during Pass 11a/11b. |
 | 7 | Monitor itself prompt-injectable | **Resolved.** Monitor output is parsed through a zod-validated `BehaviorReport` schema; non-conforming responses fall back to a neutral stub rather than executing free-form Monitor text. |

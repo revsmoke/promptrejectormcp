@@ -1,3 +1,20 @@
+# Claude Code Review — automated PR reviewer.
+#
+# Runs on every PR open / synchronize / ready_for_review / reopen and invokes
+# the `code-review@claude-code-plugins` plugin via claude-code-action@v1.
+#
+# Required secrets:
+#   - CLAUDE_CODE_OAUTH_TOKEN  Mandatory. OAuth token for the claude-code-action.
+#                              Without it the workflow still runs but produces
+#                              "No buffered inline comments" / no review output
+#                              (observed historically on PR #5 when the token
+#                              was unset). Configure it in repo Settings →
+#                              Secrets and variables → Actions.
+#
+# Notes:
+#   - `allowed_bots: '*'` lets the action respond on bot-authored PRs.
+#   - The review is driven by the `/code-review:code-review` slash command,
+#     scoped to the current repo + PR number.
 name: Claude Code Review
 
 on:

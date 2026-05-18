@@ -462,13 +462,18 @@ Any two of the three is *medium* risk; all three is *critical*. The recommended 
 
 `scan_skill` scans skill content for any `huggingface.co/<owner>/<model>` URL or `*.from_pretrained("<id>")` reference and checks each model against the Hugging Face Hub's `securityStatus` endpoint. Findings surface as `huggingFaceSecurityFlags` and `huggingFaceReports`.
 
-Flagged conditions include:
+Flagged conditions (the `class` field of each entry in `huggingFaceSecurityFlags`):
 
-- **Gated repository** — model requires explicit access grant
-- **Unsafe serialization** — model loads via legacy formats that execute embedded code on load
-- **Code-execution risk** — model card or config references `trust_remote_code=True`
+| Class | Meaning | Severity |
+|---|---|---|
+| `code_execution_risk` | Model card / config references `trust_remote_code=True` or custom code execution | critical |
+| `unsafe_serialization` | Model loads via legacy serialization formats that execute embedded code on load | high |
+| `scanner_warning` | Protect AI / HF scanner emitted a warning other than the above | medium |
+| `gated` | Repository requires license acceptance or manual access grant | low |
+| `no_safetensors` | No `.safetensors` variant; falls back to legacy weight formats | low |
+| `lookup_failed` | 401/403/404/network error — surfaced only, never blocking | safe |
 
-A clean reference returns an empty `huggingFaceSecurityFlags: []`. The check uses a 6-hour in-memory cache and degrades gracefully (returning `[]`) when `HF_TOKEN` is unset or the Hub is unreachable.
+A clean reference returns an empty `huggingFaceSecurityFlags: []`. The check uses a 6-hour in-memory cache and degrades gracefully (returning a `lookup_failed` entry) when `HF_TOKEN` is unset, the Hub is unreachable, or the model is private.
 
 ### ATLAS taxonomy tags
 

@@ -4,8 +4,6 @@
 **Purpose:** Inform new detection features for PromptRejectorMCP.
 **Method:** Web search + targeted fetch of vendor/research pages. Primary sources cited inline. Dates were checked against article headers; items below are dated late 2025 through May 2026 unless flagged otherwise.
 
-> Note on plan mode: this file is the only writable artifact in this turn. The full report is also returned inline to the caller.
-
 ---
 
 ## 1. Latest Prompt Injection Techniques (2025–2026)
@@ -64,7 +62,7 @@ Sources: https://arxiv.org/abs/2512.16962 ; https://prompt.security/blog/the-emb
 
 ### 2.4 Browser / Computer-Use Agent Hijack
 - **ClaudeBleed** (LayerX, May 2026): zero-permission Chrome extensions can hijack Claude-in-Chrome via `externally_connectable` trust-boundary flaw → Gmail/Drive/GitHub exfil. Anthropic's v1.0.70 (2026-05-06) partial fix bypassed within hours.
-- **CVE-2026-2796** Claude exploit reverse-engineered by Anthropic Red team.
+- ~~**CVE-2026-2796** Claude exploit reverse-engineered by Anthropic Red team.~~ **[CVE attribution incorrect — verified 2026-05-18]** CVE-2026-2796 in NVD is a Firefox/Thunderbird WebAssembly JIT bug (CWE-843, Mozilla source), not the ClaudeBleed Chrome-extension hijack. Use the LayerX writeup as the canonical reference until the actual CVE ID is published. See SPEC §13.1 row 1.
 - **Claude Desktop extensions** zero-click RCE exposing 10K+ users.
 Sources: https://layerxsecurity.com/blog/a-flaw-in-claudes-browser-extension-allows-any-extension-to-hijack-it/ ; https://red.anthropic.com/2026/exploit/ ; https://www.securityweek.com/vulnerability-in-claude-extension-for-chrome-exposes-ai-agent-to-takeover/ ; https://layerxsecurity.com/blog/claude-desktop-extensions-rce/
 
@@ -80,7 +78,7 @@ Sources: https://layerxsecurity.com/blog/a-flaw-in-claudes-browser-extension-all
 | Lethal Trifecta | Jun 2025 | Conceptual framework now standard vocabulary. |
 | ToxicSkills / 71 malicious Claude skills | Feb–Apr 2026 | First large-scale skill-marketplace compromise. |
 | ClaudeBleed | May 2026 | Browser-agent hijack via extension trust boundary. |
-| CVE-2026-2796 | 2026 | Claude-specific exploit chain (details on red.anthropic.com). |
+| ~~CVE-2026-2796~~ | — | **CVE attribution incorrect — verified 2026-05-18 (NVD).** ID maps to Firefox WebAssembly JIT bug, not the ClaudeBleed Chrome-extension claim. |
 | MemoryGraft | Dec 2025 | First persistent agent-memory poison via benign artifacts. |
 
 Sources: https://genai.owasp.org/llmrisk/llm01-prompt-injection/ ; https://atlas.mitre.org/ ; https://www.practical-devsecops.com/mitre-atlas-framework-guide-securing-ai-systems/
@@ -129,21 +127,22 @@ Caveat from 2026 meta-study (78 papers, 2021–26): adaptive attacks still excee
 
 Ranked by signal-to-noise × ease of implementation × incident frequency:
 
-1. **Unicode Tag / zero-width / invisible-char detector** — strip & flag U+E0000–U+E007F, U+200B–U+200F, bidi controls. Cheap, high-precision; covers ASCII Smuggling + Sneaky Bits.
-2. **Policy-Puppetry structural detector** — flag XML/JSON/INI/YAML blocks containing `policy|system|instruction|role:` keys inside *user* content, especially with `<system>`, `<policy>`, or `developer_message` tags.
-3. **MCP tool-description scanner** — for `scan_skill`-style flow, parse tool/skill manifests, hash & diff descriptions vs. known-good, flag imperative verbs in descriptions ("ignore previous", "you must", "as part of your job").
-4. **Lethal-trifecta static analyzer for skills** — inspect a skill's declared capabilities: does it co-locate (read private data) + (fetch untrusted) + (network egress / markdown image / shell)? Emit severity-critical when all 3.
-5. **Markdown-image / link exfiltration patterns** — regex for `![...](http...?...{data})` and `[text](javascript:...)`-style sinks; common exfil channel.
-6. **Indirect-injection payload feed integration** — pull Garak probes + Promptfoo redteam YAML + Unit42 IOC list into pattern library; auto-refresh via `update_vuln_feeds`.
-7. **Memory/RAG canary tokens** — emit guidance + helper for inserting canary strings in RAG/memory and watching for echo (detects MemoryGraft / MINJA).
-8. **Many-shot / context-saturation heuristic** — flag prompts where >N synthetic Q&A pairs precede an instruction-like tail (many-shot signature).
-9. **NVD + OSV + GHSA + ATLAS feed connector** — keyword-filter on "prompt injection", "LLM", "MCP", "agent", "RAG" daily; build a CVE-to-pattern map. ATLAS/AVID give technique IDs; NVD/OSV give package CVEs; GHSA covers malicious-skill GHSAs.
-10. **Skill supply-chain signer-check** — for Claude-style skills: verify `SKILL.md` signature/origin, account age, dependency-pin hashes; refuse unsigned skills from accounts < N days old (per Snyk ToxicSkills finding).
+1. **Unicode Tag / zero-width / invisible-char detector** — strip & flag U+E0000–U+E007F, U+200B–U+200F, bidi controls. Cheap, high-precision; covers ASCII Smuggling + Sneaky Bits. `[did not ship in v1.1.0 as a standalone detector tool]`
+2. **Policy-Puppetry structural detector** — flag XML/JSON/INI/YAML blocks containing `policy|system|instruction|role:` keys inside *user* content, especially with `<system>`, `<policy>`, or `developer_message` tags. `[did not ship in v1.1.0]`
+3. **MCP tool-description scanner** — for `scan_skill`-style flow, parse tool/skill manifests, hash & diff descriptions vs. known-good, flag imperative verbs in descriptions ("ignore previous", "you must", "as part of your job"). *(Shipped in v1.1.0 as `scan_mcp_tool`.)*
+4. **Lethal-trifecta static analyzer for skills** — inspect a skill's declared capabilities: does it co-locate (read private data) + (fetch untrusted) + (network egress / markdown image / shell)? Emit severity-critical when all 3. *(Shipped in v1.1.0 as `check_lethal_trifecta`.)*
+5. **Markdown-image / link exfiltration patterns** — regex for `![...](http...?...{data})` and `[text](javascript:...)`-style sinks; common exfil channel. `[did not ship in v1.1.0 as a dedicated feature]`
+6. **Indirect-injection payload feed integration** — pull Garak probes + Promptfoo redteam YAML + Unit42 IOC list into pattern library; auto-refresh via `update_vuln_feeds`. `[did not ship in v1.1.0 — Garak/Promptfoo/Unit42 feeds not integrated]`
+7. **Memory/RAG canary tokens** — emit guidance + helper for inserting canary strings in RAG/memory and watching for echo (detects MemoryGraft / MINJA). *(Shipped in v1.1.0 as `deploy_canary` / `verify_canary`.)*
+8. **Many-shot / context-saturation heuristic** — flag prompts where >N synthetic Q&A pairs precede an instruction-like tail (many-shot signature). `[did not ship in v1.1.0]`
+9. **NVD + OSV + GHSA + ATLAS feed connector** — keyword-filter on "prompt injection", "LLM", "MCP", "agent", "RAG" daily; build a CVE-to-pattern map. ATLAS/AVID give technique IDs; NVD/OSV give package CVEs; GHSA covers malicious-skill GHSAs. *(NVD, OSV, GHSA REST+GraphQL, and MITRE ATLAS shipped in v1.1.0; AVID did not.)*
+10. **Skill supply-chain signer-check** — for Claude-style skills: verify `SKILL.md` signature/origin, account age, dependency-pin hashes; refuse unsigned skills from accounts < N days old (per Snyk ToxicSkills finding). `[did not ship in v1.1.0]`
 
 ### Honorable mentions
-- Crescendo / multi-turn classifier (requires conversation state — heavier lift).
-- Multimodal OCR pass for inline images carrying typographic instructions.
-- Constitutional-classifier-style secondary screen for high-risk tool calls.
+
+- Crescendo / multi-turn classifier (requires conversation state — heavier lift). `[did not ship in v1.1.0]`
+- Multimodal OCR pass for inline images carrying typographic instructions. `[did not ship in v1.1.0 — deferred to v1.2]`
+- Constitutional-classifier-style secondary screen for high-risk tool calls. `[did not ship in v1.1.0]`
 
 ---
 

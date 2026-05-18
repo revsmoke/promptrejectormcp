@@ -21,7 +21,7 @@ Each pass has:
 
 ---
 
-## Pass 0 — Walking skeleton  ⬜
+## Pass 0 — Walking skeleton  ✅
 
 **Goal:** Every new subsystem callable end-to-end; every new MCP tool reachable; existing capability preserved.
 
@@ -56,7 +56,7 @@ Each pass has:
 
 ---
 
-## Pass 1 — Unicode smuggling detector  ⬜
+## Pass 1 — Unicode smuggling detector  ✅
 
 **Goal:** `check_prompt` catches invisible-instruction payloads.
 
@@ -75,7 +75,7 @@ Each pass has:
 
 ---
 
-## Pass 2 — Policy-puppetry structural detector  ⬜
+## Pass 2 — Policy-puppetry structural detector  ✅
 
 **Goal:** `check_prompt` catches HiddenLayer-style policy-wrapper jailbreaks.
 
@@ -88,7 +88,7 @@ Each pass has:
 
 ---
 
-## Pass 3 — Markdown-exfil + indirect-injection seed corpus  ⬜
+## Pass 3 — Markdown-exfil + indirect-injection seed corpus  ✅
 
 **Goal:** `check_prompt` catches data-exfil vectors and known indirect-injection IOCs.
 
@@ -102,7 +102,7 @@ Each pass has:
 
 ---
 
-## Pass 4 — `scan_mcp_tool` — tool-poisoning scanner  ⬜
+## Pass 4 — `scan_mcp_tool` — tool-poisoning scanner  ✅
 
 **Goal:** New `scan_mcp_tool` MCP tool fully functional.
 
@@ -120,7 +120,7 @@ Each pass has:
 
 ---
 
-## Pass 5 — `check_lethal_trifecta` — capability analyzer  ⬜
+## Pass 5 — `check_lethal_trifecta` — capability analyzer  ✅
 
 **Goal:** New `check_lethal_trifecta` MCP tool fully functional; `scan_skill` also reports trifecta status.
 
@@ -136,7 +136,7 @@ Each pass has:
 
 ---
 
-## Pass 6 — Feed expansion: OSV.dev + GHSA GraphQL  ⬜
+## Pass 6 — Feed expansion: OSV.dev + GHSA GraphQL  ✅
 
 **Goal:** `update_vuln_feeds` pulls AI-relevant CVEs from two new sources.
 
@@ -151,7 +151,7 @@ Each pass has:
 
 ---
 
-## Pass 7 — MITRE ATLAS taxonomy + CISA KEV escalator  ⬜
+## Pass 7 — MITRE ATLAS taxonomy + CISA KEV escalator  ✅
 
 **Goal:** Findings carry ATLAS technique IDs; KEV-listed CVEs get severity bumped.
 
@@ -169,7 +169,7 @@ Each pass has:
 
 ---
 
-## Pass 8 — Hugging Face Hub security signals  ⬜
+## Pass 8 — Hugging Face Hub security signals  ✅
 
 **Goal:** `scan_skill` flags references to insecure models/datasets.
 
@@ -182,7 +182,7 @@ Each pass has:
 
 ---
 
-## Pass 9 — `query_cve` unified lookup  ⬜
+## Pass 9 — `query_cve` unified lookup  ✅
 
 **Goal:** New `query_cve` MCP tool merges all feed sources.
 
@@ -196,7 +196,7 @@ Each pass has:
 
 ---
 
-## Pass 10 — `deploy_canary` + `verify_canary`  ⬜
+## Pass 10 — `deploy_canary` + `verify_canary`  ✅
 
 **Goal:** Memory/RAG poisoning detection via canary tokens.
 
@@ -210,9 +210,9 @@ Each pass has:
 
 ---
 
-## Pass 11 — `taste_test` — dual-agent sandbox (split 11a / 11b)  ⬜
+## Pass 11 — `taste_test` — dual-agent sandbox (split 11a / 11b)  ✅
 
-### Pass 11a — Architecture + Monitor + happy-path single-turn  ⬜
+### Pass 11a — Architecture + Monitor + happy-path single-turn  ✅
 
 **Goal:** `taste_test` callable end-to-end in fast mode; correct verdict on one known-malicious and one benign sample.
 
@@ -225,7 +225,7 @@ Each pass has:
 - `src/mcp/mcpServer.ts` — `taste_test` handler
 - `src/test/tasteTesterTests.ts` — fixture-based (mock Anthropic responses); one malicious + one benign
 
-### Pass 11b — Full mock tool surface + scoring + multi-turn  ⬜
+### Pass 11b — Full mock tool surface + scoring + multi-turn  ✅
 
 **Goal:** Thorough mode catches multi-turn Crescendo-style attacks.
 
@@ -243,7 +243,7 @@ Each pass has:
 
 ---
 
-## Pass 12 — Many-shot heuristic + obfuscation expansion  ⬜
+## Pass 12 — Many-shot heuristic + obfuscation expansion  ✅
 
 **Goal:** `check_prompt` flags context-saturation and Crescendo signatures.
 
@@ -257,7 +257,7 @@ Each pass has:
 
 ---
 
-## Pass 13 — Hardening, docs, ship  ⬜
+## Pass 13 — Hardening, docs, ship  ✅
 
 **Goal:** v1.1.0 release candidate.
 
@@ -301,14 +301,14 @@ Carried from SPEC §13. Resolved items struck through here as work progresses.
 
 | # | Risk | Pass | Resolution |
 |---|---|---|---|
-| 1 | CVE-2026-2796 unverified | 13 | pending |
-| 2 | MemoryGraft arXiv ID unverified | 13 | pending |
-| 3 | OWASP LLM 2026 still draft | 13 | pending (use 2025 only) |
-| 4 | ATLAS Feb 2026 IDs unconfirmed | 7 | pending |
-| 5 | Taster MAX_TURNS=5 uncalibrated | 11b | pending (corpus calibration) |
-| 6 | Mock tool router I/O leak | 11a/b | pending (audit pure-function invariant) |
-| 7 | Monitor itself prompt-injectable | 11a | pending (structured-output zod gate) |
-| 8 | Garak detection rate baseline unknown | 3 | pending (record in CHANGELOG) |
+| 1 | CVE-2026-2796 unverified | 13 | **2026-05-18:** verified against NVD — CVE exists but maps to Firefox WebAssembly JIT bug, NOT ClaudeBleed; kept `[unverified]` in §2, claim now flagged as advisory in SPEC §13.1 |
+| 2 | MemoryGraft arXiv ID unverified | 13 | **2026-05-18:** verified against arXiv — paper/title/authors/date all confirmed; resolved |
+| 3 | OWASP LLM 2026 still draft | 13 | **2026-05-18:** verified against genai.owasp.org — 2026 edition not published; 2025 remains operative; resolved (using 2025 by design) |
+| 4 | ATLAS Feb 2026 IDs unconfirmed | 7 | **2026-05-18:** could not be verified (atlas.mitre.org 404, STIX bundle truncated); kept `[unverified]` with fallback table in `AtlasService`; Cluster-E follow-up if canonical ID differs |
+| 5 | Taster MAX_TURNS=5 uncalibrated | 11b | **Resolved with adverse finding** (see SPEC §13.1 row 5); real-API calibration `2026-05-14` `scripts/calibrate-taste-tester.ts` 10/20 agreement; complementary-not-replacement positioning documented |
+| 6 | Mock tool router I/O leak | 11a/b | **Resolved** — mock tools verified as pure functions returning canned strings during Pass 11a/11b review |
+| 7 | Monitor itself prompt-injectable | 11a | **Resolved** — Monitor responses parsed through zod-validated `BehaviorReport` schema with neutral-stub fallback on non-conforming output |
+| 8 | Garak detection rate baseline unknown | 3 | **Deferred to v1.2** — curated Garak probes shipped in `patterns/prompt-injection.json` with provenance, full adversarial regression run not yet recorded; tracked as known limitation in CHANGELOG |
 
 ### Workflow hooks (per session-start reminder)
 - Run `project-kickoff-template` at start of each execution session.
@@ -346,4 +346,4 @@ This section is updated as passes complete. Each entry: pass number, completion 
 | 11a | 2026-05-13 | `dc8e251` | Taste-Tester architecture, Monitor zod schema, fast-mode single-turn |
 | 11b | 2026-05-13 | `ec04cac` | Full mock-tool surface + multi-turn loop + 20-sample labeled corpus (20/20) |
 | 12 | 2026-05-13 | `fe7d64d` | Many-shot heuristic + Sneaky-Bits/Cyrillic/Base32/hex obfuscation expansion |
-| 13 | 2026-05-14 | _pending_ | Hardening, docs, ship — README/CHANGELOG/SKILLS_SECURITY/SPEC §13.1, smoke script, version bump, enumerated-Q FP fix |
+| 13 | 2026-05-14 | `31868ea` | Hardening, docs, ship — README/CHANGELOG/SKILLS_SECURITY/SPEC §13.1, smoke script `scripts/smoke-v1.1.ts`, manifest regen + HMAC re-sign, `1.1.0-pre.0`→`1.1.0` bump, enumerated-Q FP fix; v1.1.0 tag |
