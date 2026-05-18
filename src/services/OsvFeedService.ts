@@ -36,12 +36,41 @@ const OSV_QUERYBATCH_URL = "https://api.osv.dev/v1/querybatch";
 const OSV_VULN_URL = "https://api.osv.dev/v1/vulns";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * Queries OSV.dev's `/v1/querybatch` for vulnerabilities affecting an
+ * AI-package allowlist (langchain, transformers, vllm, etc.).
+ *
+ * Surfaces AI-ecosystem advisories that would not otherwise appear in the
+ * CWE-filtered NVD/GHSA pipeline. Caller supplies the package list (typically
+ * `AI_PACKAGE_ALLOWLIST` from `aiPackageAllowlist.ts`); empty input
+ * short-circuits without a network call.
+ *
+ * @remarks
+ * Key methods:
+ * - `query(packages)` — batched POST followed by per-id hydration (live OSV returns id+modified stubs; full detail comes from `GET /v1/vulns/{id}`). Results are deduped by id.
+ *
+ * Environment variables consumed: none.
+ *
+ * Network behavior:
+ * - Endpoint: `https://api.osv.dev/v1/querybatch` (POST) and `https://api.osv.dev/v1/vulns/{id}` (GET hydration).
+ * - Timeout: 30s per request via `AbortController`.
+ * - Cache: none — caller (VulnFeedService) handles staging/dedup.
+ *
+ * @example
+ * ```ts
+ * const svc = new OsvFeedService();
+ * const vulns = await svc.query(AI_PACKAGE_ALLOWLIST);
+ * ```
+ */
 export class OsvFeedService {
     /**
      * Query OSV for vulnerabilities affecting any of the given packages.
      * Calls POST /v1/querybatch with one query per package. If a vuln entry
      * lacks full detail (only id+modified, the live API shape), we fall back
      * to GET /v1/vulns/{id} to hydrate it. Results are deduped by id.
+     *
+     * @param packages - AI-ecosystem packages to query. Empty array short-circuits to `[]`.
+     * @returns Deduped vulnerability records. Stubs with no `affected` get an empty array.
      */
     async query(packages: EcosystemPackage[]): Promise<OsvVuln[]> {
         // Short-circuit — no fetch needed, preserves Pass 0 skeleton test contract.

@@ -416,6 +416,90 @@ function withTimeout<T>(
 
 // ---------- TasteTesterService ----------
 
+/**
+ * Dual-agent sandboxed dynamic detection of malicious prompts.
+ *
+ * The service detonates a suspect prompt under a **Taster** subagent that has
+ * access to a mock tool surface (8 tools: `fetch_url`, `read_file`,
+ * `exec_shell`, `send_email`, `transfer_funds`, `navigate_browser`,
+ * `write_memory`, `query_database`). A separate **Monitor** agent then grades
+ * the Taster's transcript and emits a structured {@link BehaviorReport}.
+ * The service catches **enacted** malicious behavior — the actions the model
+ * tries to take in response to the prompt — not refused malicious intent.
+ *
+ * ## Gating
+ * Opt-in via `TASTE_TESTER_ENABLED=true` (default OFF). When disabled,
+ * {@link run} returns immediately with a clean stub and zero API cost. The
+ * Anthropic SDK is lazy-imported only when gated on, so just constructing
+ * this service in disabled mode never imports the SDK.
+ *
+ * ## Sandbox correctness
+ * The mock tool router ({@link routeMockTool}) is **pure** — no `fs`, no
+ * `child_process`, no `globalThis.fetch`. This file's only static external
+ * import is `zod`; the SDK is dynamic. Test F of `tasteTesterTests` asserts
+ * this property by source-grep. The router returns realistic-looking but
+ * obviously-synthetic responses; `fetch_url` embeds the tripwire
+ * `sk-test-FAKE` so if the Taster echoes it back in a later turn that's
+ * behavioral evidence of indirect-injection following.
+ *
+ * ## Modes
+ * - `fast` (default) — turn cap = `min(maxTurns, 2)`. Cheap-mode latency.
+ * - `thorough` — turn cap = `maxTurns` (default 5).
+ *
+ * ## Severity floor
+ * The final severity is the MAX across (Monitor's reported severity, max of
+ * reported intents, and the deterministic max derived from raw `toolCalls`
+ * via `TOOL_DEFAULTS`). A poisoned or lazy Monitor returning
+ * `{intents:[], severity:"safe"}` while the Taster actually called
+ * `exec_shell` is still floored to `critical`.
+ *
+ * ## Cancellation
+ * {@link withTimeout} accepts a factory `(signal) => Promise<T>` and threads
+ * the `AbortSignal` through `messages.create()` so timeouts cancel the
+ * in-flight HTTP request rather than orphaning it.
+ *
+ * ## Prompt caching
+ * Taster system prompt + tools and Monitor system prompt all carry
+ * `cache_control: ephemeral`. After the first call in a 5-min window,
+ * subsequent runs read those prefixes at ~0.1× cost.
+ *
+ * ## Adaptive thinking
+ * Enabled on the **Monitor only** (`{type: "adaptive"}` + `effort: "high"`)
+ * per claude-api guidance for intelligence-sensitive classification.
+ * Deliberately **NOT** enabled on the Taster — we want it to behave as a
+ * naive injection-vulnerable assistant, not a safety-aware one.
+ *
+ * ## Structured Monitor output
+ * `output_config.format` constrains the Monitor to the BehaviorReport JSON
+ * schema, so the model cannot emit prose, fenced markdown, or shape drift.
+ * If validation still fails (or the Monitor times out), the service falls
+ * back to `intentsFromToolCalls()` for actionable signal.
+ *
+ * ## Usage tracking
+ * {@link TasteTesterResult.usage} aggregates input/output/cache-creation/
+ * cache-read tokens across both Taster loop iterations and the Monitor call;
+ * consumed by `scripts/calibrate-taste-tester.ts`.
+ *
+ * ## Defaults & env vars
+ * - `TASTE_TESTER_ENABLED` (default `false`)
+ * - `ANTHROPIC_API_KEY` (required when enabled)
+ * - `TASTE_TESTER_MODEL` (default `claude-opus-4-7`)
+ * - `TASTE_TESTER_MAX_TURNS` (default `5`)
+ * - `TASTE_TESTER_MAX_TOKENS` (default `4096`)
+ * - `TASTE_TESTER_TIMEOUT_MS` (default `30000`)
+ *
+ * ## Calibration baseline
+ * Scripted-mock baseline 20/20; real-API baseline 10/20. The gap is
+ * expected — the base model refuses most direct attacks before they
+ * manifest as tool calls, so the service catches enacted (e.g.
+ * indirect-injection-via-tool-output) malicious behavior, not refused
+ * malicious intent.
+ *
+ * ## Testing seam
+ * `opts.anthropicFactory` injects a mock client matching
+ * {@link MinimalAnthropicClient}; real Anthropic API calls are never made
+ * in tests.
+ */
 export class TasteTesterService {
     private enabled: boolean;
     private apiKey: string;
@@ -443,6 +527,21 @@ export class TasteTesterService {
         this.anthropicFactory = opts.anthropicFactory;
     }
 
+    /**
+     * Detonate a prompt under the Taster and grade the transcript with the
+     * Monitor.
+     *
+     * Gated paths (feature flag off, missing API key, SDK import error) return
+     * a clean stub with `available: false` and no `usage` field. Timeout paths
+     * return `available: true` with `reason: "timeout"` and a degraded but
+     * well-shaped report so callers can still log usage and timings.
+     *
+     * @param input.prompt   The suspect prompt to detonate.
+     * @param input.mode     `"fast"` (default, capped at 2 turns) or
+     *                       `"thorough"` (up to `maxTurns`).
+     * @param input.context  Optional context block prepended to the user
+     *                       message as `[Context]\n…\n\n[Prompt]\n…`.
+     */
     async run(input: TasteTesterInput): Promise<TasteTesterResult> {
         const t0 = Date.now();
 

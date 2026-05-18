@@ -59,6 +59,44 @@ const DEFAULT_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 /** Default network timeout: 15s. */
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/**
+ * Pulls security signals from Hugging Face Hub for models and datasets and
+ * extracts HF model IDs referenced in free-form text.
+ *
+ * Hits `GET /api/models/{owner}/{name}` (or `/datasets/...`) and parses the
+ * response defensively — every field is optional and unknown shapes degrade
+ * to a single `lookup_failed` flag rather than throwing. Used by the skill
+ * scanner because marketplace skills commonly load HF models and thereby
+ * inherit those models' posture (gated, unsafe serialization, code-execution
+ * risk via `trust_remote_code`, scanner warnings, etc.).
+ *
+ * @remarks
+ * Key methods:
+ * - `checkModel(modelId)` / `checkDataset(datasetId)` — fetch + analyze; returns a `HuggingFaceModelReport` with `flags[]` and a rolled-up `severity`.
+ * - `extractModelIds(text)` — conservative scan for `owner/name` references. Requires either a `huggingface.co/...` URL or a context keyword (`model`/`pretrained`/`huggingface`/`hf_hub`/`transformers`/`from_pretrained`) within an 80-char window; rejects `host.tld` owners to avoid file-path false positives.
+ *
+ * Severity rollup (max across flags):
+ * - `code_execution_risk` → critical
+ * - `unsafe_serialization` → high
+ * - `scanner_warning` → medium
+ * - `gated`, `no_safetensors` → low
+ * - `lookup_failed` → safe (surface only; never blocks)
+ *
+ * Environment variables consumed:
+ * - `HF_TOKEN` — optional. HF allows anonymous reads of public metadata; the token raises rate limits and unlocks gated models the caller has accepted.
+ *
+ * Network behavior:
+ * - Endpoint: `https://huggingface.co/api/{models|datasets}/{id}`.
+ * - Timeout: 15s via `AbortController` (constructor-tunable).
+ * - Cache: in-memory `Map`, keyed by `kind:id`, default TTL 6h.
+ *
+ * @example
+ * ```ts
+ * const hf = new HuggingFaceService();
+ * const report = await hf.checkModel("bert-base-uncased");
+ * if (report.severity !== "safe") flag(report);
+ * ```
+ */
 export class HuggingFaceService {
     private baseUrl: string;
     private token: string | null;
@@ -75,12 +113,22 @@ export class HuggingFaceService {
         this.cache = new Map();
     }
 
-    /** Fetch + interpret security signals for one HF model id (owner/name). */
+    /**
+     * Fetch and interpret security signals for one HF model id.
+     *
+     * @param modelId - HF model identifier in `owner/name` form.
+     * @returns Report with flag list and severity. Network/parse failures degrade to a single `lookup_failed` flag.
+     */
     async checkModel(modelId: string): Promise<HuggingFaceModelReport> {
         return this.fetchAndAnalyze(modelId, "models");
     }
 
-    /** Same shape, different endpoint. */
+    /**
+     * Same shape as {@link HuggingFaceService.checkModel} but hits the datasets endpoint.
+     *
+     * @param datasetId - HF dataset identifier in `owner/name` form.
+     * @returns Report with flag list and severity.
+     */
     async checkDataset(datasetId: string): Promise<HuggingFaceModelReport> {
         return this.fetchAndAnalyze(datasetId, "datasets");
     }
@@ -244,6 +292,9 @@ export class HuggingFaceService {
      *       within 80 chars before or after the candidate.
      *
      * Returns a deduped array.
+     *
+     * @param text - Free-form input to scan (skill body, prompt, etc.).
+     * @returns Deduped array of `owner/name` HF model identifiers found.
      */
     extractModelIds(text: string): string[] {
         if (!text || typeof text !== "string") return [];

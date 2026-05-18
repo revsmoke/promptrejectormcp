@@ -72,6 +72,35 @@ export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
     return Array.from(out);
 }
 
+/**
+ * Multi-layer scanner for SKILL.md content.
+ *
+ * Aggregates results from four sub-services into a single
+ * {@link SkillScanResult}:
+ * - {@link GeminiService} — semantic LLM classification
+ * - {@link StaticCheckService} — regex/pattern detection (general + skill-scoped)
+ * - {@link TrifectaAnalyzer} — Willison's lethal-trifecta capability analysis
+ * - {@link HuggingFaceService} — security signals for any HF model IDs referenced
+ *
+ * Round-2 semantic fix: a 3-of-3 lethal trifecta now forces
+ * `overallSeverity = "critical"` and `isDangerous = true`. Previously the
+ * trifecta result was reported on `hasLethalTrifecta` but did not bubble up
+ * into the safe/unsafe decision. 2-of-3 contributes `medium` severity but
+ * does not add the synthetic `lethal_trifecta` category or force unsafe.
+ *
+ * v1.1 result-type additions: `hasLethalTrifecta`, `trifectaResult`,
+ * `huggingFaceSecurityFlags`, `huggingFaceReports`, `atlasTechniques[]`.
+ *
+ * HF integration: extracts model IDs from skill content via
+ * {@link HuggingFaceService.extractModelIds}, then fans out to
+ * `checkModel()` in parallel (`Promise.allSettled`) and rolls severity
+ * into the final result.
+ *
+ * Also exports {@link mapGeminiCategoriesToAtlas} as a top-level helper
+ * shared with {@link SecurityService}.
+ *
+ * Environment variables: none consumed directly (delegates to sub-services).
+ */
 export class SkillScanService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;

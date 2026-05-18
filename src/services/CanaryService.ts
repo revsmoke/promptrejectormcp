@@ -59,6 +59,47 @@ interface CanaryStateFile {
 
 const STATE_VERSION = 1;
 
+/**
+ * Canary-token issuer + verifier for memory/RAG poisoning detection.
+ *
+ * Issues UUIDv4 tokens (the full canary string the model would echo)
+ * paired with a 12-char `watchHandle` (first 12 hex chars of
+ * SHA-256(token)) used as an opaque public reference. State is
+ * persisted in `patterns/canary-state.json` with HMAC integrity.
+ *
+ * **Detection flow**: caller plants the token in a RAG document, agent
+ * memory, system prompt, or any context the model might ingest. Later,
+ * caller scans model output (or any downstream content) via
+ * {@link checkEcho}. A match means the model echoed a planted canary
+ * back — strong evidence of context contamination / poisoning.
+ * Detected echoes return `severity: "critical"`.
+ *
+ * **State persistence**:
+ * - Atomic write via tmp + rename, matching {@link PatternService}'s style.
+ * - HMAC-signed when a secret is available; load refuses corrupted state.
+ * - TTL-pruned on every operation (expired tokens are silently dropped).
+ *
+ * **Public surface**: `issueToken`, `checkEcho`, `list`, `revoke`,
+ * `verifyStateIntegrity`. {@link checkEcho} accepts an optional
+ * `watchHandle` — when supplied, scans only that token; otherwise scans
+ * against every active (non-expired) token in the store.
+ *
+ * Environment variables:
+ * - `CANARY_HMAC_SECRET` — preferred HMAC key for state-file integrity.
+ * - `PATTERN_INTEGRITY_SECRET` — fallback if `CANARY_HMAC_SECRET` unset.
+ * - If both unset, state is stored unsigned and a one-time warning is
+ *   logged. Tampering becomes undetectable but the service still works.
+ * - `CANARY_DEFAULT_TTL_SECONDS` — default token TTL (default 86400 = 24h).
+ *
+ * @example
+ * ```ts
+ * const cs = new CanaryService();
+ * const { token, watchHandle } = cs.issueToken({ context: "rag-doc-42" });
+ * // ...plant `token` in your RAG corpus, run the model...
+ * const result = cs.checkEcho(modelOutput);
+ * if (result.echoDetected) alert("memory poisoning detected");
+ * ```
+ */
 export class CanaryService {
     private statePath: string;
     private hmacSecret: string | null;

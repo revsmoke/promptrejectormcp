@@ -25,6 +25,44 @@ export interface PatternListFilters {
     enabled?: boolean;
 }
 
+/**
+ * File-based detection-pattern library with integrity verification.
+ *
+ * Loads `patterns/*.json` from a configurable directory (defaults to
+ * the package root's `patterns/`), validates each entry against
+ * {@link PatternEntrySchema} via Zod, and verifies the
+ * `patterns/manifest.json` integrity (per-file SHA-256 + optional HMAC).
+ *
+ * **Fallback safety**: if integrity verification fails (missing files,
+ * hash mismatch, HMAC mismatch), the service loads a hardcoded fallback
+ * pattern set from `fallbackPatterns.ts` and sets
+ * {@link isFallbackActive} to `true`. Callers should surface this in
+ * health checks — fallback patterns are a strict subset of production
+ * coverage.
+ *
+ * **Fresh-RegExp invariant**: {@link getActivePatterns} returns fresh
+ * `RegExp` instances per call. This avoids `lastIndex` state pollution
+ * across calls without forcing callers to remember to reset it
+ * themselves (defense in depth — {@link StaticCheckService} and
+ * {@link McpToolScanner} also reset before use).
+ *
+ * **Public surface**: `list`, `add`, `update`, `remove`, `verify`,
+ * `regenerateManifest`, `getActivePatterns`, `isFallbackActive`. CRUD
+ * operations regenerate the manifest atomically (tmp + rename).
+ *
+ * Environment variables:
+ * - `PATTERN_INTEGRITY_SECRET` — optional HMAC key. Without it, only
+ *   SHA-256 file hashes verify integrity (no authenticity). With it,
+ *   manifest carries an HMAC signature that detects tampering by an
+ *   attacker who doesn't know the secret.
+ *
+ * @example
+ * ```ts
+ * const ps = new PatternService();
+ * if (ps.isFallbackActive()) console.warn("running on fallback patterns");
+ * const xss = ps.list({ category: "xss", enabled: true });
+ * ```
+ */
 export class PatternService {
     private patternsDir: string;
     private manifestPath: string;

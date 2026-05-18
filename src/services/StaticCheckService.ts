@@ -161,6 +161,36 @@ export function stripUnicodeSmuggling(text: string): {
     return { cleaned, strippedChars };
 }
 
+/**
+ * Regex/pattern-based static detection layer.
+ *
+ * Loads detection patterns from {@link PatternService} when injected;
+ * otherwise falls back to a hardcoded pattern set (see `fallbackPatterns.ts`)
+ * so the service is still functional if the pattern library fails integrity
+ * verification.
+ *
+ * Detection modes (per {@link ActivePattern}):
+ * - `simple` — any regex match counts as a finding.
+ * - `threshold` — requires `countThreshold` matches or `singleMatchLength`
+ *   chars; used for low-false-positive detectors like zero-width chars.
+ *
+ * Round-2 correctness fixes baked in:
+ * - **`lastIndex = 0` reset** before every `regex.test()` / `regex.matchAll()`
+ *   call, so `g`-flagged patterns don't carry state across invocations.
+ *   Live exposure was strongest in {@link McpToolScanner}, which iterates
+ *   one cached pattern array across every string field of a tool descriptor.
+ * - **Flag-group loop continues scanning after first match** within a
+ *   group, taking max severity rather than breaking on first hit. Sneaky
+ *   Bits payloads now correctly surface `critical` severity instead of
+ *   being capped at `high`.
+ *
+ * Also exports a top-level {@link evaluatePattern} helper used by
+ * {@link McpToolScanner} so threshold semantics stay consistent across
+ * services. {@link stripUnicodeSmuggling} is exported for callers that
+ * want a cleaned string + audit trail of the stripped code points.
+ *
+ * Environment variables: none.
+ */
 export class StaticCheckService {
     private patternService: PatternService | null;
 

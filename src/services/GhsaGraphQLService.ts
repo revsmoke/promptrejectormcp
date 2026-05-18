@@ -62,6 +62,32 @@ interface GraphQLResponse {
     errors?: Array<{ message: string }>;
 }
 
+/**
+ * Queries GitHub's GraphQL `securityVulnerabilities` API for recent advisories,
+ * post-filtered to the AI-package allowlist.
+ *
+ * Pulled per ecosystem (npm/pip/etc.) and ordered by most-recently-updated.
+ * Without `GITHUB_TOKEN`, returns `[]` and logs to stderr — never throws — so
+ * tests and offline runs remain green.
+ *
+ * @remarks
+ * Key methods:
+ * - `query(ecosystem, limit?)` — single GraphQL POST, then in-memory filter via `isAllowedGhsaPackage`. Limit is clamped to `[1, 100]`.
+ *
+ * Environment variables consumed:
+ * - `GITHUB_TOKEN` — required for non-empty results. Without it the method returns `[]` after logging a warning.
+ *
+ * Network behavior:
+ * - Endpoint: `https://api.github.com/graphql` (POST).
+ * - Timeout: 30s via `AbortController`.
+ * - Cache: none — caller handles staging.
+ *
+ * @example
+ * ```ts
+ * const svc = new GhsaGraphQLService();
+ * const advs = await svc.query("PIP", 50);
+ * ```
+ */
 export class GhsaGraphQLService {
     /**
      * Fetch recent GHSA advisories for an ecosystem, then post-filter to the
@@ -69,6 +95,11 @@ export class GhsaGraphQLService {
      *
      * Without GITHUB_TOKEN: returns [] and logs to stderr. This intentionally
      * does NOT throw — tests and offline environments must still work.
+     *
+     * @param ecosystem - A GHSA ecosystem identifier (e.g. `"PIP"`, `"NPM"`, `"MAVEN"`).
+     * @param limit - Number of advisories to request; clamped to `[1, 100]`. Defaults to 50.
+     * @returns Allowlist-filtered advisories. Empty if `GITHUB_TOKEN` is missing.
+     * @throws On HTTP failure or GraphQL `errors` payload.
      */
     async query(ecosystem: string, limit: number = DEFAULT_LIMIT): Promise<GhsaAdvisory[]> {
         const token = process.env.GITHUB_TOKEN;

@@ -16,6 +16,31 @@ export interface SecurityReport {
     timestamp: string;
 }
 
+/**
+ * Dual-layer security aggregator for `check_prompt`.
+ *
+ * Runs the {@link GeminiService} semantic check and the
+ * {@link StaticCheckService} pattern check in parallel, then
+ * takes the maximum severity, dedupes categories, and applies the
+ * safety-decision rule:
+ *
+ *   unsafe = overallSeverity ∈ {critical, high}
+ *         OR (gemini.isInjection && gemini.confidence > 0.6)
+ *
+ * v1.1 additions: aggregates `atlasTechniques[]` across both layers
+ * via {@link mapGeminiCategoriesToAtlas} (Gemini→ATLAS heuristic) and
+ * the pattern-level `atlasTechnique` field set during static matching.
+ *
+ * Environment variables: none consumed directly. The Gemini key
+ * (`GEMINI_API_KEY`) is handled by {@link GeminiService}.
+ *
+ * @example
+ * ```ts
+ * const svc = new SecurityService(patternService);
+ * const report = await svc.runSecurityScan("ignore all previous...");
+ * if (!report.safe) throw new Error(`blocked: ${report.overallSeverity}`);
+ * ```
+ */
 export class SecurityService {
     private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
@@ -25,6 +50,14 @@ export class SecurityService {
         this.staticCheckService = new StaticCheckService(patternService);
     }
 
+    /**
+     * Run both detection layers against `prompt` and return the merged report.
+     *
+     * @param prompt - Untrusted user input to evaluate. Caller should bound length.
+     * @returns A {@link SecurityReport} with merged severity, categories, ATLAS
+     *   tags, and the underlying per-layer results. `safe: false` indicates
+     *   the prompt should be blocked or escalated.
+     */
     async runSecurityScan(prompt: string): Promise<SecurityReport> {
         const [geminiResult, staticResult] = await Promise.all([
             this.geminiService.checkPrompt(prompt),

@@ -34,10 +34,36 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_TIMEOUT_MS = 30_000; // 30 seconds — match OsvFeedService default.
 
 /**
- * Wraps the CISA KEV catalog as an O(1) lookup. We don't ship a fallback
- * table here (KEV is high-churn and stale data would be misleading); instead
- * a missing/empty cache returns isInKev=false, and the VulnFeedService
- * orchestrator logs the refresh failure for the operator.
+ * Wraps the CISA Known Exploited Vulnerabilities catalog as an O(1) lookup
+ * keyed by CVE ID.
+ *
+ * Used by `VulnFeedService` as a severity escalator: any staged candidate
+ * whose CVE appears in KEV gets bumped one level (low→medium→high→critical).
+ * We do not ship a built-in fallback table — KEV churns frequently and stale
+ * data is worse than none — so a missing/empty cache returns `isInKev = false`
+ * and the orchestrator surfaces the refresh failure.
+ *
+ * @remarks
+ * Key methods:
+ * - `refresh()` — fetches catalog, writes atomic JSON cache, rebuilds map. Skips network if cache is within TTL. Throws on fetch/parse failure with a clean error message; on abort surfaces `"KEV refresh failed: timeout after Xms"`.
+ * - `isInKev(cveId)` — case-insensitive O(1) membership.
+ * - `get(cveId)` — full record or `null`.
+ * - `list()` — array of all entries.
+ *
+ * Environment variables consumed: none directly. All inputs (`feedUrl`,
+ * `cacheDir`, `ttlMs`, `timeoutMs`) flow through constructor options.
+ *
+ * Network behavior:
+ * - Endpoint: CISA KEV JSON (`https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json`).
+ * - Timeout: 30s via `AbortController` (constructor-tunable).
+ * - Cache: `patterns/feed-cache/kev.json`, 24h TTL by default. Atomic write via `.tmp` + rename. Root finder walks up looking for `package.json` and stops when `dirname()` becomes idempotent (POSIX `/` / Windows drive root) so it can't loop forever.
+ *
+ * @example
+ * ```ts
+ * const kev = new KevFeedService();
+ * await kev.refresh();
+ * if (kev.isInKev("CVE-2024-1234")) escalateSeverity();
+ * ```
  */
 export class KevFeedService {
     private cacheDir: string;
@@ -127,6 +153,9 @@ export class KevFeedService {
     /**
      * Fetch the KEV catalog and persist to cache. Skips the network if the
      * cache is already within TTL. Throws on fetch failure.
+     *
+     * @returns Count of entries in the warmed map and an ISO `fetchedAt` timestamp.
+     * @throws `"KEV refresh failed: timeout after Xms"` on abort; other fetch errors bubble up with their underlying detail.
      */
     async refresh(): Promise<KevRefreshResult> {
         if (this.cacheIsFresh()) {
@@ -167,17 +196,33 @@ export class KevFeedService {
         return { count: this.entries.size, fetchedAt: new Date().toISOString() };
     }
 
-    /** Case-insensitive membership test. */
+    /**
+     * Case-insensitive membership test.
+     *
+     * @param cveId - CVE identifier (any case). Empty string returns `false`.
+     * @returns `true` if the CVE is present in the in-memory map.
+     */
     isInKev(cveId: string): boolean {
         if (!cveId) return false;
         return this.entries.has(cveId.toUpperCase());
     }
 
+    /**
+     * Fetch the full KEV entry for a CVE.
+     *
+     * @param cveId - CVE identifier (any case).
+     * @returns Entry or `null` if absent.
+     */
     get(cveId: string): KevEntry | null {
         if (!cveId) return null;
         return this.entries.get(cveId.toUpperCase()) || null;
     }
 
+    /**
+     * Snapshot of all known KEV entries.
+     *
+     * @returns Array copy of the current map values.
+     */
     list(): KevEntry[] {
         return Array.from(this.entries.values());
     }

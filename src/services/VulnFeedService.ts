@@ -93,6 +93,36 @@ const NVD_SEARCH_KEYWORDS = [
     "ssrf",
 ];
 
+/**
+ * Orchestrates vulnerability-feed pulls across NVD, GHSA REST, GHSA GraphQL,
+ * OSV.dev, MITRE ATLAS, and CISA KEV in parallel.
+ *
+ * Mines recent CVEs from CWE-tagged sources (NVD, GHSA REST), generates regex
+ * candidates via Gemini, and merges AI-supply-chain advisories (OSV, GHSA
+ * GraphQL) as empty-regex candidates tagged `ai_supply_chain`. All candidates
+ * are enriched with KEV severity escalation and ATLAS technique tags, then
+ * staged to `patterns/staging/pending-review.json` for human review before
+ * promotion via {@link VulnFeedService.promote}.
+ *
+ * @remarks
+ * Key methods:
+ * - `updateFeeds(lookbackDays?)` — parallel pull via `Promise.allSettled`; per-source counts in `VulnFeedResult.perSource`. One source failure does not abort the others.
+ * - `listStagedCandidates()` — read-only view of `pending-review.json`.
+ * - `promote(candidateId)` — moves a staged candidate into the live pattern library.
+ *
+ * Environment variables consumed:
+ * - `GEMINI_API_KEY` — optional; required for regex-candidate generation from NVD/GHSA REST. Without it, those sources still fetch but yield zero patterns.
+ * - `NVD_API_KEY` — optional; raises NVD rate limit from 5 → 50 req/30s.
+ * - `GITHUB_TOKEN` — optional; raises GitHub rate limit from 60 → 5000 req/hr. Required for non-empty GHSA GraphQL results.
+ *
+ * Network behavior:
+ * - NVD: `services.nvd.nist.gov/rest/json/cves/2.0`, sliding-window rate limiter, silent skip on network errors.
+ * - GHSA REST: `api.github.com/advisories`, sliding-window rate limiter.
+ * - OSV / GHSA GraphQL / ATLAS / KEV: delegated to their respective services (each with its own timeout).
+ *
+ * Enrichment: KEV-listed CVEs get one-level severity bump; `ai_supply_chain`
+ * candidates get `atlasTechnique: "AML.T0070"`.
+ */
 export class VulnFeedService {
     private patternService: PatternService;
     private geminiService: GeminiService | null;
@@ -168,6 +198,14 @@ export class VulnFeedService {
         return this.loadStaging().candidates;
     }
 
+    /**
+     * Pull all sources in parallel, generate/stage candidates, and return
+     * aggregated counts. Per-source failures are recorded in `errors` but do
+     * not abort sibling sources.
+     *
+     * @param lookbackDays - How far back to query CWE-tagged sources (NVD/GHSA REST). Defaults to 30.
+     * @returns Counts, per-source totals, generated-pattern count, and a list of errors.
+     */
     async updateFeeds(lookbackDays = 30): Promise<VulnFeedResult> {
         const result: VulnFeedResult = {
             fetchedCount: 0,
@@ -423,6 +461,14 @@ export class VulnFeedService {
         return "medium";
     }
 
+    /**
+     * Promote a staged candidate into the live pattern library. Removes the
+     * candidate from staging and adds it via `PatternService.add`.
+     *
+     * @param candidateId - The `id` of an entry currently in `pending-review.json`.
+     * @returns The newly added `PatternEntry`.
+     * @throws If `candidateId` does not exist in staging.
+     */
     promote(candidateId: string): PatternEntry {
         const staging = this.loadStaging();
         const idx = staging.candidates.findIndex((c) => c.id === candidateId);

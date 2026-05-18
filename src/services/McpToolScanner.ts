@@ -83,6 +83,38 @@ function maxSeverity(a: McpSeverity, b: McpSeverity): McpSeverity {
     return rankSeverity(a) >= rankSeverity(b) ? a : b;
 }
 
+/**
+ * Lints MCP tool descriptors for tool-poisoning attacks and emits a canonical
+ * SHA-256 hash for drift detection across versions.
+ *
+ * The scanner recursively walks every string-valued field in a tool descriptor
+ * (top-level `description`, nested `inputSchema.properties.*.description`,
+ * `examples[]`, schema `title`/`description`, etc.) and evaluates each one
+ * against patterns in three categories: `mcp_tool_poisoning`,
+ * `prompt_injection`, and `policy_puppetry`. Prompt-injection and
+ * policy-puppetry patterns are reused here because poisoned descriptors
+ * commonly embed the same imperative-override payloads we already catch in
+ * end-user prompts.
+ *
+ * Two signals are produced per scan:
+ * 1. **Findings** — pattern matches plus a separate `unicode_smuggling`
+ *    finding for any tag/zero-width/bidi characters stripped by
+ *    `stripUnicodeSmuggling`. Pattern evaluation uses the same threshold-aware
+ *    logic as `StaticCheckService` via the exported `evaluatePattern` helper.
+ * 2. **Canonical hash** — `canonicalStringify` produces a sorted-key
+ *    deterministic JSON representation; the SHA-256 of that is the descriptor
+ *    identity. When a `priorHash` is supplied and doesn't match, `drift: true`
+ *    is set in the result independent of finding severity.
+ *
+ * `inspectedFields` lists the dot-path of every string field the scanner read
+ * (e.g. `inputSchema.properties.q.description`, `examples[0]`) — useful for
+ * audit trails and for proving coverage in tests.
+ *
+ * Severity is rolled up as the max across all findings; `safe` when none fire.
+ * No env vars; PatternService is injected via the constructor. When no
+ * PatternService is wired (early bootstrap), the scanner still emits
+ * hash/drift but skips pattern checks.
+ */
 export class McpToolScanner {
     private patternService: PatternService | null;
 
@@ -90,6 +122,19 @@ export class McpToolScanner {
         this.patternService = patternService ?? null;
     }
 
+    /**
+     * Scan a single MCP tool descriptor.
+     *
+     * @param input.tool       The tool descriptor object as received from an
+     *                         MCP server (typically `{ name, description,
+     *                         inputSchema }` plus any extension fields).
+     * @param input.priorHash  Optional known-good hash. If supplied and not
+     *                         equal to the freshly-computed hash, the result's
+     *                         `drift` flag is set.
+     * @returns Canonical hash, drift flag, ordered list of findings, rolled-up
+     *          severity, and the sorted list of every string field path the
+     *          scanner inspected.
+     */
     scan(input: McpToolScanInput): McpToolScanResult {
         const canonical = canonicalStringify(input.tool);
         const hash = createHash("sha256").update(canonical).digest("hex");
