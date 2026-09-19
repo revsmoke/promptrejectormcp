@@ -35,9 +35,9 @@ export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): Nod
     return {
         PATH: source.PATH,
         SystemRoot: source.SystemRoot,
-        TEMP: source.TEMP,
-        TMP: source.TMP,
-        TMPDIR: source.TMPDIR,
+        TEMP: home,
+        TMP: home,
+        TMPDIR: home,
         HOME: home,
         USERPROFILE: home,
         NODE_ENV: "test",
@@ -46,7 +46,7 @@ export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): Nod
     };
 }
 
-export function runSuite(cwd: string, suite: OfflineSuite) {
+export function runSuite(cwd: string, suite: OfflineSuite, options: { timeoutMs?: number } = {}) {
     const log = join(cwd, "network-violations.jsonl");
     rmSync(log, { force: true });
     const child = spawnSync(process.execPath, [
@@ -60,7 +60,9 @@ export function runSuite(cwd: string, suite: OfflineSuite) {
             OFFLINE_ALLOW_LOOPBACK: suite.allowLoopback ? "1" : "0",
         },
         encoding: "utf8",
-        timeout: 120_000,
+        timeout: options.timeoutMs ?? 120_000,
+        // Test subprocesses must not extend the deadline by ignoring SIGTERM.
+        killSignal: "SIGKILL",
         maxBuffer: 10 * 1024 * 1024,
     });
     const violations = existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").filter(Boolean) : [];
