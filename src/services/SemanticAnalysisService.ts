@@ -47,7 +47,10 @@ export class SemanticAnalysisService {
     }
     async generate<T>(role: Exclude<GenerativeRole, "taster">, request: Omit<StructuredRequest<T>, "profile" | "maxOutputTokens">, context: CallContext): Promise<CallResult<T>> {
         const profiles = roleProfiles(this.snapshot, role);
-        const bounded: CallContext = { ...context, role, deadlineMs: Math.min(context.deadlineMs, Date.now() + this.snapshot.config.limits.reasoningTimeoutMs) };
+        // Every adapter applies its own per-call cap. Keep the original task
+        // deadline here so a timed-out primary can use a fallback within the
+        // remaining task budget, without granting a fresh overall deadline.
+        const bounded: CallContext = { ...context, role, deadlineMs: Math.min(context.deadlineMs, context.budget.deadlineMs) };
         let result: CallResult<T> | undefined;
         for (const [index, profile] of profiles.entries()) {
             if (index && result?.status === "unavailable" && !["not_configured", "authentication", "rate_limited", "timeout", "transport", "invalid_response", "context_limit"].includes(result.code)) break;

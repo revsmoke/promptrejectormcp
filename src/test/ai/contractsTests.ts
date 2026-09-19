@@ -5,6 +5,7 @@ import { SkillScanService } from "../../services/SkillScanService.js";
 import { HuggingFaceService } from "../../services/HuggingFaceService.js";
 import { semanticFindingSchema } from "../../ai/taskSchemas.js";
 import { benignFinding, fixtureSemantic } from "./fixtures.js";
+import { withMockedFetch, jsonResponse } from "../helpers/mockFetch.js";
 
 // Regression: a syntactically valid but empty provider object is unavailable,
 // never an invented benign classification. This uses the real HTTP boundary.
@@ -58,4 +59,36 @@ assert.equal(overflowHf.calls, 16);
 const skillOutage = await new SkillScanService(undefined, new HuggingFaceService(), fixtureSemantic({ unavailable: "timeout" })).scanSkill("Analyze a spreadsheet.");
 assert.equal(skillOutage.safe, false);
 assert.equal(skillOutage.analysisAvailable, false);
+// Exercise actual HF HTTP parsing and the entire skill coverage path. A 200
+// response is not evidence that required supply-chain analysis completed.
+for (const payload of [null, [], {}, { id: "owner/model" }, { id: "owner/model", siblings: "missing" }, { id: "owner/model", siblings: [{}] }, { id: "owner/model", siblings: [], tags: "malformed" }]) {
+    let requests = 0;
+    const hf = new HuggingFaceService();
+    await withMockedFetch(async () => { requests++; return jsonResponse(payload); }, async () => {
+        const scanner = new SkillScanService(undefined, hf, fixtureSemantic());
+        for (let repeat = 0; repeat < 2; repeat++) {
+            const report = await scanner.scanSkillV2('Loads from_pretrained("owner/model") for analysis.');
+            assert.equal(report.safe, false, `invalid native metadata must not allow: ${JSON.stringify(payload)}`);
+            assert.equal(report.coverage.find((entry) => entry.check === "hugging_face")?.status, "partial");
+            assert.ok(report.huggingFaceSecurityFlags.some((flag) => flag.class === "lookup_failed"));
+        }
+        assert.equal(requests, 2, "malformed successful-looking metadata must not enter the cache");
+    });
+}
+for (const [kind, payload] of [
+    ["model", { id: "owner/model", siblings: [{ rfilename: "weights.safetensors" }], tags: ["transformers"], gated: false, cardData: null }],
+    ["model", { modelId: "owner/model", siblings: [{ rfilename: "weights.safetensors" }] }],
+    ["dataset", { id: "owner/dataset", siblings: [{ rfilename: "data.parquet" }], cardData: { license: "mit" }, tags: ["task_categories:text-classification"] }],
+] as const) {
+    const hf = new HuggingFaceService();
+    await withMockedFetch(async () => jsonResponse(payload), async () => {
+        const report = kind === "dataset" ? await hf.checkDataset("owner/dataset") : await hf.checkModel("owner/model");
+        assert.ok(!report.flags.some((flag) => flag.class === "lookup_failed"), "valid native model/dataset inventories remain supported");
+    });
+}
+await withMockedFetch(async () => jsonResponse({ id: "owner/model", cardData: { trust_remote_code: true } }), async () => {
+    const report = await new SkillScanService(undefined, new HuggingFaceService(), fixtureSemantic()).scanSkillV2('Loads from_pretrained("owner/model") for analysis.');
+    assert.equal(report.decision, "block", "partial metadata must retain existing positive risk signals");
+    assert.equal(report.coverage.find((entry) => entry.check === "hugging_face")?.status, "partial");
+});
 console.log("PASS strict semantic regression");

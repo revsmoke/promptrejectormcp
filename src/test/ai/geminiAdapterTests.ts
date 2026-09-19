@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { GeminiAdapter } from "../../ai/providers/GeminiAdapter.js";
 import { NativeTransport } from "../../ai/transport.js";
 import { AnalysisBudget } from "../../ai/budget.js";
-import { limitsSchema } from "../../ai/config.js";
+import { limitsSchema, loadAIConfig, parseAIConfig } from "../../ai/config.js";
+import { ProviderRegistry } from "../../ai/registry.js";
+import { SemanticAnalysisService } from "../../services/SemanticAnalysisService.js";
 import { semanticFindingSchema, nativeJsonSchema } from "../../ai/taskSchemas.js";
 import type { StructuredRequest, CallContext } from "../../ai/contracts.js";
 
@@ -54,4 +56,32 @@ const retried = await retryAdapter.generate(req, retriedContext);
 assert.equal(retried.status, "ok");
 assert.equal(retriedContext.budget.usage.summary().calls, 2);
 assert.equal(retriedContext.budget.usage.summary().usage.inputTokens, null, "unknown retry usage cannot masquerade as a complete final-response total");
+// Fallback gets its own bounded call within the original shared task deadline.
+// A primary 25ms timeout must not consume the whole 150ms task budget.
+const base = loadAIConfig({}).config;
+const fallbackConfig = parseAIConfig({ ...base,
+    profiles: { ...base.profiles, fallback: { ...base.profiles["legacy-gemini"], maxOutputTokens: 1024 } },
+    roles: { ...base.roles, semantic: { primary: "legacy-gemini", fallback: "fallback" } },
+    limits: { ...base.limits, analysisDeadlineMs: 150, reasoningTimeoutMs: 25 },
+});
+let fallbackCalls = 0;
+const fallbackRegistry = new ProviderRegistry(fallbackConfig, { env: { GEMINI_API_KEY: "fixture-key" }, fetch: async () => {
+    fallbackCalls++;
+    return fallbackCalls % 2 === 1 ? new Promise<Response>(() => {}) : new Response(JSON.stringify(native(benign)));
+} });
+const fallbackService = new SemanticAnalysisService(fallbackConfig, fallbackRegistry);
+const fallbackContext = fallbackService.createContext("prompt");
+const fallbackStart = Date.now();
+const recovered = await fallbackService.analyze("A harmless request", "prompt", fallbackContext);
+assert.equal(recovered.status, "ok", "primary timeout should leave remaining task time for configured fallback");
+assert.equal(fallbackCalls, 2);
+assert.equal(fallbackContext.routing?.length, 2);
+assert.ok(Date.now() - fallbackStart < 150);
+let expiredFallbackCalls = 0;
+const expiredRegistry = new ProviderRegistry(fallbackConfig, { env: { GEMINI_API_KEY: "fixture-key" }, fetch: async () => { expiredFallbackCalls++; return new Promise<Response>(() => {}); } });
+const expiredService = new SemanticAnalysisService(fallbackConfig, expiredRegistry);
+const expiredContext = { ...expiredService.createContext("prompt"), deadlineMs: Date.now() + 10 };
+const expiredResult = await expiredService.analyze("A harmless request", "prompt", expiredContext);
+assert.equal(expiredResult.status === "unavailable" && expiredResult.code, "timeout");
+assert.equal(expiredFallbackCalls, 1, "no fallback may dispatch after the actual request deadline");
 console.log("PASS Gemini native schema, strict parsing, termination and attribution");

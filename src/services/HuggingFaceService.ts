@@ -1,5 +1,32 @@
 import { withDeadline } from "../ai/transport.js";
 
+function isObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function nonemptyString(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0; }
+function optionalStrings(value: unknown): boolean { return value == null || (Array.isArray(value) && value.every((item) => typeof item === "string")); }
+
+/** The full model/dataset endpoints provide repository identity and siblings.
+ * Optional card/scanner fields may be absent, but supplied malformed values
+ * must not silently disappear from required security coverage. Unknown native
+ * fields are preserved for forward compatibility rather than rejected. */
+function hasCompleteMetadataShape(value: Record<string, unknown>): boolean {
+    if (!nonemptyString(value.id) && !nonemptyString(value.modelId)) return false;
+    if (value.id !== undefined && !nonemptyString(value.id)) return false;
+    if (value.modelId !== undefined && !nonemptyString(value.modelId)) return false;
+    if (!Array.isArray(value.siblings) || !value.siblings.every((file) => isObject(file) && nonemptyString(file.rfilename))) return false;
+    if (!optionalStrings(value.tags)) return false;
+    if (value.gated != null && typeof value.gated !== "boolean" && value.gated !== "auto" && value.gated !== "manual") return false;
+    if (value.cardData != null) {
+        if (!isObject(value.cardData) || !optionalStrings(value.cardData.tags)) return false;
+        if (value.cardData.trust_remote_code != null && typeof value.cardData.trust_remote_code !== "boolean") return false;
+    }
+    for (const field of ["securityStatus", "security", "protectAiScanResult"]) {
+        if (value[field] != null && !isObject(value[field])) return false;
+    }
+    return true;
+}
+
 // Pass 8: Hugging Face Hub security signals.
 //
 // HF exposes per-model / per-dataset metadata at:
@@ -66,8 +93,10 @@ const DEFAULT_TIMEOUT_MS = 15_000;
  * extracts HF model IDs referenced in free-form text.
  *
  * Hits `GET /api/models/{owner}/{name}` (or `/datasets/...`) and parses the
- * response defensively — every field is optional and unknown shapes degrade
- * to a single `lookup_failed` flag rather than throwing. Used by the skill
+ * response defensively — a repository identity and complete file inventory
+ * are required, while optional security fields are checked when supplied.
+ * Malformed metadata produces `lookup_failed`, retaining any positive risk
+ * signals that can still be read. Used by the skill
  * scanner because marketplace skills commonly load HF models and thereby
  * inherit those models' posture (gated, unsafe serialization, code-execution
  * risk via `trust_remote_code`, scanner warnings, etc.).
@@ -193,13 +222,17 @@ export class HuggingFaceService {
     }
 
     /**
-     * Parse the HF API response defensively. Every field is optional; we never
-     * throw on missing/unexpected shapes — worst case, we return empty flags.
+     * Validate the minimum native metadata needed by these checks before
+     * concluding coverage is complete. Scanner/card fields are optional in
+     * actual model/dataset responses; missing identity or file inventory is not
+     * a negative security finding. Partial payloads retain observable risks.
      */
     private analyzeApiPayload(data: unknown): HuggingFaceModelFlag[] {
         const flags: HuggingFaceModelFlag[] = [];
-        if (!data || typeof data !== "object") return flags;
+        const lookupFailed: HuggingFaceModelFlag = { class: "lookup_failed", note: "HF metadata is malformed or lacks the repository identity/file inventory required for analysis.", rawField: "metadata_shape" };
+        if (!isObject(data)) return [lookupFailed];
         const obj = data as Record<string, any>;
+        if (!hasCompleteMetadataShape(data)) flags.push(lookupFailed);
 
         // 1. Gated. HF returns `gated: false | "auto" | "manual"`. Anything truthy
         //    means the user must accept terms — relevant signal for skill consumers
