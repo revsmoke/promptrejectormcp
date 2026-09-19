@@ -16,8 +16,8 @@ This ledger tracks the [implementation plan](../superpowers/plans/2026-09-19-typ
 
 | Pass | Deliverable | Code / documentation | Offline verification | Live qualification | Activation |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Reproducible offline baseline | Implemented; independent review pending | 18/18 suites pass, Node 24.13.0 | Not applicable | No changes |
-| 1 | Contracts, configuration, service construction, truthful v2 results | Pending | Pending | Pending where needed | Off |
+| 0 | Reproducible offline baseline | Implemented; independent spec and quality reviews approved | 18/18 suites pass, Node 24.13.0 | Not applicable | No changes |
+| 1 | Contracts, configuration, service construction, truthful v2 results | Implemented; independent review pending | 25/25 suites pass; lint passes, Node 24.13.0 | Pending where needed | TypeSafe off; enforcement blocked |
 | 2 | Claude/OpenAI structured adapters and role selection | Pending | Pending | Pending | Off |
 | 3 | Portable Taste-Tester conversations and monitor role | Pending | Pending | Pending | Off |
 | 4 | TypeSafe client, bounded requests, cache, accounting | Pending | Pending | Pending | Off |
@@ -48,3 +48,17 @@ Quality-review follow-up: isolated child deadlines now use `SIGKILL`, preventing
 ## Evidence required for later updates
 
 For each completed pass, record the commit, commands and results, any known pre-existing failures, reviewer outcomes, and remaining dependencies. A green offline test count does not mark live quality or activation complete. Record actual provider/model IDs and qualification manifest hashes when live gates are run; never record API keys or raw sensitive prompts. Preserve an explicit blocked/pending gate whenever the necessary evidence is absent.
+
+## Pass 1 evidence
+
+Implementation commit: `feat: validate semantic results and centralize AI configuration` (record the resulting hash in the coordinating review). The foundation includes strict typed reasoning results, immutable nonsecret configuration/profile hashes, independent role contracts, native Gemini structured output, task attempt/deadline/usage budgets, bounded transport queues and response reads, and a shared dependency graph built after dotenv. The registry exposes the provider seam for subsequent Claude/OpenAI adapters; those adapters and TypeSafe activation remain separate passes.
+
+The initial semantic regression was observed before its repair: a native HTTP fixture containing the text `{}` produced `error: undefined`. After strict validation, it is `invalid_response`. A second observed regression showed that a clean local scan plus unavailable semantic analysis returned `safe: true`; it now returns `safe: false`. Valid v1 results retain the historical severity/isInjection/confidence formula and real numeric model self-assessment; null confidence is unavailable in v1 and stays nullable in v2. The new v2 policy uses explicit allow/block/review/unavailable and required coverage. Existing static and skill-specific, HF, ATLAS and trifecta findings remain in the aggregate.
+
+REST `/v2/check-prompt` and `/v2/scan-skill` and MCP `reportVersion:2` use the same semantic service. Non-Gemini semantic v1 requests receive a migration error before inference. Input schemas, UTF-16 character ceilings and the 4 MiB REST JSON ceiling are checked with ASCII, multibyte and escaped-string boundary fixtures. MCP startup is tested in a child process with a synthetic `.env`; it proves dotenv-before-construction and JSON-RPC-only stdout. The offline runner now copies the real nonsecret package metadata for version reporting.
+
+Skill scans preserve rejected/failed HF lookups as incomplete coverage and audit at most 16 references; overflow cannot become safe. HF calls honor the shared deadline/cancellation and failure reports do not enter the success cache. The existing HF integration tests now inject semantic fixtures rather than relying on a constructor key or a captured SDK fetch. The private skill-check test seam and positional HF injection remain available.
+
+Transport regressions cover pre-aborted work never starting, queued cancellation, queue overflow, slow/missing response bodies, bounded reads, redirects, sanitized errors, transient retry limits including overload, Retry-After preserving the original deadline, and event-loop stalls completing after an absolute deadline. Earlier transient attempts each contribute unknown usage, so final-response token counts cannot masquerade as complete run totals. Unknown prices/usage remain unknown; monetary caps reject dispatch without a conservative estimate. Optional shadow calls have a separate attempt pool and are shed under monetary caps until an explicit required-spend envelope is implemented.
+
+Verification: `npm run test:offline` reports **25 passed, 0 failed, zero unexpected network violations**; `npm run lint` passes. The focused foundation suites and `git diff --check` also pass after final cleanup. No paid API calls were performed. Node 18.20/22/24 conformance beyond this Node 24.13 run, live profile probes, qualification manifests, shared judgment-call budget envelopes, portable Taster/Monitor execution, and enforcement activation remain for their specified later passes. The historical unsafe experiment verifier remains unchanged and excluded from offline execution. Independent foundation spec/quality review is pending.

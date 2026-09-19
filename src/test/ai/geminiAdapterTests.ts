@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import { GeminiAdapter } from "../../ai/providers/GeminiAdapter.js";
+import { NativeTransport } from "../../ai/transport.js";
+import { AnalysisBudget } from "../../ai/budget.js";
+import { limitsSchema } from "../../ai/config.js";
+import { semanticFindingSchema, nativeJsonSchema } from "../../ai/taskSchemas.js";
+import type { StructuredRequest, CallContext } from "../../ai/contracts.js";
+
+export const benign = { verdict: "benign" as const, severity: "low" as const, categories: [], explanation: "A harmless summary request.", evidenceIds: [], isInjection: false, selfReportedConfidence: 0.9 };
+const req: StructuredRequest<typeof benign> = { profile: { provider: "gemini", model: "gemini-3-flash-preview", maxOutputTokens: 2048 }, systemInstruction: "trusted rubric", state: '{"input":"untrusted input"}', schemaId: "semantic", schemaVersion: "1", rubricVersion: "1", jsonSchema: nativeJsonSchema(semanticFindingSchema), parse: (value) => semanticFindingSchema.parse(value) as typeof benign, maxOutputTokens: 2048 };
+const ctx = (): CallContext => { const budget = new AnalysisBudget("prompt", limitsSchema.parse({})); return { budget, deadlineMs: budget.deadlineMs, runId: "test", role: "semantic", configHash: "test" }; };
+let captured: { url?: string; init?: RequestInit } = {};
+function adapter(body: unknown, key = "fixture-key") {
+    return new GeminiAdapter({ apiKey: key, transport: new NativeTransport({ fetch: async (url, init) => { captured = { url: String(url), init }; return new Response(JSON.stringify(body)); } }) });
+}
+function native(value: unknown, finishReason = "STOP") { return { candidates: [{ finishReason, content: { parts: [{ text: JSON.stringify(value) }] } }], modelVersion: "gemini-3-flash-preview-actual", usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 20, thoughtsTokenCount: 4, cachedContentTokenCount: 10 } }; }
+const result = await adapter(native(benign)).generate(req, ctx());
+assert.equal(result.status, "ok");
+assert.equal(result.meta.resolvedModel, "gemini-3-flash-preview-actual");
+assert.equal(result.meta.usage.reasoningIsOutputSubset, false);
+assert.equal(result.meta.usage.inputTokens, 50);
+assert.ok(!captured.url?.includes("fixture-key"));
+const sent = JSON.parse(String(captured.init?.body));
+assert.equal(sent.systemInstruction.parts[0].text, "trusted rubric");
+assert.equal(sent.contents[0].parts[0].text, req.state);
+assert.equal(sent.generationConfig.responseMimeType, "application/json");
+assert.deepEqual(sent.generationConfig.responseJsonSchema.required, Object.keys(benign));
+assert.equal(sent.generationConfig.temperature, undefined);
+assert.equal((captured.init?.headers as Record<string, string>)["x-goog-api-key"], "fixture-key");
+for (const value of [{}, [], { ...benign, extra: true }, { ...benign, categories: ["made_up"] }, { ...benign, evidenceIds: ["not-input"] }, { ...benign, selfReportedConfidence: 2 }, { ...benign, isInjection: "false" }]) {
+    const rejected = await adapter(native(value)).generate(req, ctx());
+    assert.equal(rejected.status === "unavailable" && rejected.code, "invalid_response");
+}
+for (const [body, code] of [
+    [{ candidates: [] }, "invalid_response"],
+    [{ candidates: [native(benign).candidates[0], native(benign).candidates[0]] }, "invalid_response"],
+    [{ promptFeedback: { blockReason: "SAFETY" } }, "refusal"],
+    [native(benign, "SAFETY"), "refusal"],
+    [native(benign, "MAX_TOKENS"), "incomplete"],
+] as const) assert.equal((await adapter(body).generate(req, ctx())).status, "unavailable", code);
+const missing = await adapter(native(benign), "").generate(req, ctx());
+assert.equal(missing.status === "unavailable" && missing.code, "not_configured");
+assert.equal(missing.meta.attempts, 0);
+const absentUsage = await adapter({ candidates: native(benign).candidates }).generate(req, ctx());
+assert.equal(absentUsage.meta.resolvedModel, null);
+assert.equal(absentUsage.meta.usage.inputTokens, null);
+let retryCalls = 0;
+const retriedContext = ctx();
+const retryAdapter = new GeminiAdapter({ apiKey: "fixture-key", transport: new NativeTransport({ fetch: async () => {
+    retryCalls++;
+    return retryCalls === 1 ? new Response("", { status: 503, headers: { "retry-after": "0" } }) : new Response(JSON.stringify(native(benign)));
+} }) });
+const retried = await retryAdapter.generate(req, retriedContext);
+assert.equal(retried.status, "ok");
+assert.equal(retriedContext.budget.usage.summary().calls, 2);
+assert.equal(retriedContext.budget.usage.summary().usage.inputTokens, null, "unknown retry usage cannot masquerade as a complete final-response total");
+console.log("PASS Gemini native schema, strict parsing, termination and attribution");

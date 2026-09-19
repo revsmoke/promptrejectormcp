@@ -27,6 +27,13 @@ export const OFFLINE_SUITES: readonly OfflineSuite[] = [
     { file: "tasteTesterTests.js" },
     { file: "tasteTesterCorpusTests.js" },
     { file: "manyShotObfuscationTests.js" },
+    { file: "ai/contractsTests.js" },
+    { file: "ai/bootstrapTests.js" },
+    { file: "ai/geminiAdapterTests.js" },
+    { file: "ai/decisionPolicyTests.js" },
+    { file: "ai/apiVersionTests.js", allowLoopback: true },
+    { file: "ai/transportTests.js" },
+    { file: "ai/budgetTests.js" },
 ];
 
 export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {
@@ -103,7 +110,9 @@ export function runOfflineTests(projectRoot: string): boolean {
             // Some existing tests inspect source next to their compiled imports.
             copyFixtures(join(projectRoot, "src"), join(cwd, "dist"));
             cpSync(join(projectRoot, "patterns"), join(cwd, "patterns"), { recursive: true, filter: excludeEnvironmentFiles });
-            writeFileSync(join(cwd, "package.json"), '{"type":"module"}\n');
+            // REST/MCP read the actual package version. This manifest contains
+            // no credentials; preserve it instead of inventing a test version.
+            cpSync(join(projectRoot, "package.json"), join(cwd, "package.json"));
             symlinkSync(join(projectRoot, "node_modules"), join(cwd, "node_modules"), "dir");
             const result = runSuite(cwd, suite);
             if (!result.passed) failures++;

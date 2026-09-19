@@ -1,7 +1,12 @@
-import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
-import { StaticCheckService, StaticCheckResult } from "./StaticCheckService.js";
-import { mapGeminiCategoriesToAtlas } from "./SkillScanService.js";
+import { type GeminiCheckResult, toLegacyGemini } from "./GeminiService.js";
+import { StaticCheckService, type StaticCheckResult } from "./StaticCheckService.js";
+import { mapSecurityCategoriesToAtlas } from "./securityTaxonomy.js";
 import type { PatternService } from "./PatternService.js";
+import { SemanticAnalysisService } from "./SemanticAnalysisService.js";
+import { completedCheck, semanticCoverage } from "./AnalysisCoverage.js";
+import { decide, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
+import { promptAnalysisReportSchema, type PromptAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
+import { promptInputSchema } from "../ai/schemas.js";
 
 export interface SecurityReport {
     safe: boolean;
@@ -11,94 +16,50 @@ export interface SecurityReport {
     geminiAvailable: boolean;
     gemini: GeminiCheckResult;
     static: StaticCheckResult;
-    /** Pass 7: MITRE ATLAS technique IDs aggregated across static + Gemini. */
     atlasTechniques: string[];
     timestamp: string;
 }
-
-/**
- * Dual-layer security aggregator for `check_prompt`.
- *
- * Runs the {@link GeminiService} semantic check and the
- * {@link StaticCheckService} pattern check in parallel, then
- * takes the maximum severity, dedupes categories, and applies the
- * safety-decision rule:
- *
- *   unsafe = overallSeverity ∈ {critical, high}
- *         OR (gemini.isInjection && gemini.confidence > 0.6)
- *
- * v1.1 additions: aggregates `atlasTechniques[]` across both layers
- * via {@link mapGeminiCategoriesToAtlas} (Gemini→ATLAS heuristic) and
- * the pattern-level `atlasTechnique` field set during static matching.
- *
- * Environment variables: none consumed directly. The Gemini key
- * (`GEMINI_API_KEY`) is handled by {@link GeminiService}.
- *
- * @example
- * ```ts
- * const svc = new SecurityService(patternService);
- * const report = await svc.runSecurityScan("ignore all previous...");
- * if (!report.safe) throw new Error(`blocked: ${report.overallSeverity}`);
- * ```
- */
+export class ReportVersionRequiredError extends Error {
+    readonly code = "report_version_required";
+    constructor() { super("Selected semantic profiles require report version 2"); }
+}
+/** The v1 compatibility mapper and v2 policy share the same single analysis. */
 export class SecurityService {
-    private geminiService: GeminiService;
-    private staticCheckService: StaticCheckService;
-
-    constructor(patternService?: PatternService) {
-        this.geminiService = new GeminiService();
+    private readonly staticCheckService: StaticCheckService;
+    constructor(patternService?: PatternService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService()) {
         this.staticCheckService = new StaticCheckService(patternService);
     }
-
-    /**
-     * Run both detection layers against `prompt` and return the merged report.
-     *
-     * @param prompt - Untrusted user input to evaluate. Caller should bound length.
-     * @returns A {@link SecurityReport} with merged severity, categories, ATLAS
-     *   tags, and the underlying per-layer results. `safe: false` indicates
-     *   the prompt should be blocked or escalated.
-     */
-    async runSecurityScan(prompt: string): Promise<SecurityReport> {
-        const [geminiResult, staticResult] = await Promise.all([
-            this.geminiService.checkPrompt(prompt),
-            Promise.resolve(this.staticCheckService.check(prompt))
-        ]);
-
-        // Aggregate severity
-        const severities: ("low" | "medium" | "high" | "critical")[] = ["low", "medium", "high", "critical"];
-        const geminiSevIdx = severities.indexOf(geminiResult.severity);
-        const staticSevIdx = severities.indexOf(staticResult.severity);
-        const overallSeverity = severities[Math.max(geminiSevIdx, staticSevIdx)];
-
-        // Aggregate categories
-        const categories = Array.from(new Set([...geminiResult.categories, ...staticResult.categories]));
-
-        // Decide "safe" status
-        // Safe if overall severity is low OR (medium but confidence is low)
-        // CRITICAL: If gemini is sure it's an injection (isInjection: true, high confidence), it's NOT safe.
-        const isDangerous = overallSeverity === "critical" ||
-            overallSeverity === "high" ||
-            (geminiResult.isInjection && geminiResult.confidence > 0.6);
-
-        const safe = !isDangerous;
-
-        // Pass 7: union ATLAS techniques from static-pattern matches and the
-        // Gemini-category heuristic mapping. Deduped via Set.
-        const atlasTechniques = Array.from(new Set([
-            ...(staticResult.atlasTechniques || []),
-            ...mapGeminiCategoriesToAtlas(geminiResult.categories || []),
-        ]));
-
-        return {
-            safe,
-            overallConfidence: geminiResult.confidence,
-            overallSeverity,
-            categories,
-            geminiAvailable: !geminiResult.error,
-            gemini: geminiResult,
-            static: staticResult,
-            atlasTechniques,
-            timestamp: new Date().toISOString()
-        };
+    get supportsV1(): boolean { return this.semantic.supportsV1; }
+    async runSecurityScan(prompt: string, options: { signal?: AbortSignal } = {}): Promise<SecurityReport> {
+        if (!this.supportsV1) throw new ReportVersionRequiredError();
+        const { report, gemini } = await this.analyze(prompt, options.signal);
+        const overallSeverity = maximumSeverity(report.static.severity, gemini.severity);
+        return { safe: !gemini.error && !blockingSeverity(overallSeverity) && !(gemini.isInjection && gemini.confidence > 0.6),
+            overallConfidence: gemini.confidence, overallSeverity,
+            categories: [...new Set([...gemini.categories, ...report.static.categories])],
+            geminiAvailable: !gemini.error, gemini, static: report.static as StaticCheckResult,
+            atlasTechniques: report.atlasTechniques, timestamp: report.timestamp };
+    }
+    async runSecurityScanV2(prompt: string, options: { signal?: AbortSignal } = {}): Promise<PromptAnalysisReport> {
+        return (await this.analyze(prompt, options.signal)).report;
+    }
+    private async analyze(prompt: string, signal?: AbortSignal) {
+        promptInputSchema.parse({ prompt });
+        const context = this.semantic.createContext("prompt", signal);
+        const local = this.staticCheckService.check(prompt);
+        const semantic = await this.semantic.analyze(prompt, "prompt", context);
+        const coverage = [completedCheck("local", prompt.length), semanticCoverage(semantic, prompt.length)];
+        const outcome = decide({ task: "prompt", coverage, semantic, localBlocking: blockingSeverity(local.severity) });
+        const finding = semantic.status === "ok" ? semantic.value : null;
+        const categories = [...new Set([...local.categories, ...(finding?.categories ?? [])])];
+        const report = promptAnalysisReportSchema.parse({
+            schemaVersion: 2, task: "prompt", ...outcome,
+            overallSeverity: maximumSeverity(local.severity, finding?.severity ?? "low"), categories,
+            findings: [...local.findings], atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? [])])],
+            timestamp: new Date().toISOString(), coverage, semantic, judgments: null,
+            analysisMode: this.semantic.snapshot.config.typesafe.prompt, policyVersion: POLICY_VERSION, configHash: context.configHash,
+            routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(), static: local,
+        });
+        return { report, gemini: toLegacyGemini(semantic) };
     }
 }

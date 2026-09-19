@@ -1,131 +1,135 @@
 import express from "express";
 import cors from "cors";
 import { createRequire } from "module";
-import { SecurityService } from "../services/SecurityService.js";
-import { SkillScanService } from "../services/SkillScanService.js";
-import { PatternService } from "../services/PatternService.js";
-import { VulnFeedService } from "../services/VulnFeedService.js";
+import type { Services } from "../bootstrap.js";
+import { promptInputSchema, skillInputSchema, isSizeError } from "../ai/schemas.js";
+import { ReportVersionRequiredError } from "../services/SecurityService.js";
+import { scanPromptReport, scanSkillReport } from "./reportSerializers.js";
 import { z } from "zod";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../package.json");
 
-const app = express();
-const port = process.env.PORT || 3000;
+export function createApiApp(services: Services) {
+    const app = express();
+    const { patternService, vulnFeedService } = services;
 
-const patternService = new PatternService();
-const securityService = new SecurityService(patternService);
-const skillScanService = new SkillScanService(patternService);
-const vulnFeedService = new VulnFeedService(patternService);
+    const corsOrigin = process.env.CORS_ORIGIN || "*";
+    app.use(cors({ origin: corsOrigin === "*" ? true : corsOrigin.split(",") }));
+    app.use(express.json({ limit: "4mb" }));
 
-const corsOrigin = process.env.CORS_ORIGIN || "*";
-app.use(cors({ origin: corsOrigin === "*" ? true : corsOrigin.split(",") }));
-app.use(express.json());
+    // Validation schemas
+    const UpdateFeedsSchema = z.object({
+        lookbackDays: z.number().int().min(1).max(365).optional(),
+    }).optional();
 
-// Validation schemas
-const CheckPromptSchema = z.object({
-    prompt: z.string().min(1, "Prompt cannot be empty").max(100_000, "Prompt exceeds 100,000 character limit"),
-});
+    const ListPatternsQuerySchema = z.object({
+        category: z.string().optional(),
+        scope: z.enum(["general", "skill"]).optional(),
+        enabled: z.enum(["true", "false"]).optional(),
+    });
 
-const ScanSkillSchema = z.object({
-    skillContent: z.string().min(1, "Skill content cannot be empty").max(500_000, "Skill content exceeds 500,000 character limit"),
-});
+    // Primary Endpoint - Check Prompt
+    for (const reportVersion of [1, 2] as const) {
+        app.post(`/v${reportVersion}/check-prompt`, async (req, res) => {
+            const validatedBody = promptInputSchema.safeParse(req.body);
+            if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
+            const controller = new AbortController();
+            const cancel = () => { if (!res.writableEnded) controller.abort(); };
+            req.on("aborted", cancel); res.on("close", cancel);
+            try {
+                const report = await scanPromptReport(services, validatedBody.data.prompt, reportVersion, controller.signal);
 
-const UpdateFeedsSchema = z.object({
-    lookbackDays: z.number().int().min(1).max(365).optional(),
-}).optional();
+                res.json(report);
+            } catch (error) {
+                if (error instanceof ReportVersionRequiredError) return res.status(409).json({ error: error.code, route: "/v2/check-prompt" });
+                console.error("API scan failed: internal_error");
+                res.status(500).json({ error: "Internal server error" });
+            } finally { req.off("aborted", cancel); res.off("close", cancel); }
+        });
 
-const ListPatternsQuerySchema = z.object({
-    category: z.string().optional(),
-    scope: z.enum(["general", "skill"]).optional(),
-    enabled: z.enum(["true", "false"]).optional(),
-});
+        // Skill Scanning Endpoint
+        app.post(`/v${reportVersion}/scan-skill`, async (req, res) => {
+            const validatedBody = skillInputSchema.safeParse(req.body);
+            if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
+            const controller = new AbortController();
+            const cancel = () => { if (!res.writableEnded) controller.abort(); };
+            req.on("aborted", cancel); res.on("close", cancel);
+            try {
+                const report = await scanSkillReport(services, validatedBody.data.skillContent, reportVersion, controller.signal);
 
-// Primary Endpoint - Check Prompt
-app.post("/v1/check-prompt", async (req, res) => {
-    try {
-        const validatedBody = CheckPromptSchema.parse(req.body);
-        const report = await securityService.runSecurityScan(validatedBody.prompt);
+                res.json(report);
+            } catch (error) {
+                if (error instanceof ReportVersionRequiredError) return res.status(409).json({ error: error.code, route: "/v2/scan-skill" });
+                console.error("API scan failed: internal_error");
+                res.status(500).json({ error: "Internal server error" });
+            } finally { req.off("aborted", cancel); res.off("close", cancel); }
+        });
+    }
 
-        res.json(report);
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Invalid request body", details: error.issues });
+    // Pattern Library Endpoints
+    app.get("/v1/patterns", (req, res) => {
+        try {
+            const query = ListPatternsQuerySchema.parse(req.query);
+            const filters: any = {};
+            if (query.category) filters.category = query.category;
+            if (query.scope) filters.scope = query.scope;
+            if (query.enabled !== undefined) filters.enabled = query.enabled === "true";
+
+            const patterns = patternService.list(filters);
+            res.json({ count: patterns.length, patterns });
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ error: "Invalid query parameters", details: error.issues });
+            }
+            console.error("API Error:", error);
+            res.status(500).json({ error: "Internal server error" });
         }
-        console.error("API Error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+    });
 
-// Skill Scanning Endpoint
-app.post("/v1/scan-skill", async (req, res) => {
-    try {
-        const validatedBody = ScanSkillSchema.parse(req.body);
-        const report = await skillScanService.scanSkill(validatedBody.skillContent);
-
-        res.json(report);
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Invalid request body", details: error.issues });
+    app.post("/v1/patterns/update-feeds", async (req, res) => {
+        try {
+            const body = UpdateFeedsSchema.parse(req.body);
+            const result = await vulnFeedService.updateFeeds(body?.lookbackDays);
+            res.json(result);
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                return res.status(400).json({ error: "Invalid request body", details: error.issues });
+            }
+            console.error("API Error:", error);
+            res.status(500).json({ error: "Internal server error" });
         }
-        console.error("API Error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+    });
 
-// Pattern Library Endpoints
-app.get("/v1/patterns", (req, res) => {
-    try {
-        const query = ListPatternsQuerySchema.parse(req.query);
-        const filters: any = {};
-        if (query.category) filters.category = query.category;
-        if (query.scope) filters.scope = query.scope;
-        if (query.enabled !== undefined) filters.enabled = query.enabled === "true";
-
-        const patterns = patternService.list(filters);
-        res.json({ count: patterns.length, patterns });
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Invalid query parameters", details: error.issues });
+    app.post("/v1/patterns/verify", (req, res) => {
+        try {
+            const result = patternService.verify();
+            res.json(result);
+        } catch (error) {
+            console.error("API Error:", error);
+            res.status(500).json({ error: "Internal server error" });
         }
-        console.error("API Error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+    });
 
-app.post("/v1/patterns/update-feeds", async (req, res) => {
-    try {
-        const body = UpdateFeedsSchema.parse(req.body);
-        const result = await vulnFeedService.updateFeeds(body?.lookbackDays);
-        res.json(result);
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({ error: "Invalid request body", details: error.issues });
-        }
-        console.error("API Error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-
-app.post("/v1/patterns/verify", (req, res) => {
-    try {
-        const result = patternService.verify();
-        res.json(result);
-    } catch (error) {
-        console.error("API Error:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
-
-// Health check
-app.get("/health", (req, res) => {
-    res.json({ status: "ok", version });
-});
-
-export function startApiServer() {
-    app.listen(port, () => {
+    // Health check
+    app.get("/health", (req, res) => {
+        const roles = Object.fromEntries(Object.entries(services.snapshot.config.roles).map(([role, setting]) => {
+            const profile = services.snapshot.config.profiles[setting.primary];
+            return [role, { provider: profile.provider, model: profile.model, configured: services.configuredProviders[profile.provider] }];
+        }));
+        res.json({ status: "ok", version, configHash: services.snapshot.hash, roles, reports: { prompt: [1, 2], skill: [1, 2], enforcementScope: "v2_only", legacySemanticCompatible: services.semantic.supportsV1 } });
+    });
+    app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        if (error.type === "entity.too.large") return res.status(413).json({ error: "input_too_large" });
+        if (error.type === "entity.parse.failed") return res.status(400).json({ error: "invalid_json" });
+        return res.status(500).json({ error: "internal_error" });
+    });
+    return app;
+}
+export function startApiServer(services: Services, port = process.env.PORT || 3000) {
+    return createApiApp(services).listen(port, () => {
         console.error(`[API] PromptRejector API running at http://localhost:${port}`);
     });
 }
 
-export default app;
+export default createApiApp;

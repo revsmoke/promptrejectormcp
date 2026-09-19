@@ -1,4 +1,12 @@
-import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
+import { type GeminiCheckResult, toLegacyGemini } from "./GeminiService.js";
+import { SemanticAnalysisService } from "./SemanticAnalysisService.js";
+import { ReportVersionRequiredError } from "./SecurityService.js";
+import { mapSecurityCategoriesToAtlas } from "./securityTaxonomy.js";
+import { completedCheck, semanticCoverage, type CoverageEntry } from "./AnalysisCoverage.js";
+import { decide, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
+import { skillAnalysisReportSchema, type SkillAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
+import { skillInputSchema } from "../ai/schemas.js";
+import { withDeadline } from "../ai/transport.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
 import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
@@ -6,6 +14,8 @@ import { HuggingFaceService, type HuggingFaceModelFlag, type HuggingFaceModelRep
 
 export interface SkillScanResult {
     safe: boolean;
+    geminiAvailable: boolean;
+    analysisAvailable: boolean;
     geminiConfidence: number; // Confidence score from LLM analysis only
     overallSeverity: "low" | "medium" | "high" | "critical";
     categories: string[];
@@ -57,19 +67,7 @@ function severityIdx(s: string): number {
  * absent — we'd rather report no tag than a misleading one.
  */
 export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
-    const map: Record<string, string> = {
-        unicode_smuggling: "AML.T0051",
-        policy_puppetry: "AML.T0054",
-        markdown_exfil: "AML.T0024",
-        prompt_injection: "AML.T0051",
-        obfuscation: "AML.T0051",
-    };
-    const out = new Set<string>();
-    for (const c of categories) {
-        const id = map[c];
-        if (id) out.add(id);
-    }
-    return Array.from(out);
+    return mapSecurityCategoriesToAtlas(categories);
 }
 
 /**
@@ -102,15 +100,13 @@ export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
  * Environment variables: none consumed directly (delegates to sub-services).
  */
 export class SkillScanService {
-    private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
     private patternService: PatternService | null;
     private trifectaAnalyzer: TrifectaAnalyzer;
     private huggingFaceService: HuggingFaceService;
 
-    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService) {
+    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService()) {
         this.patternService = patternService ?? null;
-        this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService(patternService);
         this.trifectaAnalyzer = new TrifectaAnalyzer();
         // Pass 8: HF security signals. Default keeps existing call sites working;
@@ -119,25 +115,43 @@ export class SkillScanService {
         this.huggingFaceService = huggingFaceService ?? new HuggingFaceService();
     }
 
-    async scanSkill(skillContent: string): Promise<SkillScanResult> {
+    get supportsV1(): boolean { return this.semantic.supportsV1; }
+
+    async scanSkill(skillContent: string, options: { signal?: AbortSignal } = {}): Promise<SkillScanResult> {
+        if (!this.supportsV1) throw new ReportVersionRequiredError();
+        return (await this.analyze(skillContent, options.signal)).legacy;
+    }
+
+    async scanSkillV2(skillContent: string, options: { signal?: AbortSignal } = {}): Promise<SkillAnalysisReport> {
+        return (await this.analyze(skillContent, options.signal)).report;
+    }
+
+    private async analyze(skillContent: string, signal?: AbortSignal) {
+        skillInputSchema.parse({ skillContent });
+        const context = this.semantic.createContext("skill", signal);
         // Pass 8: extract HF model ids first (sync, cheap) so we can fan out
         // network requests in parallel with the LLM + static checks.
-        const modelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const allModelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const modelIds = allModelIds.slice(0, 16);
+        let failedHfLookups = 0;
         const hfCheckPromise = modelIds.length === 0
             ? Promise.resolve([] as HuggingFaceModelReport[])
-            : Promise.allSettled(modelIds.map((id) => this.huggingFaceService.checkModel(id)))
-                  .then((settled) =>
-                      settled
+            : Promise.allSettled(modelIds.map((id) => withDeadline((hfSignal) => this.huggingFaceService.checkModel(id, { signal: hfSignal, deadlineMs: context.deadlineMs }), context.deadlineMs, signal)))
+                  .then((settled) => {
+                      failedHfLookups = settled.filter((item) => item.status === "rejected").length;
+                      return settled
                           .filter((s): s is PromiseFulfilledResult<HuggingFaceModelReport> => s.status === "fulfilled")
-                          .map((s) => s.value),
-                  );
+                          .map((s) => s.value);
+                  });
 
-        const [geminiResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
-            this.geminiService.checkPrompt(skillContent),
+        const [semanticResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
+            this.semantic.analyze(skillContent, "skill", context),
             Promise.resolve(this.staticCheckService.check(skillContent)),
             Promise.resolve(this.runSkillSpecificChecks(skillContent)),
             hfCheckPromise,
         ]);
+        const geminiResult = toLegacyGemini(semanticResult);
+        const hfComplete = allModelIds.length <= 16 && failedHfLookups === 0 && !hfReports.some((report) => report.flags.some((flag) => flag.class === "lookup_failed"));
 
         // Pass 5: lethal-trifecta capability classification (sync, cheap).
         const trifectaResult = this.trifectaAnalyzer.analyze({ skillContent });
@@ -200,7 +214,7 @@ export class SkillScanService {
             skillSpecificResult.hasNetworkExfiltration ||
             trifectaResult.trifectaPresent;
 
-        const safe = !isDangerous;
+        const safe = !isDangerous && !geminiResult.error && hfComplete;
 
         // Pass 7: aggregate ATLAS techniques across static + Gemini (skill-specific
         // checks don't carry pattern entries today; future ATLAS hooks can fold in here).
@@ -212,8 +226,10 @@ export class SkillScanService {
             ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : []),
         ]));
 
-        return {
+        const legacy: SkillScanResult = {
             safe,
+            geminiAvailable: !geminiResult.error,
+            analysisAvailable: !geminiResult.error && hfComplete,
             geminiConfidence: geminiResult.confidence,
             overallSeverity,
             categories,
@@ -227,6 +243,29 @@ export class SkillScanService {
             huggingFaceReports: hfReports,
             timestamp: new Date().toISOString()
         };
+        const capabilityNeedsReview = [trifectaResult.privateDataRead, trifectaResult.untrustedContentFetch, trifectaResult.externalEgress].filter((bucket) => bucket.present).length === 2;
+        const hfCoverage: CoverageEntry = { ...completedCheck("hugging_face", skillContent.length, "external"),
+            inspectedFields: hfReports.length, status: hfComplete ? "complete" : "partial",
+            reason: allModelIds.length > 16 ? "reference_limit" : !hfComplete ? "lookup_failed" : null };
+        const coverage = [completedCheck("local", skillContent.length), completedCheck("skill", skillContent.length),
+            { ...completedCheck("capability", skillContent.length, "declared"), reason: "local_declared_scope" },
+            hfCoverage, semanticCoverage(semanticResult, skillContent.length)];
+        const localSeverity = maximumSeverity(staticResult.severity, skillSpecificResult.severity, hfSeverity, trifectaSeverityMapped);
+        const outcome = decide({ task: "skill", coverage, semantic: semanticResult, needsReview: capabilityNeedsReview,
+            localBlocking: blockingSeverity(localSeverity) || skillSpecificResult.hasDangerousToolUsage || skillSpecificResult.hasNetworkExfiltration || trifectaResult.trifectaPresent });
+        const finding = semanticResult.status === "ok" ? semanticResult.value : null;
+        const v2Categories = [...new Set([...staticResult.categories, ...skillSpecificResult.categories, ...(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["lethal_trifecta"] : [])])];
+        const report = skillAnalysisReportSchema.parse({
+            schemaVersion: 2, task: "skill", ...outcome, overallSeverity: maximumSeverity(localSeverity, finding?.severity ?? "low"),
+            categories: v2Categories, findings: [...staticResult.findings, ...skillSpecificResult.findings, ...huggingFaceSecurityFlags.map((flag) => flag.note)],
+            atlasTechniques: [...new Set([...staticResult.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : [])])],
+            timestamp: legacy.timestamp, coverage, semantic: semanticResult, judgments: null,
+            analysisMode: this.semantic.snapshot.config.typesafe.skill, policyVersion: POLICY_VERSION, configHash: context.configHash,
+            routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(),
+            static: staticResult, skillSpecific: skillSpecificResult, trifectaResult, hasLethalTrifecta: trifectaResult.trifectaPresent,
+            huggingFaceSecurityFlags, huggingFaceReports: hfReports,
+        });
+        return { legacy, report };
     }
 
     private runSkillSpecificChecks(content: string): SkillSpecificFindings {

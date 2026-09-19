@@ -1,3 +1,5 @@
+import { withDeadline } from "../ai/transport.js";
+
 // Pass 8: Hugging Face Hub security signals.
 //
 // HF exposes per-model / per-dataset metadata at:
@@ -119,8 +121,8 @@ export class HuggingFaceService {
      * @param modelId - HF model identifier in `owner/name` form.
      * @returns Report with flag list and severity. Network/parse failures degrade to a single `lookup_failed` flag.
      */
-    async checkModel(modelId: string): Promise<HuggingFaceModelReport> {
-        return this.fetchAndAnalyze(modelId, "models");
+    async checkModel(modelId: string, options: { signal?: AbortSignal; deadlineMs?: number } = {}): Promise<HuggingFaceModelReport> {
+        return this.fetchAndAnalyze(modelId, "models", options);
     }
 
     /**
@@ -133,7 +135,7 @@ export class HuggingFaceService {
         return this.fetchAndAnalyze(datasetId, "datasets");
     }
 
-    private async fetchAndAnalyze(id: string, kind: "models" | "datasets"): Promise<HuggingFaceModelReport> {
+    private async fetchAndAnalyze(id: string, kind: "models" | "datasets", options: { signal?: AbortSignal; deadlineMs?: number } = {}): Promise<HuggingFaceModelReport> {
         // Cache lookup — keyed by kind + id so a model "x/y" and dataset "x/y" don't collide.
         const cacheKey = `${kind}:${id}`;
         const cached = this.cache.get(cacheKey);
@@ -145,37 +147,33 @@ export class HuggingFaceService {
         const headers: Record<string, string> = { Accept: "application/json" };
         if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
 
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-
         let report: HuggingFaceModelReport;
         try {
-            const resp = await globalThis.fetch(url, { headers, signal: controller.signal });
-            if (!resp.ok) {
-                // 401/403 typically means gated/private; 404 means typo or deleted.
-                // We surface as lookup_failed — caller decides what to do.
-                report = this.buildReport(id, [{
-                    class: "lookup_failed",
-                    note: `HF API returned HTTP ${resp.status} for ${kind}/${id}`,
-                    rawField: "http_status",
-                }]);
-            } else {
+            report = await withDeadline(async (signal) => {
+                const resp = await globalThis.fetch(url, { headers, signal });
+                if (!resp.ok) {
+                    // 401/403 typically means gated/private; 404 means typo or deleted.
+                    // We surface as lookup_failed — caller decides what to do.
+                    void resp.body?.cancel().catch(() => {});
+                    return this.buildReport(id, [{
+                        class: "lookup_failed",
+                        note: `HF API returned HTTP ${resp.status} for ${kind}/${id}`,
+                        rawField: "http_status",
+                    }]);
+                }
                 const data = (await resp.json()) as unknown;
-                const flags = this.analyzeApiPayload(data);
-                report = this.buildReport(id, flags);
-            }
-        } catch (err: any) {
+                return this.buildReport(id, this.analyzeApiPayload(data));
+            }, Math.min(options.deadlineMs ?? Infinity, Date.now() + this.timeoutMs), options.signal);
+        } catch {
             // Network errors, aborts, JSON parse failures — all degrade to lookup_failed.
             report = this.buildReport(id, [{
                 class: "lookup_failed",
-                note: `HF fetch error: ${err?.message || String(err)}`,
+                note: "HF lookup unavailable (network, timeout, cancellation or invalid response).",
                 rawField: "exception",
             }]);
-        } finally {
-            clearTimeout(timer);
         }
 
-        this.cache.set(cacheKey, { report, fetchedAtMs: Date.now() });
+        if (!report.flags.some((flag) => flag.class === "lookup_failed")) this.cache.set(cacheKey, { report, fetchedAtMs: Date.now() });
         return report;
     }
 

@@ -19,6 +19,9 @@ import { CanaryService } from "../services/CanaryService.js";
 import { McpToolScanner } from "../services/McpToolScanner.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
 import { UnifiedCveCache, type QueryCveFilters } from "../services/UnifiedCveCache.js";
+import { createServices, type Services } from "../bootstrap.js";
+import { handleMcpScan } from "../api/reportSerializers.js";
+import { roleProfiles } from "../ai/config.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../package.json");
@@ -40,39 +43,21 @@ export class PromptRejectorMCPServer {
     private tasteTesterService: TasteTesterService;
     private unifiedCveCache: UnifiedCveCache;
 
-    constructor() {
-        this.patternService = new PatternService();
-        this.securityService = new SecurityService(this.patternService);
-        // Pass 8: instantiate HF service before SkillScanService so the same
-        // instance (and its in-memory cache) is shared by every scan.
-        this.huggingFaceService = new HuggingFaceService();
-        this.skillScanService = new SkillScanService(this.patternService, this.huggingFaceService);
-        this.atlasService = new AtlasService();
-        this.osvFeedService = new OsvFeedService();
-        this.ghsaGraphQLService = new GhsaGraphQLService();
-        this.kevFeedService = new KevFeedService();
-        // Pass 7: wire ATLAS + KEV into VulnFeedService so candidates pick up
-        // taxonomy tags and KEV-escalated severity at staging time.
-        this.vulnFeedService = new VulnFeedService(
-            this.patternService,
-            undefined,
-            undefined,
-            this.osvFeedService,
-            this.ghsaGraphQLService,
-            this.atlasService,
-            this.kevFeedService,
-        );
-        this.trifectaAnalyzer = new TrifectaAnalyzer();
-        this.canaryService = new CanaryService();
-        this.mcpToolScanner = new McpToolScanner(this.patternService);
-        this.tasteTesterService = new TasteTesterService();
-        // Pass 9: read-only aggregator over staged CVE candidates. Depends on
-        // vulnFeedService + atlasService + kevFeedService already being live.
-        this.unifiedCveCache = new UnifiedCveCache(
-            this.vulnFeedService,
-            this.atlasService,
-            this.kevFeedService,
-        );
+    constructor(readonly services: Services = createServices()) {
+        this.patternService = services.patternService;
+        this.securityService = services.securityService;
+        this.huggingFaceService = services.huggingFaceService;
+        this.skillScanService = services.skillScanService;
+        this.atlasService = services.atlasService;
+        this.osvFeedService = services.osvFeedService;
+        this.ghsaGraphQLService = services.ghsaGraphQLService;
+        this.kevFeedService = services.kevFeedService;
+        this.vulnFeedService = services.vulnFeedService;
+        this.trifectaAnalyzer = services.trifectaAnalyzer;
+        this.canaryService = services.canaryService;
+        this.mcpToolScanner = services.mcpToolScanner;
+        this.tasteTesterService = services.tasteTesterService;
+        this.unifiedCveCache = services.unifiedCveCache;
         this.server = new Server(
             {
                 name: "prompt-rejector",
@@ -108,10 +93,14 @@ export class PromptRejectorMCPServer {
                             properties: {
                                 prompt: {
                                     type: "string",
+                                    minLength: 1,
+                                    maxLength: 100000,
                                     description: "The user input prompt to check.",
                                 },
+                                reportVersion: { type: "integer", enum: [1, 2], default: 1 },
                             },
                             required: ["prompt"],
+                            additionalProperties: false,
                         },
                     },
                     {
@@ -122,10 +111,14 @@ export class PromptRejectorMCPServer {
                             properties: {
                                 skillContent: {
                                     type: "string",
+                                    minLength: 1,
+                                    maxLength: 500000,
                                     description: "The raw markdown content of the SKILL.md file to scan.",
                                 },
+                                reportVersion: { type: "integer", enum: [1, 2], default: 1 },
                             },
                             required: ["skillContent"],
+                            additionalProperties: false,
                         },
                     },
                     {
@@ -259,45 +252,17 @@ export class PromptRejectorMCPServer {
         });
 
         // Handle tool calls
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const { name, arguments: args } = request.params;
 
-            if (name === "check_prompt") {
-                const { prompt } = args as { prompt: string };
-                if (!prompt || prompt.length > 100_000) {
-                    return {
-                        content: [{ type: "text", text: JSON.stringify({ error: "Prompt must be 1-100,000 characters" }) }],
-                    };
-                }
-                const report = await this.securityService.runSecurityScan(prompt);
-
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify(report, null, 2),
-                        },
-                    ],
-                };
+            if (name === "check_prompt" || name === "scan_skill") return handleMcpScan(this.services, name, args, extra.signal);
+            if (name === "taste_test" && [...roleProfiles(this.services.snapshot, "taster"), ...roleProfiles(this.services.snapshot, "monitor")].some((profile) => profile.provider !== "anthropic")) {
+                return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "report_version_required", reportVersion: 2 }) }] };
             }
-
-            if (name === "scan_skill") {
-                const { skillContent } = args as { skillContent: string };
-                if (!skillContent || skillContent.length > 500_000) {
-                    return {
-                        content: [{ type: "text", text: JSON.stringify({ error: "Skill content must be 1-500,000 characters" }) }],
-                    };
-                }
-                const report = await this.skillScanService.scanSkill(skillContent);
-
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify(report, null, 2),
-                        },
-                    ],
-                };
+            // Reserve version validation for later slices without claiming
+            // descriptor/capability/Taster v2 behavior before it is implemented.
+            if (["scan_mcp_tool", "check_lethal_trifecta", "taste_test"].includes(name) && args?.reportVersion !== undefined && args.reportVersion !== 1) {
+                return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "unsupported_report_version" }) }] };
             }
 
             if (name === "list_patterns") {
