@@ -1,0 +1,21 @@
+{
+  "startedAt": "2026-09-19T20:27:01.492Z",
+  "model": "jev-1.13.0",
+  "budgetUsd": 0.1,
+  "pricePerMillion": 0.042,
+  "maxAttempts": 160,
+  "concurrency": 3,
+  "timeoutMs": 20000,
+  "geminiEnabled": true,
+  "commit": "2f3a83c266009afa84cc235c43abd7db3d7e6fe3",
+  "casesSha256": "57cef2dd85f29c50b9159fe1fb58699b620af31006743f128fb3dbb2c5a81d8c",
+  "questionsSha256": "bfba60b443792db619fc97f144ef680c40d82c4c624935f1db3d0e3778ccc033",
+  "patternsSha256": "edab108bef80d1f1a8eccd4a390c8980d08ed6bcc0d6b4b435ec199930ace6aa",
+  "node": "v26.9.0",
+  "corpusNotes": "Existing Taste-Tester labels are used as input-risk labels, not enacted-behavior labels. New labels are authored hypotheses; no independent annotation or production distribution.",
+  "completedAt": "2026-09-19T20:27:49.084Z",
+  "attempts": 104,
+  "inputTokens": 69968,
+  "estimatedUsd": 0.0029386560000000004,
+  "failures": 0
+}
