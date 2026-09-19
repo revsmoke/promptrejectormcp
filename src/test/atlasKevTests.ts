@@ -1,8 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-// Dummy NVD key to disarm rate limiter in integration tests below.
+// Synthetic credentials select the authenticated rate-limit path while every
+// request is mocked. Without the GitHub token, C1 waits a minute per CWE.
 process.env.NVD_API_KEY = process.env.NVD_API_KEY || "test-key-for-rate-limiter";
+process.env.GITHUB_TOKEN = process.env.GITHUB_TOKEN || "test-token-for-rate-limiter";
 
 import { AtlasService } from "../services/AtlasService.js";
 import { KevFeedService } from "../services/KevFeedService.js";

@@ -1,0 +1,121 @@
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export interface OfflineSuite { file: string; allowLoopback?: boolean }
+
+// Explicit registration is deliberate. advancedTests and skillScanTests make
+// live provider calls and must never enter this default offline suite.
+export const OFFLINE_SUITES: readonly OfflineSuite[] = [
+    { file: "offlineRunnerTests.js" },
+    { file: "patternServiceTests.js" },
+    { file: "integrationTests.js" },
+    { file: "vulnFeedTests.js" },
+    { file: "vulnFeed2Tests.js" },
+    { file: "v11SkeletonTests.js" },
+    { file: "unicodeSmugglingTests.js" },
+    { file: "policyPuppetryTests.js" },
+    { file: "markdownExfilTests.js" },
+    { file: "mcpToolScannerTests.js" },
+    { file: "trifectaTests.js" },
+    { file: "atlasKevTests.js" },
+    { file: "huggingFaceTests.js" },
+    { file: "queryCveTests.js" },
+    { file: "canaryTests.js" },
+    { file: "tasteTesterTests.js" },
+    { file: "tasteTesterCorpusTests.js" },
+    { file: "manyShotObfuscationTests.js" },
+];
+
+export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {
+    // Allowlist, rather than a list of known credential names: newly added
+    // providers and NODE_OPTIONS/DOTENV_CONFIG_PATH cannot leak into tests.
+    return {
+        PATH: source.PATH,
+        SystemRoot: source.SystemRoot,
+        TEMP: source.TEMP,
+        TMP: source.TMP,
+        TMPDIR: source.TMPDIR,
+        HOME: home,
+        USERPROFILE: home,
+        NODE_ENV: "test",
+        NO_COLOR: "1",
+        TZ: "UTC",
+    };
+}
+
+export function runSuite(cwd: string, suite: OfflineSuite) {
+    const log = join(cwd, "network-violations.jsonl");
+    rmSync(log, { force: true });
+    const child = spawnSync(process.execPath, [
+        "--require", join(cwd, "dist/scripts/offlineNetworkGuard.cjs"),
+        join(cwd, "dist/test", suite.file),
+    ], {
+        cwd,
+        env: {
+            ...offlineEnvironment(process.env, cwd),
+            OFFLINE_NETWORK_LOG: log,
+            OFFLINE_ALLOW_LOOPBACK: suite.allowLoopback ? "1" : "0",
+        },
+        encoding: "utf8",
+        timeout: 120_000,
+        maxBuffer: 10 * 1024 * 1024,
+    });
+    const violations = existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").filter(Boolean) : [];
+    return {
+        passed: child.status === 0 && !child.error && violations.length === 0,
+        status: child.status,
+        error: child.error?.message,
+        output: child.stdout + child.stderr,
+        violations,
+    };
+}
+
+function copyFixtures(source: string, destination: string): void {
+    mkdirSync(destination, { recursive: true });
+    for (const entry of readdirSync(source, { withFileTypes: true })) {
+        const from = join(source, entry.name);
+        const to = join(destination, entry.name);
+        if (entry.isDirectory()) copyFixtures(from, to);
+        else if (entry.isFile() && excludeEnvironmentFiles(from) && /\.(?:ts|cts|json)$/.test(entry.name)) cpSync(from, to);
+    }
+}
+
+function excludeEnvironmentFiles(path: string): boolean {
+    return !path.split(/[\\/]/).some((name) => name === ".env" || name.startsWith(".env."));
+}
+
+export function runOfflineTests(projectRoot: string): boolean {
+    const temporary = mkdtempSync(join(tmpdir(), "prompt-rejector-offline-"));
+    let failures = 0;
+    try {
+        // Every suite gets a fresh filesystem; mutation in one suite cannot
+        // modify production patterns or contaminate a later suite.
+        for (const [index, suite] of OFFLINE_SUITES.entries()) {
+            const cwd = join(temporary, String(index));
+            mkdirSync(cwd);
+            cpSync(join(projectRoot, "dist"), join(cwd, "dist"), { recursive: true, filter: excludeEnvironmentFiles });
+            copyFixtures(join(projectRoot, "src"), join(cwd, "src"));
+            // Some existing tests inspect source next to their compiled imports.
+            copyFixtures(join(projectRoot, "src"), join(cwd, "dist"));
+            cpSync(join(projectRoot, "patterns"), join(cwd, "patterns"), { recursive: true, filter: excludeEnvironmentFiles });
+            writeFileSync(join(cwd, "package.json"), '{"type":"module"}\n');
+            symlinkSync(join(projectRoot, "node_modules"), join(cwd, "node_modules"), "dir");
+            const result = runSuite(cwd, suite);
+            if (!result.passed) failures++;
+            console.log(`${result.passed ? "PASS" : "FAIL"} ${suite.file} (${result.violations.length} network violations)`);
+            if (!result.passed) console.error(result.output, result.error ?? "", ...result.violations);
+        }
+        console.log(`Offline suites: ${OFFLINE_SUITES.length - failures} passed, ${failures} failed; Node ${process.version}`);
+        return failures === 0;
+    } finally {
+        rmSync(temporary, { recursive: true, force: true });
+    }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+    process.exitCode = runOfflineTests(projectRoot) ? 0 : 1;
+}

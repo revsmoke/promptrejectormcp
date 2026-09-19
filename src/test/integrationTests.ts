@@ -1,5 +1,8 @@
 import dotenv from "dotenv";
 dotenv.config();
+// These tests exercise local checks only, but the legacy SkillScanService
+// constructor requires a key. This non-credential must never reach a provider.
+process.env.GEMINI_API_KEY = "offline-unused-gemini-key";
 
 import { StaticCheckService } from "../services/StaticCheckService.js";
 import { PatternService } from "../services/PatternService.js";

@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config({ quiet: true });
+// SkillScanService's legacy constructor requires a key even for mocked calls.
+process.env.GEMINI_API_KEY = "offline-unused-gemini-key";
 
 import { HuggingFaceService } from "../services/HuggingFaceService.js";
 import { withMockedFetch, jsonResponse } from "./helpers/mockFetch.js";
