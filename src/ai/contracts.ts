@@ -43,6 +43,9 @@ export interface ModelProfile {
     readonly options?: Readonly<Record<string, unknown>>;
 }
 export interface CallContext {
+    /** Internal operation identity/progress; never populated from scan input. */
+    readonly callId?: string;
+    readonly onAttempt?: () => void;
     readonly signal?: AbortSignal;
     readonly deadlineMs: number;
     readonly runId: string;

@@ -67,7 +67,7 @@ export class TypeSafeAdapter implements JudgmentProvider {
     }
     async evaluate(request: JudgmentRequest, call: CallContext): Promise<CallResult<JudgmentAnswers>> {
         const started = Date.now();
-        const meta: CallMeta = { callId: randomUUID(), provider: "typesafe", requestedModel: request.model, resolvedModel: null,
+        const meta: CallMeta = { callId: call.callId ?? randomUUID(), provider: "typesafe", requestedModel: request.model, resolvedModel: null,
             profileHash: hashConfiguration({ provider: "typesafe", model: request.model }), rubricVersion: request.rubricVersion,
             schemaVersion: request.schemaVersion, elapsedMs: 0, attempts: 0, usage: emptyUsage(), failureCode: null };
         const fail = (code: FailureCode): CallResult<JudgmentAnswers> => ({ status: "unavailable", code, meta: { ...meta, elapsedMs: Date.now() - started, failureCode: code } });

@@ -107,6 +107,7 @@ export class NativeTransport {
                 if (!reservation.ok) throw new TransportFailure(reservation.code);
                 reservationIds.push(reservation.id);
                 attempts++;
+                call.onAttempt?.();
                 let response: Response;
                 try {
                     response = await untilAborted(this.fetcher(request.url, {

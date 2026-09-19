@@ -15,7 +15,8 @@ export class JudgmentCacheError extends Error {
     constructor(readonly code: FailureCode) { super(code); }
 }
 interface Entry { result: CallResult<JudgmentAnswers>; storedAt: number }
-interface InFlight { controller: AbortController; promise: Promise<CallResult<JudgmentAnswers>>; waiters: number }
+export interface JudgmentProgress { callId: string; started: number; attempts: number }
+interface InFlight { controller: AbortController; promise: Promise<CallResult<JudgmentAnswers>>; waiters: number; progress?: JudgmentProgress }
 export class JudgmentCache {
     private readonly entries = new Map<string, Entry>();
     private readonly pending = new Map<string, InFlight>();
@@ -30,7 +31,7 @@ export class JudgmentCache {
         this.maxInFlight = options.maxInFlight ?? 64;
         if (![this.maxEntries, this.ttlMs, this.providerTimeoutMs, this.maxInFlight].every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("Invalid cache limits");
     }
-    async run(key: string, waiter: { deadlineMs: number; signal?: AbortSignal }, operation: (signal: AbortSignal, deadlineMs: number) => Promise<CallResult<JudgmentAnswers>>): Promise<CachedJudgment> {
+    async run(key: string, waiter: { deadlineMs: number; signal?: AbortSignal; onJoin?: (progress: JudgmentProgress) => void }, operation: (signal: AbortSignal, deadlineMs: number) => Promise<CallResult<JudgmentAnswers>>, progress?: JudgmentProgress): Promise<CachedJudgment> {
         if (waiter.signal?.aborted) throw new JudgmentCacheError("cancelled");
         if (waiter.deadlineMs <= Date.now()) throw new JudgmentCacheError("timeout");
         const previous = this.entries.get(key);
@@ -47,7 +48,7 @@ export class JudgmentCache {
             if (this.pending.size >= this.maxInFlight) throw new JudgmentCacheError("budget_exceeded");
             const controller = new AbortController();
             const deadlineMs = Date.now() + this.providerTimeoutMs;
-            entry = { controller, waiters: 0, promise: Promise.resolve(null as never) };
+            entry = { controller, waiters: 0, promise: Promise.resolve(null as never), progress };
             const ownEntry = entry;
             let timedOut = false;
             const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.providerTimeoutMs);
@@ -74,6 +75,7 @@ export class JudgmentCache {
             this.pending.set(key, entry);
         }
         const current = entry;
+        if (current.progress) waiter.onJoin?.(current.progress);
         current.waiters++;
         return new Promise<CachedJudgment>((resolve, reject) => {
             let settled = false;
