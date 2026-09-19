@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "synthetic-stress-v1",
+  "caseSha256": "b4375937d9cf99f037d6d1f02f2d20f8ce379488e66d54f428e8eefbb4082373",
+  "scope": "development-stress-labels-only",
+  "qualificationEligible": false,
+  "date": "2026-09-19",
+  "adjudicator": "Codex coordinating agent",
+  "reviewers": [
+    {
+      "id": "label-review-A",
+      "agent": "review_plan_foundation",
+      "independent": true,
+      "approved": true,
+      "caseSha256": "b4375937d9cf99f037d6d1f02f2d20f8ce379488e66d54f428e8eefbb4082373",
+      "scope": "binary intent/poisoning labels only; no calibrated severity or held-out qualification"
+    },
+    {
+      "id": "label-review-B",
+      "agent": "review_plan_typesafe",
+      "independent": true,
+      "approved": true,
+      "caseSha256": "b4375937d9cf99f037d6d1f02f2d20f8ce379488e66d54f428e8eefbb4082373",
+      "scope": "binary intent/poisoning labels only; no calibrated severity or held-out qualification"
+    }
+  ],
+  "procedure": "Both agents inspected family definitions, task transformations and generated records independently without inference or access to the other review. Both checked the revised hash and confirmed that a final metadata-only cleanup changed no input or label.",
+  "adjudications": [
+    "Removed the risky-only retrieved-document prompt wrapper. Both classes now present direct behavior text, eliminating reporter-versus-source ambiguity.",
+    "Applied the same declared public-only capability suffix to all skills. Intent labels do not imply granted runtime permissions or enacted behavior.",
+    "Aligned educational descriptor purpose with security explanation and public-message descriptor purpose with drafting.",
+    "Removed unreviewed blanket severity labels; severity remains null.",
+    "Reclassified the whole set as development, retaining a permanent qualificationEligible:false marker."
+  ],
+  "developmentAntecedents": {
+    "credential-diagnostic": [
+      "prerequisite",
+      "attack-indirect",
+      "attack-euphemism",
+      "fresh-desc-prereq"
+    ],
+    "memory-backdoor": [
+      "attack-memory",
+      "fresh-persistent-override"
+    ],
+    "encoded-execution": [
+      "attack-base64"
+    ],
+    "classifier-evasion": [
+      "attack-classifier",
+      "classifier-attack",
+      "fresh-self-label",
+      "fresh-desc-self-label"
+    ],
+    "defensive-boundary": [
+      "benign-negative",
+      "fresh-defensive-policy"
+    ],
+    "required-parameter": [
+      "legitimate-must",
+      "fresh-desc-normal"
+    ],
+    "user-confirmed-action": [
+      "legitimate-must",
+      "fresh-desc-normal"
+    ],
+    "public-local-only": [
+      "local-cache",
+      "readme-language",
+      "fresh-cap-local"
+    ],
+    "audit-warning": [
+      "quote-secret"
+    ]
+  },
+  "limitations": [
+    "20 shared templates, including 10 risk templates; 1200 correlated variants are not 1200 independent cases.",
+    "Domain and descriptor placement are coupled, not fully crossed.",
+    "Binary labels do not establish task-level allow/block policy or severity.",
+    "Use family/placement/review/unavailable metrics, not independent-row confidence intervals.",
+    "Separate untouched acceptance data is still required."
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "synthetic-stress-v1",
+  "created": "2026-09-19",
+  "status": "reviewed-development",
+  "qualificationEligible": false,
+  "path": "cases.jsonl",
+  "sha256": "b4375937d9cf99f037d6d1f02f2d20f8ce379488e66d54f428e8eefbb4082373",
+  "count": 1200,
+  "strata": [
+    {
+      "task": "descriptor",
+      "risky": 200,
+      "benign": 200
+    },
+    {
+      "task": "prompt",
+      "risky": 200,
+      "benign": 200
+    },
+    {
+      "task": "skill",
+      "risky": 200,
+      "benign": 200
+    }
+  ],
+  "familyCount": 20,
+  "variationsPerFamilyPerTask": 20,
+  "limitations": [
+    "Synthetic authored cases; not sampled production traffic or a broad external benchmark.",
+    "Within-family variations are correlated. Do not treat 400 cases as 400 independent attack families.",
+    "Labels require two independent reviews and adjudication; this development set is never sufficient for held-out qualification.",
+    "Benign source intent may trigger preserved incumbent static rules; measure those false positives explicitly.",
+    "No inference outputs were inspected while authoring; development-family overlap is explicitly recorded in review.json."
+  ],
+  "reviewFile": "review.json"
+}

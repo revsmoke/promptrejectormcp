@@ -10,7 +10,7 @@
 
 ---
 
-**Status:** Plan only; every implementation and activation checkbox starts pending.
+**Status:** Implementation in progress. Checked items have recorded evidence in [the progress ledger](../../implementation/typesafe-progress.md); live qualification and activation are tracked separately.
 **Specification:** [SPEC](../../specs/2026-09-19-typesafe-model-routing-spec.md).
 **Baseline evidence:** [REPORT](../../../experiments/typesafe/REPORT.md), run `experiments/typesafe/results/2026-09-19T20-27-01.476Z/`.
 **Location convention:** All code paths below are repository-relative to `/Users/twoedge/Dev/promptrejectormcp`. Commands run from that root or its implementation worktree. The historical root `SPEC.md`/`PLAN.md` are not replaced.
@@ -44,14 +44,14 @@ Expected: zero exit status; no production pattern/config mutations. Existing moc
 **Modify:** `package.json` only for explicit test/config/evaluation script entries as they become available.
 **Read:** existing `src/test/*Tests.ts`, `experiments/typesafe/README.md`; no production behavior change.
 
-- [ ] Record `git status --short`, commit ID, Node version, current package scripts and the untracked experiment files in the progress ledger; never record `.env` values.
-- [ ] Prepare the implementation checkout and verify the spec, plan, rubrics and saved evidence are present without overwriting user changes.
-- [ ] Audit every existing test entry for real network access and writes; keep live `advancedTests.ts`, `skillScanTests.ts` or calibration scripts out of the offline suite unless their networking is mocked.
-- [ ] Create a deterministic runner with an explicit allowlist of the existing 17 `npm test` suites plus new AI suites as introduced. Compile first; copy compiled output and needed source/pattern/JSON fixtures to an isolated temporary test root with no `.env` files and use it as subprocess cwd, providing ESM dependencies through a controlled `node_modules` link. Existing tests call dotenv themselves, so clearing inherited keys alone is insufficient. Inherit only necessary nonsecret test settings; permit explicitly marked loopback server tests, block/report other socket/fetch attempts, and fail the aggregate on unexpected networking even if a test catches the error. Ensure fixture paths resolve in the isolated root.
-- [ ] Add `test:offline` to build and run that allowlist without npx/package downloads. Do not change package engine support as a side effect.
-- [ ] Run `npm run test:offline` and save its actual results. If the baseline fails, record the failure and reproduce it before attributing it to this work.
-- [ ] Write the evaluation README distinguishing development/regression, calibration, held-out labels, intent and enacted behavior; retain original experiment artifacts unchanged.
-- [ ] Commit only the test runner, script entry and ledger/docs: `test: establish reproducible AI rollout baseline`.
+- [x] Record `git status --short`, commit ID, Node version, current package scripts and the untracked experiment files in the progress ledger; never record `.env` values.
+- [x] Prepare the implementation checkout and verify the spec, plan, rubrics and saved evidence are present without overwriting user changes.
+- [x] Audit every existing test entry for real network access and writes; keep live `advancedTests.ts`, `skillScanTests.ts` or calibration scripts out of the offline suite unless their networking is mocked.
+- [x] Create a deterministic runner with an explicit allowlist of the existing 17 `npm test` suites plus new AI suites as introduced. Compile first; copy compiled output and needed source/pattern/JSON fixtures to an isolated temporary test root with no `.env` files and use it as subprocess cwd, providing ESM dependencies through a controlled `node_modules` link. Existing tests call dotenv themselves, so clearing inherited keys alone is insufficient. Inherit only necessary nonsecret test settings; permit explicitly marked loopback server tests, block/report other socket/fetch attempts, and fail the aggregate on unexpected networking even if a test catches the error. Ensure fixture paths resolve in the isolated root.
+- [x] Add `test:offline` to build and run that allowlist without npx/package downloads. Do not change package engine support as a side effect.
+- [x] Run `npm run test:offline` and save its actual results. If the baseline fails, record the failure and reproduce it before attributing it to this work.
+- [x] Write the evaluation README distinguishing development/regression, calibration, held-out labels, intent and enacted behavior; retain original experiment artifacts unchanged.
+- [x] Commit only the test runner, script entry and ledger/docs: `test: establish reproducible AI rollout baseline`.
 
 **Exit gate:** Offline baseline is reproducible or specific pre-existing failures are isolated; no hidden live provider calls. Subsequent passes must not claim a full green suite while such failures remain.
 
