@@ -16,7 +16,7 @@ export function replayHistorical(directory: string) {
         const times:number[]=[];
         for (const item of selected) {
             const row=rows.find((candidate)=>candidate.group===group && candidate.id===item.id && candidate.phase==='primary');
-            if (!row?.data && row?.skipped!=='no candidates') continue;
+            if (!row?.data && !(group==='extraction' && row?.skipped==='no candidates')) continue;
             evaluated++;
             const answers=row.data?.answers;
             if (row.data) { times.push(row.elapsedMs); tokens+=row.data.usage.input_tokens; }
