@@ -54,7 +54,7 @@ export class JudgmentService {
         if (!options.completeSource || options.cache === false || (task !== "descriptor" && task !== "capability")) return finish(await invoke(call));
         const key = judgmentCacheKey({ task, request, trustedContext: options.trustedContext ?? { origin: "unspecified", authorization: "unverified" }, coverage: options.coverage ?? { completeSource: true } });
         try {
-            const cached = await this.cache.run(key, { deadlineMs: call.deadlineMs, signal: call.signal, onJoin: (shared) => { operation = shared; } }, async (signal, deadlineMs) => {
+            const cached = await this.cache.run(key, { deadlineMs: call.deadlineMs, signal: call.signal, onJoin: (shared, disposition) => { operation = shared; observation.cache = disposition; } }, async (signal, deadlineMs) => {
                 const estimatedUsd = reserveCost(Buffer.byteLength(JSON.stringify({ model: request.model, state: request.state, questions: request.questions })), 0, this.prices);
                 const envelope = context.budget.reserveSharedCall(this.snapshot.config.limits, { deadlineMs, estimatedUsd, optional: call.optional });
                 if (!envelope.ok) return failed(envelope.code);

@@ -31,7 +31,7 @@ export class JudgmentCache {
         this.maxInFlight = options.maxInFlight ?? 64;
         if (![this.maxEntries, this.ttlMs, this.providerTimeoutMs, this.maxInFlight].every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("Invalid cache limits");
     }
-    async run(key: string, waiter: { deadlineMs: number; signal?: AbortSignal; onJoin?: (progress: JudgmentProgress) => void }, operation: (signal: AbortSignal, deadlineMs: number) => Promise<CallResult<JudgmentAnswers>>, progress?: JudgmentProgress): Promise<CachedJudgment> {
+    async run(key: string, waiter: { deadlineMs: number; signal?: AbortSignal; onJoin?: (progress: JudgmentProgress, disposition: CacheDisposition) => void }, operation: (signal: AbortSignal, deadlineMs: number) => Promise<CallResult<JudgmentAnswers>>, progress?: JudgmentProgress): Promise<CachedJudgment> {
         if (waiter.signal?.aborted) throw new JudgmentCacheError("cancelled");
         if (waiter.deadlineMs <= Date.now()) throw new JudgmentCacheError("timeout");
         const previous = this.entries.get(key);
@@ -75,7 +75,7 @@ export class JudgmentCache {
             this.pending.set(key, entry);
         }
         const current = entry;
-        if (current.progress) waiter.onJoin?.(current.progress);
+        if (current.progress) waiter.onJoin?.(current.progress, disposition);
         current.waiters++;
         return new Promise<CachedJudgment>((resolve, reject) => {
             let settled = false;
