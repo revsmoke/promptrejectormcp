@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "structured": true,
+      "tools": true,
+      "statelessTools": true,
+      "maxInputBytes": 900000,
+      "maxOutputTokens": 65536,
+      "allowedOptions": [
+        "temperature",
+        "thinkingConfig"
+      ],
+      "reasoningEfforts": [],
+      "thinkingLevels": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "verifiedAt": "2026-09-19",
+      "source": "https://ai.google.dev/gemini-api/docs/models"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "structured": true,
+      "tools": true,
+      "statelessTools": true,
+      "maxInputBytes": 900000,
+      "maxOutputTokens": 65536,
+      "allowedOptions": [
+        "thinking",
+        "output_config"
+      ],
+      "reasoningEfforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "thinkingLevels": [],
+      "verifiedAt": "2026-09-19",
+      "source": "https://platform.claude.com/docs/en/about-claude/models/overview"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "structured": true,
+      "tools": true,
+      "statelessTools": true,
+      "maxInputBytes": 900000,
+      "maxOutputTokens": 65536,
+      "allowedOptions": [
+        "thinking",
+        "output_config"
+      ],
+      "reasoningEfforts": [
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "thinkingLevels": [],
+      "verifiedAt": "2026-09-19",
+      "source": "https://platform.claude.com/docs/en/about-claude/models/overview"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "structured": true,
+      "tools": true,
+      "statelessTools": true,
+      "maxInputBytes": 900000,
+      "maxOutputTokens": 65536,
+      "allowedOptions": [
+        "reasoning"
+      ],
+      "reasoningEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "thinkingLevels": [],
+      "verifiedAt": "2026-09-19",
+      "source": "https://developers.openai.com/api/docs/models/gpt-6-astra"
+    }
+  ]
+}

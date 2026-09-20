@@ -1,0 +1,759 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+  "success": true,
+  "cases": [
+    "skill_model_reference",
+    "rest_prompt_benign"
+  ],
+  "limits": {
+    "maxRequests": 7,
+    "maxUsd": 0.15
+  },
+  "attempts": 6,
+  "reservedUsd": 0.030595117999999998,
+  "unknownSpend": false,
+  "reports": [
+    {
+      "id": "skill_model_reference",
+      "report": {
+        "schemaVersion": 2,
+        "decision": "review",
+        "safe": false,
+        "overallSeverity": "low",
+        "categories": [],
+        "findings": [],
+        "atlasTechniques": [],
+        "timestamp": "2026-09-20T02:44:40.624Z",
+        "coverage": [
+          {
+            "check": "local",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "skill",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "semantic",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "rubricVersion": "skill-context.1"
+          },
+          {
+            "check": "intent_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "prompt-defensive.2"
+          },
+          {
+            "check": "capability_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "capability-presence-provenance.1"
+          },
+          {
+            "check": "reference_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "model-reference-source-spans.2"
+          },
+          {
+            "check": "capability",
+            "required": true,
+            "status": "partial",
+            "reason": "unknown_scope",
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "declared",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "hugging_face",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 95,
+            "inspectedFields": 1,
+            "scope": "external",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "qualification",
+            "required": false,
+            "status": "not_requested",
+            "reason": "qualification_optional_not_supplied",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          }
+        ],
+        "semantic": {
+          "status": "ok",
+          "value": {
+            "verdict": "benign",
+            "severity": "low",
+            "categories": [],
+            "explanation": "The input is a simple descriptive text mentioning a model for an audit with no malicious intent or injection attempts.",
+            "evidenceIds": [
+              "input"
+            ],
+            "isInjection": false,
+            "selfReportedConfidence": 1
+          },
+          "meta": {
+            "callId": "3f30f81f-13fd-4075-a2fa-c2a4a695f113",
+            "provider": "gemini",
+            "requestedModel": "gemini-3-flash-preview",
+            "resolvedModel": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "rubricVersion": "skill-context.1",
+            "schemaVersion": "skill-context.1",
+            "elapsedMs": 4998,
+            "attempts": 1,
+            "usage": {
+              "inputTokens": 945,
+              "outputTokens": 136,
+              "cachedReadTokens": null,
+              "cacheWriteTokens": null,
+              "reasoningTokens": 761,
+              "reasoningIsOutputSubset": false,
+              "cachedReadIsInputSubset": true,
+              "cacheWriteIsInputSubset": true
+            },
+            "failureCode": null
+          }
+        },
+        "judgments": {
+          "intent": {
+            "mode": "cascade",
+            "cache": "disabled",
+            "ageMs": 0,
+            "sourceHash": "80476d45c846e7e44fba65aa37998e3562717d4074ee6bdab5e07356eb80bab5",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "override": {
+                  "type": "noul",
+                  "noul": 0.1
+                },
+                "disclosure": {
+                  "type": "noul",
+                  "noul": 0.03
+                },
+                "consequential": {
+                  "type": "noul",
+                  "noul": 0.02
+                }
+              },
+              "meta": {
+                "callId": "ef942c32-1a63-4a16-9925-727feacc2fe8",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "prompt-defensive.2",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 552,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 728,
+                  "outputTokens": 57,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "capability": {
+            "mode": "enforce",
+            "cache": "miss",
+            "ageMs": 0,
+            "sourceHash": "59839a863ab473b6a05cf65a1d973ee29ca01eb29b5d08e04d15363f88192158",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "private": {
+                  "type": "noul",
+                  "noul": 0.02
+                },
+                "untrusted": {
+                  "type": "noul",
+                  "noul": 0.07
+                },
+                "egress": {
+                  "type": "noul",
+                  "noul": 0.03
+                }
+              },
+              "meta": {
+                "callId": "8412335d-1e75-446d-bf99-3f192ce6b223",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "capability-presence-provenance.1",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 455,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 787,
+                  "outputTokens": 55,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "modelReference": {
+            "mode": "enforce",
+            "cache": "disabled",
+            "ageMs": 0,
+            "sourceHash": "c0d115fab20cb732ebface69b4038296acdf75c30038565ec48f09b2ce4b24d4",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "c0": {
+                  "type": "noul",
+                  "noul": 0.97
+                }
+              },
+              "meta": {
+                "callId": "9e5933aa-b934-4a21-b9cc-646528a8e34d",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "model-reference-source-spans.2",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 505,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 494,
+                  "outputTokens": 21,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "capabilityBuckets": {
+            "privateDataRead": {
+              "state": "unknown",
+              "provenance": "inferred",
+              "evidence": []
+            },
+            "untrustedContentFetch": {
+              "state": "unknown",
+              "provenance": "inferred",
+              "evidence": []
+            },
+            "externalEgress": {
+              "state": "unknown",
+              "provenance": "inferred",
+              "evidence": []
+            }
+          }
+        },
+        "shadow": null,
+        "analysisMode": "cascade",
+        "policyVersion": "security-policy-v2.1",
+        "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+        "routing": [
+          {
+            "role": "semantic",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "status": "attempted",
+            "reason": "primary"
+          },
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          },
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          },
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          }
+        ],
+        "timings": {
+          "totalMs": 6322
+        },
+        "usage": {
+          "calls": 4,
+          "usage": {
+            "inputTokens": 2954,
+            "outputTokens": 269,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": false,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "estimatedUsd": null,
+          "pricingVersions": [
+            "2026-09-19-conservative-standard-v2"
+          ]
+        },
+        "static": {
+          "hasXSS": false,
+          "hasSQLi": false,
+          "hasShellInjection": false,
+          "hasObfuscation": false,
+          "hasPolicyPuppetry": false,
+          "hasMarkdownExfil": false,
+          "hasPromptInjection": false,
+          "hasManyShot": false,
+          "severity": "low",
+          "categories": [],
+          "findings": [],
+          "atlasTechniques": []
+        },
+        "task": "skill",
+        "skillSpecific": {
+          "hasHiddenInstructions": false,
+          "hasDangerousToolUsage": false,
+          "hasSensitiveFileAccess": false,
+          "hasObfuscation": false,
+          "hasSocialEngineering": false,
+          "hasNetworkExfiltration": false,
+          "findings": [],
+          "severity": "low",
+          "categories": []
+        },
+        "trifectaResult": {
+          "privateDataRead": {
+            "present": false,
+            "evidence": []
+          },
+          "untrustedContentFetch": {
+            "present": false,
+            "evidence": []
+          },
+          "externalEgress": {
+            "present": false,
+            "evidence": []
+          },
+          "trifectaPresent": false,
+          "severity": "safe",
+          "recommendation": "Lethal trifecta not present."
+        },
+        "hasLethalTrifecta": false,
+        "huggingFaceSecurityFlags": [],
+        "huggingFaceReports": [
+          {
+            "modelId": "openai/whisper-tiny",
+            "fetchedAt": "2026-09-20T02:44:40.624Z",
+            "flags": [],
+            "severity": "safe"
+          }
+        ],
+        "modelReferences": {
+          "baselineIds": [
+            "openai/whisper-tiny"
+          ],
+          "candidateCount": 1,
+          "candidateOverflow": false,
+          "candidates": [
+            {
+              "id": "c0",
+              "repository": "openai/whisper-tiny",
+              "start": 62,
+              "end": 81,
+              "text": "openai/whisper-tiny",
+              "kind": "unresolved"
+            }
+          ],
+          "parserCorrections": [],
+          "shadowAdditions": [],
+          "lookupIds": [
+            "openai/whisper-tiny"
+          ],
+          "unresolvedIds": []
+        }
+      }
+    },
+    {
+      "id": "health_no_inference",
+      "report": {
+        "status": "ok",
+        "version": "1.1.0",
+        "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+        "roles": {
+          "semantic": {
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "configured": true,
+            "enabled": true,
+            "readiness": "ready",
+            "fallback": null
+          },
+          "patternDraft": {
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "configured": true,
+            "enabled": true,
+            "readiness": "ready",
+            "fallback": null
+          },
+          "taster": {
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "configured": true,
+            "enabled": false,
+            "readiness": "disabled",
+            "fallback": null
+          },
+          "monitor": {
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "configured": true,
+            "enabled": false,
+            "readiness": "disabled",
+            "fallback": null
+          }
+        },
+        "typesafe": {
+          "model": "jev-1.13.0",
+          "modes": {
+            "descriptor": "enforce",
+            "prompt": "cascade",
+            "skill": "cascade",
+            "capability": "enforce",
+            "modelReference": "enforce"
+          },
+          "configured": true,
+          "readiness": "ready"
+        },
+        "qualificationPolicy": "optional",
+        "qualificationStatus": "unqualified",
+        "mcpDefaultReportVersion": 2,
+        "qualification": {
+          "tasks": {}
+        },
+        "readinessMeaning": "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
+        "reports": {
+          "prompt": [
+            1,
+            2
+          ],
+          "skill": [
+            1,
+            2
+          ],
+          "enforcementScope": "v2_only",
+          "legacyDescriptorCapability": "local_only",
+          "legacySemanticCompatible": true,
+          "legacyTasterCompatible": false
+        }
+      }
+    },
+    {
+      "id": "rest_prompt_benign",
+      "report": {
+        "schemaVersion": 2,
+        "decision": "allow",
+        "safe": true,
+        "overallSeverity": "low",
+        "categories": [],
+        "findings": [],
+        "atlasTechniques": [],
+        "timestamp": "2026-09-20T02:44:42.698Z",
+        "coverage": [
+          {
+            "check": "local",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 100,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "intent_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 100,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "prompt-defensive.2"
+          },
+          {
+            "check": "semantic",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 100,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "rubricVersion": "security-eight-categories-v2.1"
+          },
+          {
+            "check": "qualification",
+            "required": false,
+            "status": "not_requested",
+            "reason": "qualification_optional_not_supplied",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          }
+        ],
+        "semantic": {
+          "status": "ok",
+          "value": {
+            "verdict": "benign",
+            "severity": "low",
+            "categories": [],
+            "explanation": "The input is a simple request to summarize a short sentence about weather. No malicious intent or adversarial techniques detected.",
+            "evidenceIds": [
+              "input"
+            ],
+            "isInjection": false,
+            "selfReportedConfidence": 1
+          },
+          "meta": {
+            "callId": "8ededa81-9d9d-4b60-99d8-88bd35709b67",
+            "provider": "gemini",
+            "requestedModel": "gemini-3-flash-preview",
+            "resolvedModel": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "rubricVersion": "security-eight-categories-v2.1",
+            "schemaVersion": "semantic-v2.1",
+            "elapsedMs": 1600,
+            "attempts": 1,
+            "usage": {
+              "inputTokens": 627,
+              "outputTokens": 58,
+              "cachedReadTokens": null,
+              "cacheWriteTokens": null,
+              "reasoningTokens": 142,
+              "reasoningIsOutputSubset": false,
+              "cachedReadIsInputSubset": true,
+              "cacheWriteIsInputSubset": true
+            },
+            "failureCode": null
+          }
+        },
+        "judgments": {
+          "intent": {
+            "mode": "cascade",
+            "cache": "disabled",
+            "ageMs": 0,
+            "sourceHash": "60b38fdfd3813ab620ae42e0b9d7427792f36be6e82996d53cb1e18f74f0dc47",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "override": {
+                  "type": "noul",
+                  "noul": 0.04
+                },
+                "disclosure": {
+                  "type": "noul",
+                  "noul": 0.01
+                },
+                "consequential": {
+                  "type": "noul",
+                  "noul": 0.01
+                }
+              },
+              "meta": {
+                "callId": "b59e5842-0e2f-47bb-a8df-c00a7ed363f6",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "prompt-defensive.2",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 446,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 720,
+                  "outputTokens": 57,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "capability": null,
+          "modelReference": null,
+          "capabilityBuckets": null
+        },
+        "shadow": null,
+        "analysisMode": "cascade",
+        "policyVersion": "security-policy-v2.1",
+        "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+        "routing": [
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          },
+          {
+            "role": "semantic",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "status": "attempted",
+            "reason": "primary"
+          }
+        ],
+        "timings": {
+          "totalMs": 2049
+        },
+        "usage": {
+          "calls": 2,
+          "usage": {
+            "inputTokens": 1347,
+            "outputTokens": 115,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": false,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "estimatedUsd": null,
+          "pricingVersions": [
+            "2026-09-19-conservative-standard-v2"
+          ]
+        },
+        "static": {
+          "hasXSS": false,
+          "hasSQLi": false,
+          "hasShellInjection": false,
+          "hasObfuscation": false,
+          "hasPolicyPuppetry": false,
+          "hasMarkdownExfil": false,
+          "hasPromptInjection": false,
+          "hasManyShot": false,
+          "severity": "low",
+          "categories": [],
+          "findings": [],
+          "atlasTechniques": []
+        },
+        "task": "prompt"
+      }
+    },
+    {
+      "id": "rest_rejects_policy_override",
+      "report": {
+        "status": 400
+      }
+    },
+    {
+      "id": "mcp_rejects_policy_override",
+      "report": {
+        "isError": true
+      }
+    }
+  ]
+}

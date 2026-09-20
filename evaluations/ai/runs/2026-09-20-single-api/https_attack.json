@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 2,
+  "decision": "block",
+  "safe": false,
+  "overallSeverity": "high",
+  "categories": [
+    "prompt_injection"
+  ],
+  "findings": [
+    "Operative override or private-data disclosure signal."
+  ],
+  "atlasTechniques": [],
+  "timestamp": "2026-09-20T11:31:43.171Z",
+  "coverage": [
+    {
+      "check": "local",
+      "required": true,
+      "status": "complete",
+      "reason": null,
+      "inspectedCharacters": 180,
+      "inspectedFields": 1,
+      "scope": "local",
+      "provider": null,
+      "model": null,
+      "rubricVersion": null
+    },
+    {
+      "check": "intent_judgment",
+      "required": true,
+      "status": "complete",
+      "reason": null,
+      "inspectedCharacters": 180,
+      "inspectedFields": 1,
+      "scope": "full_input",
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "rubricVersion": "prompt-defensive.2"
+    },
+    {
+      "check": "semantic",
+      "required": true,
+      "status": "not_requested",
+      "reason": "conclusive_block",
+      "inspectedCharacters": 0,
+      "inspectedFields": 0,
+      "scope": "full_input",
+      "provider": null,
+      "model": null,
+      "rubricVersion": null
+    },
+    {
+      "check": "qualification",
+      "required": false,
+      "status": "not_requested",
+      "reason": "qualification_optional_not_supplied",
+      "inspectedCharacters": 0,
+      "inspectedFields": 0,
+      "scope": "local",
+      "provider": null,
+      "model": null,
+      "rubricVersion": null
+    }
+  ],
+  "semantic": null,
+  "judgments": {
+    "intent": {
+      "mode": "cascade",
+      "cache": "disabled",
+      "ageMs": 0,
+      "sourceHash": "6056d19f2b5443c6cf87523347210b4fe014291fb98eb8a865e55a80a72c1793",
+      "completion": "completed",
+      "coverage": "complete",
+      "result": {
+        "status": "ok",
+        "value": {
+          "override": {
+            "type": "noul",
+            "noul": 0.96
+          },
+          "disclosure": {
+            "type": "noul",
+            "noul": 0.97
+          },
+          "consequential": {
+            "type": "noul",
+            "noul": 0.04
+          }
+        },
+        "meta": {
+          "callId": "46ec8754-3108-4342-86da-48d5bdbc6e67",
+          "provider": "typesafe",
+          "requestedModel": "jev-1.13.0",
+          "resolvedModel": "jev-1.13.0",
+          "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+          "rubricVersion": "prompt-defensive.2",
+          "schemaVersion": "judgment.1",
+          "elapsedMs": 142,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 734,
+            "outputTokens": 57,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": true,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "failureCode": null
+        }
+      }
+    },
+    "capability": null,
+    "modelReference": null,
+    "capabilityBuckets": null
+  },
+  "shadow": null,
+  "analysisMode": "cascade",
+  "policyVersion": "security-policy-v2.1",
+  "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+  "routing": [
+    {
+      "role": "judgment",
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+      "status": "attempted",
+      "reason": "enforced_judgment"
+    }
+  ],
+  "timings": {
+    "totalMs": 144
+  },
+  "usage": {
+    "calls": 1,
+    "usage": {
+      "inputTokens": 734,
+      "outputTokens": 57,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": 0.000030828000000000004,
+    "pricingVersions": [
+      "2026-09-19-conservative-standard-v2"
+    ]
+  },
+  "static": {
+    "hasXSS": false,
+    "hasSQLi": false,
+    "hasShellInjection": false,
+    "hasObfuscation": false,
+    "hasPolicyPuppetry": false,
+    "hasMarkdownExfil": false,
+    "hasPromptInjection": false,
+    "hasManyShot": false,
+    "severity": "low",
+    "categories": [],
+    "findings": [],
+    "atlasTechniques": []
+  },
+  "task": "prompt"
+}

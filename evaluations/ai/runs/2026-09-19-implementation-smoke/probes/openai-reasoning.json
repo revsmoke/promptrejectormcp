@@ -1,0 +1,49 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "profile": "openai-reasoning",
+  "status": "unavailable",
+  "code": "budget_exceeded",
+  "meta": {
+    "callId": "c7a85fb5-10d7-4aed-9115-1b91680d1b9f",
+    "provider": "openai",
+    "requestedModel": "gpt-6-astra",
+    "resolvedModel": null,
+    "profileHash": "4ee45c12d54728f591226ac82f0a05804c886e6243d97ee1e7c04f23d9ef47c6",
+    "rubricVersion": "security-eight-categories-v2.1",
+    "schemaVersion": "semantic-v2.1",
+    "elapsedMs": 0,
+    "attempts": 0,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "failureCode": "budget_exceeded"
+  },
+  "limits": {
+    "maxRequests": 1,
+    "maxUsd": 0.4
+  },
+  "actualAttempts": 0,
+  "usage": {
+    "calls": 0,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": null,
+    "pricingVersions": []
+  }
+}

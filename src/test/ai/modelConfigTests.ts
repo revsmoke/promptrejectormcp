@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadAIConfig, parseAIConfig } from "../../ai/config.js";
+import { validateModelProfile } from "../../ai/modelProfiles.js";
+const base = loadAIConfig({}).config;
+const custom = { provider: "openai" as const, model: "a-future-qualified-model", maxOutputTokens: 1024, options: { reasoning: { effort: "low" } } };
+const catalog = { schemaVersion: 1 as const, models: [{ provider: "openai" as const, model: custom.model, structured: true, tools: true, maxInputBytes: 500000, maxOutputTokens: 10000, allowedOptions: ["reasoning"], reasoningEfforts: ["low"], thinkingLevels: [], verifiedAt: "2026-09-19", source: "https://developers.openai.com/api/docs/models", statelessTools: true }] };
+assert.doesNotThrow(() => validateModelProfile(custom, catalog), "a declared model string must work without editing scanner code");
+assert.throws(() => validateModelProfile({ ...custom, options: { temperature: 0 } }, catalog));
+assert.throws(() => validateModelProfile({ ...custom, options: { reasoning: { effort: "none" } } }, catalog));
+assert.throws(() => validateModelProfile({ ...custom, options: { reasoning: { effort: "low", evil: true } } }, catalog));
+const existing = loadAIConfig({});
+assert.equal(existing.config.roles.semantic.primary, "legacy-gemini");
+assert.equal(loadAIConfig({ OPENAI_API_KEY: "unused" }).hash, existing.hash);
+const dir = mkdtempSync(join(tmpdir(), "models-"));
+try {
+    const merged = { schemaVersion: 1 as const, models: [...existing.capabilities.models, ...catalog.models] };
+    const capabilitiesPath = join(dir, "capabilities.json");
+    writeFileSync(capabilitiesPath, JSON.stringify(merged));
+    const configuration = { ...base, capabilitiesFile: "capabilities.json", profiles: { ...base.profiles, custom }, roles: { ...base.roles, semantic: { primary: "custom" } } };
+    const configPath = join(dir, "ai.json");
+    writeFileSync(configPath, JSON.stringify(configuration));
+    const loaded = loadAIConfig({ AI_CONFIG_PATH: configPath, GEMINI_API_KEY: "unused", TASTE_TESTER_MODEL: "ignored" });
+    assert.equal(loaded.config.profiles[loaded.config.roles.semantic.primary].model, custom.model);
+    assert.ok(Object.isFrozen(loaded.capabilities.models[0]));
+    assert.notEqual(loaded.hash, parseAIConfig({ ...configuration, capabilitiesFile: undefined }, false, { capabilities: { ...merged, models: merged.models.map((m) => ({ ...m, maxInputBytes: m.maxInputBytes - 1 })) } }).hash);
+} finally { rmSync(dir, { recursive: true, force: true }); }
+console.log("PASS external capability catalog and immutable configuration precedence");

@@ -1,4 +1,21 @@
-import { GeminiService, GeminiCheckResult } from "./GeminiService.js";
+import { type GeminiCheckResult, toLegacyGemini } from "./GeminiService.js";
+import { SemanticAnalysisService } from "./SemanticAnalysisService.js";
+import { ReportVersionRequiredError } from "./SecurityService.js";
+import { mapSecurityCategoriesToAtlas } from "./securityTaxonomy.js";
+import { completedCheck, semanticCoverage, qualificationCoverage, skippedCheck, type CoverageEntry } from "./AnalysisCoverage.js";
+import { decide, decisiveIntent, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
+import { skillAnalysisReportSchema, type SkillAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
+import { skillInputSchema } from "../ai/schemas.js";
+import { withDeadline } from "../ai/transport.js";
+import { JudgmentService, effectiveJudgmentMode, type JudgmentObservation } from "./JudgmentService.js";
+import { promptJudgmentRequest } from "../ai/rubrics/prompt.js";
+import { judgmentCoverage, judgmentRouting } from "../schemas/JudgmentReportSchemas.js";
+import { CapabilityAnalysisService, type CapabilityStates } from "./CapabilityAnalysisService.js";
+import type { CallResult } from "../ai/contracts.js";
+import type { SemanticFinding } from "../ai/taskSchemas.js";
+import { validateQualifiedPatterns } from "../ai/qualification.js";
+import type { TrustedCapabilityContext } from "./TrustedCapabilityResolver.js";
+import { ModelReferenceService } from "./ModelReferenceService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
 import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
@@ -6,6 +23,8 @@ import { HuggingFaceService, type HuggingFaceModelFlag, type HuggingFaceModelRep
 
 export interface SkillScanResult {
     safe: boolean;
+    geminiAvailable: boolean;
+    analysisAvailable: boolean;
     geminiConfidence: number; // Confidence score from LLM analysis only
     overallSeverity: "low" | "medium" | "high" | "critical";
     categories: string[];
@@ -57,19 +76,7 @@ function severityIdx(s: string): number {
  * absent — we'd rather report no tag than a misleading one.
  */
 export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
-    const map: Record<string, string> = {
-        unicode_smuggling: "AML.T0051",
-        policy_puppetry: "AML.T0054",
-        markdown_exfil: "AML.T0024",
-        prompt_injection: "AML.T0051",
-        obfuscation: "AML.T0051",
-    };
-    const out = new Set<string>();
-    for (const c of categories) {
-        const id = map[c];
-        if (id) out.add(id);
-    }
-    return Array.from(out);
+    return mapSecurityCategoriesToAtlas(categories);
 }
 
 /**
@@ -102,15 +109,13 @@ export function mapGeminiCategoriesToAtlas(categories: string[]): string[] {
  * Environment variables: none consumed directly (delegates to sub-services).
  */
 export class SkillScanService {
-    private geminiService: GeminiService;
     private staticCheckService: StaticCheckService;
     private patternService: PatternService | null;
     private trifectaAnalyzer: TrifectaAnalyzer;
     private huggingFaceService: HuggingFaceService;
 
-    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService) {
+    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService(), readonly judgmentService = new JudgmentService(semantic.snapshot), readonly capabilityAnalysis = new CapabilityAnalysisService(judgmentService), readonly modelReferences = new ModelReferenceService(judgmentService)) {
         this.patternService = patternService ?? null;
-        this.geminiService = new GeminiService();
         this.staticCheckService = new StaticCheckService(patternService);
         this.trifectaAnalyzer = new TrifectaAnalyzer();
         // Pass 8: HF security signals. Default keeps existing call sites working;
@@ -119,25 +124,158 @@ export class SkillScanService {
         this.huggingFaceService = huggingFaceService ?? new HuggingFaceService();
     }
 
-    async scanSkill(skillContent: string): Promise<SkillScanResult> {
+    get supportsV1(): boolean { return this.semantic.supportsV1; }
+
+    async scanSkill(skillContent: string, options: { signal?: AbortSignal } = {}): Promise<SkillScanResult> {
+        if (!this.supportsV1) throw new ReportVersionRequiredError();
+        return (await this.analyze(skillContent, options.signal)).legacy;
+    }
+
+    async scanSkillV2(skillContent: string, options: { signal?: AbortSignal; trustedContext?: TrustedCapabilityContext } = {}): Promise<SkillAnalysisReport> {
+        if (["enforce", "cascade"].includes(this.semantic.snapshot.config.typesafe.skill)) return this.analyzeEnforced(skillContent, options.signal, options.trustedContext);
+        return (await this.analyze(skillContent, options.signal, true)).report;
+    }
+
+    private async analyzeEnforced(skillContent: string, signal?: AbortSignal, trustedContext?: TrustedCapabilityContext): Promise<SkillAnalysisReport> {
+        skillInputSchema.parse({ skillContent });
+        const context = this.semantic.createContext("skill", signal);
+        const snapshot = this.semantic.snapshot;
+        const mode = snapshot.config.typesafe.skill;
+        const capabilityMode = effectiveJudgmentMode(snapshot, "capability", "skill");
+        const referenceMode = effectiveJudgmentMode(snapshot, "modelReference", "skill");
+        const qualified = () => !!this.patternService && ["skill", ...(capabilityMode === "enforce" ? ["capability"] : []), ...(referenceMode === "enforce" ? ["modelReference"] : [])].every((task) => validateQualifiedPatterns(snapshot, task as "skill" | "capability" | "modelReference", this.patternService!));
+        const before = qualified();
+        const local = this.staticCheckService.check(skillContent);
+        const skillSpecific = this.runSkillSpecificChecks(skillContent);
+        const trifecta = this.trifectaAnalyzer.analyze({ skillContent });
+        const references = this.modelReferences.extract(skillContent);
+        const localSeverity = maximumSeverity(local.severity, skillSpecific.severity, trifecta.severity === "safe" ? "low" : trifecta.severity);
+        const localBlock = blockingSeverity(localSeverity) || skillSpecific.hasDangerousToolUsage || skillSpecific.hasNetworkExfiltration || trifecta.trifectaPresent;
+        const coverage: CoverageEntry[] = [completedCheck("local", skillContent.length), completedCheck("skill", skillContent.length)];
+        let intent: JudgmentObservation | null = null;
+        let capability: Awaited<ReturnType<CapabilityAnalysisService["observe"]>> | null = null;
+        let reference: Awaited<ReturnType<ModelReferenceService["observe"]>> | null = null;
+        let semantic: CallResult<SemanticFinding> | null = null;
+        let capabilityStates: CapabilityStates | null = null;
+        let hfReports: HuggingFaceModelReport[] = [];
+        let lookupIds = references.baselineIds;
+        let unresolvedIds: string[] = [];
+        let capabilityReview = [trifecta.privateDataRead, trifecta.untrustedContentFetch, trifecta.externalEgress].filter((bucket) => bucket.present).length === 2;
+        let capabilityBlock = false;
+        let failedLookups = false;
+        let referenceComplete = true;
+        if (!localBlock && before) {
+            intent = await this.judgmentService.evaluate("skill", promptJudgmentRequest(skillContent, "skill", snapshot.config.typesafe.model), context, { completeSource: true });
+            if (!(mode === "cascade" && decisiveIntent(intent))) {
+                // Only required children run before the reasoner. Optional
+                // children wait until all authoritative spend is complete.
+                [capability, reference] = await Promise.all([
+                    capabilityMode === "enforce" ? this.capabilityAnalysis.observe({ skillContent }, context, { parentTask: "skill", trustedContext }) : Promise.resolve(null),
+                    referenceMode === "enforce" ? this.modelReferences.observe(skillContent, references, context, "skill") : Promise.resolve(null),
+                ]);
+                capabilityStates = capability?.buckets ?? null;
+                lookupIds = reference?.lookupIds ?? lookupIds;
+                unresolvedIds = reference?.unresolvedIds ?? [];
+                const capabilityRequired = !!capabilityStates && this.capabilityAnalysis.outcome(capabilityStates).review;
+                const unresolvedCandidates = references.candidates.filter((candidate) => unresolvedIds.includes(candidate.id));
+                if (capabilityRequired || unresolvedCandidates.length) {
+                    const assessed = await this.semantic.analyzeSkill(skillContent, this.capabilityAnalysis.sources({ skillContent }), capabilityStates, unresolvedCandidates, context, capabilityRequired);
+                    semantic = assessed.status === "ok" ? { ...assessed, value: assessed.value.security } : assessed;
+                    if (assessed.status === "ok") {
+                        if (capabilityStates) capabilityStates = this.capabilityAnalysis.resolve(capabilityStates, assessed.value.capabilities);
+                        // Context may establish that an unresolved span is not a
+                        // model. It cannot remove incumbents or invent additions.
+                        const excluded = new Set(assessed.value.references.filter((item) => item.classification === "not_model").map((item) => item.id));
+                        unresolvedIds = unresolvedIds.filter((id) => !excluded.has(id));
+                    }
+                } else semantic = await this.semantic.analyze(skillContent, "skill", context, true);
+                if (capabilityStates) {
+                    const derived = this.capabilityAnalysis.outcome(capabilityStates);
+                    capabilityBlock = derived.block;
+                    capabilityReview = derived.review;
+                }
+                referenceComplete = referenceMode !== "enforce" || (!references.candidateOverflow && unresolvedIds.length === 0);
+                const settled = await Promise.allSettled(lookupIds.slice(0, 16).map((id) => withDeadline((hfSignal) => this.huggingFaceService.checkModel(id, { signal: hfSignal, deadlineMs: context.deadlineMs }), context.deadlineMs, signal)));
+                hfReports = settled.filter((result): result is PromiseFulfilledResult<HuggingFaceModelReport> => result.status === "fulfilled").map((result) => result.value);
+                failedLookups = settled.some((result) => result.status === "rejected") || hfReports.some((report) => report.flags.some((flag) => flag.class === "lookup_failed"));
+                context.budget.authorizeShadow({ requiredWorkComplete: true });
+                if (capabilityMode === "shadow") capability = await this.capabilityAnalysis.observe({ skillContent }, context, { parentTask: "skill", trustedContext });
+                if (referenceMode === "shadow") reference = await this.modelReferences.observe(skillContent, references, context, "skill");
+            }
+        }
+        const conclusiveSkip = localBlock || (mode === "cascade" && decisiveIntent(intent));
+        const skippedReason = conclusiveSkip ? "conclusive_block" : "qualification_changed";
+        if (semantic) coverage.push(semanticCoverage(semantic, skillContent.length));
+        else coverage.push(skippedCheck("semantic", conclusiveSkip ? "conclusive_block" : "qualification_changed"));
+        for (const [check, observation] of [["intent_judgment", intent], ["capability_judgment", capability?.judgments], ["reference_judgment", reference?.judgments]] as const) {
+            if (!observation) {
+                const enabled = check === "intent_judgment" || check === "capability_judgment" && capabilityMode === "enforce" || check === "reference_judgment" && referenceMode === "enforce";
+                if (enabled && (conclusiveSkip || !before)) coverage.push(skippedCheck(check, skippedReason));
+                continue;
+            }
+            const entry = judgmentCoverage(check, observation, skillContent.length, 1);
+            // Full reasoning resolves uncertainty after a failed small-model
+            // judgment. Its own coverage remains required independently.
+            if (semantic && entry.required) { entry.required = false; entry.reason = "full_reasoning_retained"; }
+            coverage.push(entry);
+            context.routing?.push(judgmentRouting(observation, snapshot.config.typesafe.model));
+        }
+        coverage.push(conclusiveSkip || !before ? skippedCheck("capability", skippedReason) : { ...completedCheck("capability", skillContent.length, "declared"), status: capabilityMode === "enforce" && capabilityReview ? "partial" : "complete", reason: capabilityReview ? "unknown_scope" : "declared_scope" });
+        const hfComplete = !failedLookups && lookupIds.length <= 16 && referenceComplete;
+        coverage.push(conclusiveSkip || !before ? skippedCheck("hugging_face", skippedReason) : { ...completedCheck("hugging_face", skillContent.length, "external"), inspectedFields: hfReports.length,
+            status: hfComplete ? "complete" : "partial", reason: lookupIds.length > 16 ? "reference_limit" : !referenceComplete ? references.candidateOverflow ? "candidate_limit" : "unresolved_references" : failedLookups ? "lookup_failed" : null });
+        const current = before && qualified();
+        coverage.push(qualificationCoverage(current, snapshot));
+        const flags = hfReports.flatMap((report) => report.flags);
+        const hfSeverity = maximumSeverity(...hfReports.map((report) => report.severity === "safe" ? "low" : report.severity));
+        const hazardBlock = current && decisiveIntent(intent);
+        const finding = semantic?.status === "ok" ? semantic.value : null;
+        // Qualification drift disables new model decisions, but cannot erase
+        // an independently observed local or Hugging Face blocking finding.
+        const incumbentBlock = localBlock || blockingSeverity(hfSeverity);
+        const outcome = !current && !incumbentBlock ? { decision: "unavailable" as const, safe: false }
+            : decide({ task: "skill", mode, coverage, semantic: semantic ?? undefined, needsReview: capabilityReview || unresolvedIds.length > 0,
+                localBlocking: incumbentBlock || hazardBlock || current && capabilityBlock });
+        const allTrifecta = trifecta.trifectaPresent || (current && capabilityBlock);
+        return skillAnalysisReportSchema.parse({ schemaVersion: 2, task: "skill", ...outcome,
+            overallSeverity: maximumSeverity(localSeverity, hfSeverity, finding?.severity ?? "low", hazardBlock ? "high" : "low", allTrifecta ? "critical" : "low"),
+            categories: [...new Set([...local.categories, ...skillSpecific.categories, ...finding?.categories ?? [], ...(allTrifecta ? ["lethal_trifecta"] : []), ...(hazardBlock ? ["prompt_injection"] : [])])],
+            findings: [...local.findings, ...skillSpecific.findings, ...flags.map((flag) => flag.note), ...(hazardBlock ? ["Operative override or private-data disclosure signal."] : []), ...(capabilityBlock ? ["Three supported capability buckets form a lethal trifecta."] : [])],
+            atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? []), ...(allTrifecta ? ["AML.T0024", "AML.T0051"] : [])])],
+            timestamp: new Date().toISOString(), coverage, semantic, judgments: { intent, capability: capabilityMode === "enforce" ? capability?.judgments ?? null : null, modelReference: referenceMode === "enforce" ? reference?.judgments ?? null : null, capabilityBuckets: capabilityStates },
+            shadow: capabilityMode === "shadow" || referenceMode === "shadow" ? { intent: null, capability: capabilityMode === "shadow" ? capability?.judgments ?? null : null, modelReference: referenceMode === "shadow" ? reference?.judgments ?? null : null, capabilityBuckets: capabilityMode === "shadow" ? capability?.buckets ?? null : null } : null,
+            modelReferences: { candidates: references.candidates, candidateCount: references.candidateCount, candidateOverflow: references.candidateOverflow, parserCorrections: references.parserCorrections, baselineIds: references.baselineIds, lookupIds, unresolvedIds, shadowAdditions: referenceMode === "shadow" ? reference?.additions ?? [] : [] },
+            analysisMode: mode, policyVersion: POLICY_VERSION, configHash: context.configHash, routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(),
+            static: local, skillSpecific, trifectaResult: trifecta, hasLethalTrifecta: allTrifecta, huggingFaceSecurityFlags: flags, huggingFaceReports: hfReports });
+    }
+
+    private async analyze(skillContent: string, signal?: AbortSignal, v2 = false) {
+        skillInputSchema.parse({ skillContent });
+        const context = this.semantic.createContext("skill", signal);
         // Pass 8: extract HF model ids first (sync, cheap) so we can fan out
         // network requests in parallel with the LLM + static checks.
-        const modelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const references = this.modelReferences.extract(skillContent);
+        const allModelIds = references.baselineIds;
+        const modelIds = allModelIds.slice(0, 16);
+        let failedHfLookups = 0;
         const hfCheckPromise = modelIds.length === 0
             ? Promise.resolve([] as HuggingFaceModelReport[])
-            : Promise.allSettled(modelIds.map((id) => this.huggingFaceService.checkModel(id)))
-                  .then((settled) =>
-                      settled
+            : Promise.allSettled(modelIds.map((id) => withDeadline((hfSignal) => this.huggingFaceService.checkModel(id, { signal: hfSignal, deadlineMs: context.deadlineMs }), context.deadlineMs, signal)))
+                  .then((settled) => {
+                      failedHfLookups = settled.filter((item) => item.status === "rejected").length;
+                      return settled
                           .filter((s): s is PromiseFulfilledResult<HuggingFaceModelReport> => s.status === "fulfilled")
-                          .map((s) => s.value),
-                  );
+                          .map((s) => s.value);
+                  });
 
-        const [geminiResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
-            this.geminiService.checkPrompt(skillContent),
+        const [semanticResult, staticResult, skillSpecificResult, hfReports] = await Promise.all([
+            this.semantic.analyze(skillContent, "skill", context),
             Promise.resolve(this.staticCheckService.check(skillContent)),
             Promise.resolve(this.runSkillSpecificChecks(skillContent)),
             hfCheckPromise,
         ]);
+        const geminiResult = toLegacyGemini(semanticResult);
+        const hfComplete = allModelIds.length <= 16 && failedHfLookups === 0 && !hfReports.some((report) => report.flags.some((flag) => flag.class === "lookup_failed"));
 
         // Pass 5: lethal-trifecta capability classification (sync, cheap).
         const trifectaResult = this.trifectaAnalyzer.analyze({ skillContent });
@@ -200,7 +338,7 @@ export class SkillScanService {
             skillSpecificResult.hasNetworkExfiltration ||
             trifectaResult.trifectaPresent;
 
-        const safe = !isDangerous;
+        const safe = !isDangerous && !geminiResult.error && hfComplete;
 
         // Pass 7: aggregate ATLAS techniques across static + Gemini (skill-specific
         // checks don't carry pattern entries today; future ATLAS hooks can fold in here).
@@ -212,8 +350,10 @@ export class SkillScanService {
             ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : []),
         ]));
 
-        return {
+        const legacy: SkillScanResult = {
             safe,
+            geminiAvailable: !geminiResult.error,
+            analysisAvailable: !geminiResult.error && hfComplete,
             geminiConfidence: geminiResult.confidence,
             overallSeverity,
             categories,
@@ -227,6 +367,39 @@ export class SkillScanService {
             huggingFaceReports: hfReports,
             timestamp: new Date().toISOString()
         };
+        const capabilityNeedsReview = [trifectaResult.privateDataRead, trifectaResult.untrustedContentFetch, trifectaResult.externalEgress].filter((bucket) => bucket.present).length === 2;
+        const hfCoverage: CoverageEntry = { ...completedCheck("hugging_face", skillContent.length, "external"),
+            inspectedFields: hfReports.length, status: hfComplete ? "complete" : "partial",
+            reason: allModelIds.length > 16 ? "reference_limit" : !hfComplete ? "lookup_failed" : null };
+        const coverage = [completedCheck("local", skillContent.length), completedCheck("skill", skillContent.length),
+            { ...completedCheck("capability", skillContent.length, "declared"), reason: "local_declared_scope" },
+            hfCoverage, semanticCoverage(semanticResult, skillContent.length)];
+        const localSeverity = maximumSeverity(staticResult.severity, skillSpecificResult.severity, hfSeverity, trifectaSeverityMapped);
+        const outcome = decide({ task: "skill", coverage, semantic: semanticResult, needsReview: capabilityNeedsReview,
+            localBlocking: blockingSeverity(localSeverity) || skillSpecificResult.hasDangerousToolUsage || skillSpecificResult.hasNetworkExfiltration || trifectaResult.trifectaPresent });
+        context.budget.authorizeShadow({ requiredWorkComplete: true });
+        const [intent, capabilityObservation, referenceObservation] = v2 ? await Promise.all([
+            this.judgmentService.evaluate("skill", promptJudgmentRequest(skillContent, "skill", this.semantic.snapshot.config.typesafe.model), context, { completeSource: true }),
+            this.capabilityAnalysis.observe({ skillContent }, context, { parentTask: "skill" }),
+            this.modelReferences.observe(skillContent, references, context, "skill"),
+        ]) : [null, null, null];
+        for (const [check, observation] of [["intent_judgment", intent], ["capability_judgment", capabilityObservation?.judgments], ["reference_judgment", referenceObservation?.judgments]] as const) {
+            if (observation) { coverage.push(judgmentCoverage(check, observation, skillContent.length, 1)); context.routing?.push(judgmentRouting(observation, this.semantic.snapshot.config.typesafe.model)); }
+        }
+        const finding = semanticResult.status === "ok" ? semanticResult.value : null;
+        const v2Categories = [...new Set([...staticResult.categories, ...skillSpecificResult.categories, ...(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["lethal_trifecta"] : [])])];
+        const report = skillAnalysisReportSchema.parse({
+            schemaVersion: 2, task: "skill", ...outcome, overallSeverity: maximumSeverity(localSeverity, finding?.severity ?? "low"),
+            categories: v2Categories, findings: [...staticResult.findings, ...skillSpecificResult.findings, ...huggingFaceSecurityFlags.map((flag) => flag.note)],
+            atlasTechniques: [...new Set([...staticResult.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : [])])],
+            timestamp: legacy.timestamp, coverage, semantic: semanticResult, judgments: null, shadow: intent?.mode === "shadow" ? { intent, capability: capabilityObservation?.judgments ?? null, modelReference: referenceObservation?.judgments ?? null, capabilityBuckets: capabilityObservation?.judgments.mode === "shadow" ? capabilityObservation.buckets : null } : null,
+            modelReferences: { baselineIds: allModelIds, candidates: references.candidates, candidateCount: references.candidateCount, candidateOverflow: references.candidateOverflow, parserCorrections: references.parserCorrections, shadowAdditions: referenceObservation?.judgments?.mode === "shadow" ? referenceObservation.additions : [] },
+            analysisMode: this.semantic.snapshot.config.typesafe.skill, policyVersion: POLICY_VERSION, configHash: context.configHash,
+            routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(),
+            static: staticResult, skillSpecific: skillSpecificResult, trifectaResult, hasLethalTrifecta: trifectaResult.trifectaPresent,
+            huggingFaceSecurityFlags, huggingFaceReports: hfReports,
+        });
+        return { legacy, report };
     }
 
     private runSkillSpecificChecks(content: string): SkillSpecificFindings {

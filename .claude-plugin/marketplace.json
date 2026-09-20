@@ -1,0 +1,14 @@
+{
+  "name": "prompt-rejector",
+  "owner": {
+    "name": "Bryan Rice"
+  },
+  "plugins": [
+    {
+      "name": "prompt-rejector",
+      "source": "./plugins/prompt-rejector",
+      "description": "Screen prompts, skills and MCP tools with TypeSafe judgments and configurable reasoning models."
+    }
+  ],
+  "description": "Prompt Rejector security tools and setup skill for Claude Code."
+}

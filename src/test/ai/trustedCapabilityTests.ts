@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import { TrustedCapabilityResolver, type RuntimeCapabilityRecord } from "../../services/TrustedCapabilityResolver.js";
+
+const binding = { agentId: "agent-a", scope: "project-only", configurationVersion: "config-1" };
+const records: RuntimeCapabilityRecord[] = [{ binding, bucket: "privateDataRead", state: "absent", evidenceId: "host-sandbox.1", description: "The host enforces public fixture reads only." }];
+const resolver = new TrustedCapabilityResolver("config-1", records);
+const context = resolver.contextFor(binding);
+const facts = resolver.resolve(context);
+assert.equal(facts.length, 1); assert.equal(facts[0].state, "absent");
+assert.equal(facts[0].provenance, "verified_runtime");
+assert.deepEqual(facts[0].binding, binding);
+assert.ok(Object.isFrozen(facts)); assert.ok(Object.isFrozen(facts[0])); assert.ok(Object.isFrozen(facts[0].binding));
+assert.deepEqual(resolver.resolve(), []);
+assert.deepEqual(resolver.resolve({ ...binding, verified_runtime: true, facts }), []);
+assert.deepEqual(resolver.resolve(JSON.parse(JSON.stringify(context))), [], "JSON round trips cannot mint host provenance");
+assert.deepEqual(resolver.resolve(resolver.contextFor({ ...binding, agentId: "agent-b" })), []);
+assert.deepEqual(resolver.resolve(resolver.contextFor({ ...binding, scope: "all-files" })), []);
+assert.throws(() => resolver.contextFor({ ...binding, configurationVersion: "stale" }));
+const anotherResolver = new TrustedCapabilityResolver("config-1", records);
+assert.deepEqual(anotherResolver.resolve(context), [], "capability context is private to its host graph");
+records[0].state = "present"; records[0].binding.scope = "mutated";
+assert.equal(resolver.resolve(context)[0].state, "absent");
+assert.equal(resolver.resolve(context)[0].binding.scope, "project-only");
+assert.throws(() => new TrustedCapabilityResolver("current", records), /configuration/i);
+assert.throws(() => new TrustedCapabilityResolver("config-1", [ { ...records[0], binding: { ...binding, scope: "project-only" } }, { ...records[0], binding: { ...binding, scope: "project-only" }, state: "absent" } ]), /duplicate/i);
+console.log("PASS runtime capability identity/scope binding and unforgeable public provenance");

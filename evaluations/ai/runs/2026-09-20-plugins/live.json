@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-09-20T18:05:05.543Z",
+  "runtimeHash": "531833e8bd6e03bcc78d2ca219d614522ec5ec019959e48a01ac0f26f3142e30",
+  "bundled": {
+    "tools": 11,
+    "decision": "block",
+    "localSeverity": "critical",
+    "provider": "typesafe",
+    "model": "jev-1.13.0",
+    "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+    "elapsedMs": 480
+  },
+  "https": {
+    "tools": 11,
+    "decision": "block",
+    "localSeverity": "critical",
+    "provider": "typesafe",
+    "model": "jev-1.13.0",
+    "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+    "elapsedMs": 458,
+    "unauthenticatedStatus": 401,
+    "tlsVerification": true,
+    "jwksFetchedOverHttps": true
+  },
+  "scope": "Two real TypeSafe scans, local SDK clients; no hosted OAuth login or cloud UI connection tested."
+}

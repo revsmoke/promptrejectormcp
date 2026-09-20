@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## Unreleased — installable plugins and remote MCP
+
+- Add a portable plugin with Codex and Claude Code compatibility manifests, repository marketplaces, and one provider-neutral setup/use skill.
+- Build complete local ZIP and Claude Desktop MCPB bundles, a standalone skill ZIP, checksums and CI download artifacts; exclude credentials and mutable state.
+- Add paths-only plugin setup and an MCP doctor with an optional live TypeSafe check.
+- Add a separate OAuth-protected Streamable HTTP MCP transport and remote plugin generator for hosted web connections; preserve the current HTTPS REST API and stdio behavior.
+- Add MCP tool safety annotations and regression tests for authentication, package relocation, credentials, cache-independent state and client startup.
+- Refresh compatible dependency lockfile patches; keep packaging-only interactive CLI dependencies out of delivered runtimes.
+
+## [Unreleased]
+
+### Added
+
+- A single first-time installation walkthrough covering prerequisites, keys, trusted localhost HTTPS, MCP-only setup, model changes, upgrades and troubleshooting. The example environment selects active TypeSafe consistently; local certificates are excluded from Git and npm packaging. Verified with a fresh source checkout.
+- Independent semantic, pattern-drafting, Taster and Monitor model profiles with native Gemini, Claude and OpenAI adapters, validated capabilities and availability-only fallback.
+- TypeSafe Jev judgments for descriptor poisoning, prompt/skill intent, capability presence and exact-source model references; bounded caches and shared request/cost accounting.
+- One current `/v2` REST API and matching MCP reports with explicit allow/block/review/unavailable decisions, required coverage, provider attribution and usage. Existing 11 MCP tool names remain; version selection is removed. Retired `/v1/*` requests return 410 before analysis.
+- Shared active TypeSafe configuration and directory-independent HTTPS API/MCP launchers, with optional or required formal qualification. `npm start` serves HTTPS on loopback port 3001, requires certificate/key files, and fails visibly if TLS configuration or the port is unavailable.
+- Enforcement and prompt/skill cascade policies, isolated candidate evaluation, immutable development datasets, reviewed held-out evidence requirements and code/model/pattern-bound activation manifests.
+- Guarded offline suites, runtime CI matrix, non-inferencing configuration/health diagnostics, bounded live probes and model-switch/rollback documentation.
+
+### Fixed
+
+- Provider failures, malformed output and incomplete required HF metadata can no longer silently authorize a safe scan.
+- Gemini combined skill response compatibility, while preserving strict local validation of every response.
+- Per-route resolved-model checks prevent a primary from borrowing a fallback profile's identity policy.
+- HF model/dataset/Space parsing, source-evidence validation, partial Taster action evidence, model identity drift and expired/stale qualification handling.
+
+### Rollout status
+
+Both launchers select an **active TypeSafe** profile with working Jev and Gemini analysis. The local HTTPS API and MCP installation are live verified with the same configuration. Taster remains opt-in. Formal held-out qualification is reported separately and is not claimed. Bounded live activation evidence includes real security blocks and clean contextual reasoning; Claude/OpenAI remain selectable adapters, with account access still needed for their live verification. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates. Package and registry versions remain 1.1.0 until a separate release.
+
 ## [1.1.0] - 2026-05-14
 
 ### 🚀 LLM/Agentic Threat Expansion
@@ -294,7 +326,7 @@ This is the initial release. For future upgrades, migration guides will be provi
 
 ## Deprecations
 
-None yet.
+In the current application on `main`, `/v1/*` and MCP report version 1 are retired. Use the sole `/v2` API and omit MCP version selectors. Package publication remains separate from source delivery.
 
 ---
 

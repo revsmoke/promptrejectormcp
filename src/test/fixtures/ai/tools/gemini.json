@@ -1,0 +1,64 @@
+{
+  "first": {
+    "modelVersion": "gemini-3-flash-preview",
+    "candidates": [
+      {
+        "finishReason": "STOP",
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "PRIVATE_REASONING",
+              "thought": true,
+              "thoughtSignature": "PRIVATE_SIGNATURE"
+            },
+            {
+              "functionCall": {
+                "id": "a",
+                "name": "read_file",
+                "args": {
+                  "path": "first"
+                }
+              },
+              "thoughtSignature": "PRIVATE_CALL_SIGNATURE"
+            },
+            {
+              "functionCall": {
+                "id": "b",
+                "name": "read_file",
+                "args": {
+                  "path": "second"
+                }
+              },
+              "thoughtSignature": "PRIVATE_CALL_SIGNATURE"
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 10,
+      "candidatesTokenCount": 10
+    }
+  },
+  "second": {
+    "modelVersion": "gemini-3-flash-preview",
+    "candidates": [
+      {
+        "finishReason": "STOP",
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Done"
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 10,
+      "candidatesTokenCount": 10
+    }
+  }
+}

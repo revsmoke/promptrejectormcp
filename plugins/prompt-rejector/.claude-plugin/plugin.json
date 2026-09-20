@@ -1,0 +1,17 @@
+{
+  "name": "prompt-rejector",
+  "version": "1.1.0",
+  "description": "Screen prompts, skills and MCP tools with TypeSafe judgments and configurable reasoning models.",
+  "author": {
+    "name": "Bryan Rice"
+  },
+  "homepage": "https://github.com/revsmoke/promptrejectormcp",
+  "repository": "https://github.com/revsmoke/promptrejectormcp",
+  "license": "ISC",
+  "keywords": [
+    "security",
+    "mcp",
+    "prompt-injection",
+    "typesafe"
+  ]
+}

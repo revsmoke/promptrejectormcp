@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "descriptor-smoke-v1",
+  "path": "cases.jsonl",
+  "sha256": "e2de1a796306c4d6dcce39ae44ab0fc90f488ce10d8059d5019b2406d8c733a8",
+  "count": 16,
+  "qualificationEligible": false,
+  "limitations": [
+    "First eight risky and first eight benign exploratory descriptor cases in source order; selected before this service run.",
+    "Historical authored hypotheses, already observed development data; not held-out qualification.",
+    "Subset preserves original IDs, hashes, labels and occurrence provenance. Source: exploratory-v1."
+  ]
+}

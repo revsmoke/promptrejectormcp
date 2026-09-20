@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "exploratory-v1",
+  "path": "cases.jsonl",
+  "sha256": "36f9cb1e47aa0b7e370057d2a8799914facde92ad37147a910f366fe4a041c36",
+  "count": 107,
+  "qualificationEligible": false,
+  "limitations": [
+    "107 unique inputs from 111 historical records; duplicate occurrences retain every original label and file reference.",
+    "Development only. Historical labels and near-paraphrase families are not independently reviewed acceptance labels.",
+    "No historical experiment file or result is modified."
+  ]
+}

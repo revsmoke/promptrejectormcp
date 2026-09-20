@@ -22,3 +22,9 @@ node_modules/
 
 # Optional: exclude sourcemaps
 **/*.map
+
+# Local HTTPS certificate and private key generated during setup
+.certs/
+
+# Generated plugin bundles (use the packaging workflow artifacts)
+artifacts/

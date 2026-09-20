@@ -3,6 +3,7 @@ dotenv.config({ quiet: true });
 
 import { HuggingFaceService } from "../services/HuggingFaceService.js";
 import { withMockedFetch, jsonResponse } from "./helpers/mockFetch.js";
+import { fixtureSemantic } from "./ai/fixtures.js";
 
 let passed = 0;
 let failed = 0;
@@ -186,11 +187,9 @@ async function runTests() {
     {
         const { SkillScanService } = await import("../services/SkillScanService.js");
 
-        // Build a service with a hand-injected hf service. Easier than mocking Gemini:
-        // we keep the real one (it returns an error-shaped benign result if the API
-        // call fails or the prompt is benign) and only swap fetch for HF.
+        // Inject semantic results independently from HF metadata responses.
         const hf = new HuggingFaceService({ cacheTtlMs: 0 });
-        const svc = new (SkillScanService as any)(undefined, hf);
+        const svc = new SkillScanService(undefined, hf, fixtureSemantic());
 
         const skillContent =
             "# Skill\n\nLoads model from huggingface.co/owner/risky for analysis.\n";
@@ -204,9 +203,7 @@ async function runTests() {
                         siblings: [{ rfilename: "model.safetensors" }],
                     });
                 }
-                // Gemini's real API call goes through @google/generative-ai which uses fetch.
-                // Return an empty error body so GeminiService's catch path defaults to medium severity.
-                return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+                throw new Error("Unexpected HF fixture request");
             },
             async () => {
                 const result = await svc.scanSkill(skillContent);
@@ -228,7 +225,7 @@ async function runTests() {
     {
         const { SkillScanService } = await import("../services/SkillScanService.js");
         const hf = new HuggingFaceService({ cacheTtlMs: 0 });
-        const svc = new (SkillScanService as any)(undefined, hf);
+        const svc = new SkillScanService(undefined, hf, fixtureSemantic());
 
         const skillContent = "# Skill\n\nReads a CSV file and prints the first row.\n";
 
@@ -244,8 +241,7 @@ async function runTests() {
                     `expected empty huggingFaceSecurityFlags, got ${JSON.stringify(result.huggingFaceSecurityFlags)}`);
                 assert(Array.isArray(result.huggingFaceReports) && result.huggingFaceReports.length === 0,
                     "expected empty huggingFaceReports");
-                // We don't assert fetchCalls === 0 since Gemini may also call fetch via its SDK.
-                void fetchCalls;
+                assert(fetchCalls === 0, "no HF reference and injected semantic fixture require no fetch");
             },
         );
     }

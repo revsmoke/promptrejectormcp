@@ -13,6 +13,7 @@ import { PatternService } from "../services/PatternService.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
 import { tmpdir } from "os";
 import { join } from "path";
+import { withMockedFetch, jsonResponse } from "./helpers/mockFetch.js";
 
 let passed = 0;
 let failed = 0;
@@ -81,23 +82,25 @@ async function runTests() {
     console.log("Test 5: KevFeedService");
     {
         const svc = new KevFeedService();
-        const refresh = await svc.refresh();
-        assert(refresh.count === 0, "Stub refresh returns count: 0");
-        assert(svc.isInKev("CVE-0000-0000") === false, "Empty KEV set returns false");
+        await withMockedFetch(async () => jsonResponse({ vulnerabilities: [] }), async () => {
+            const refresh = await svc.refresh();
+            assert(refresh.count === 0, "Empty fixture refresh returns count: 0");
+            assert(svc.isInKev("CVE-0000-0000") === false, "Empty KEV set returns false");
+        });
     }
 
     // Test 6: HuggingFaceService.checkModel
-    // Pass 8 wired this to the real HF API. We don't mock fetch here (this is
-    // the skeleton smoke test, not the HF-specific suite), so the call will
-    // either succeed against the live API or degrade to lookup_failed. Both
-    // are acceptable; we only assert the report shape is well-formed.
+    // Validate the report shape against a fixture, independent of live HF
+    // availability. Provider quality and connectivity have separate gates.
     console.log("Test 6: HuggingFaceService.checkModel");
     {
         const svc = new HuggingFaceService({ timeoutMs: 1500 });
-        const res = await svc.checkModel("test/model");
-        assert(Array.isArray(res.flags), "checkModel returns a report with .flags array");
-        assert(typeof res.modelId === "string" && res.modelId === "test/model", "report.modelId echoes input");
-        assert(typeof res.severity === "string", "report.severity is a string");
+        await withMockedFetch(async () => jsonResponse({ id: "test/model", siblings: [] }), async () => {
+            const res = await svc.checkModel("test/model");
+            assert(Array.isArray(res.flags), "checkModel returns a report with .flags array");
+            assert(typeof res.modelId === "string" && res.modelId === "test/model", "report.modelId echoes input");
+            assert(typeof res.severity === "string", "report.severity is a string");
+        });
     }
 
     // Test 7: TrifectaAnalyzer.analyze

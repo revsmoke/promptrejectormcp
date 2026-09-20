@@ -43,3 +43,9 @@ npm_recovery_codes.txt
 awesome-mcp-servers/
 CLAUDE.md
 .claude
+
+# Local HTTPS certificate and private key generated during setup
+.certs/
+
+# Generated plugin bundles (use the packaging workflow artifacts)
+artifacts/

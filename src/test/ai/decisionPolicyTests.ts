@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { decide, decideBehavior } from "../../services/DecisionPolicy.js";
+import { completedCheck } from "../../services/AnalysisCoverage.js";
+import { emptyUsage } from "../../ai/usage.js";
+import type { CallResult } from "../../ai/contracts.js";
+import type { SemanticFinding } from "../../ai/taskSchemas.js";
+
+const meta = { callId: "one", provider: "gemini" as const, requestedModel: "fixture", resolvedModel: null, profileHash: "fixture", rubricVersion: "fixture", schemaVersion: "fixture", elapsedMs: 1, attempts: 1, usage: emptyUsage(), failureCode: null };
+const benign: CallResult<SemanticFinding> = { status: "ok", value: { verdict: "benign", severity: "low", categories: [], explanation: "benign", evidenceIds: [], isInjection: false, selfReportedConfidence: null }, meta };
+const unavailable: CallResult<SemanticFinding> = { status: "unavailable", code: "timeout", meta: { ...meta, failureCode: "timeout" } };
+const coverage = [completedCheck("local", 10), completedCheck("semantic", 10)];
+assert.equal(decide({ task: "prompt", coverage, semantic: benign }).decision, "allow");
+assert.equal(decide({ task: "prompt", coverage, semantic: unavailable }).decision, "unavailable");
+assert.equal(decide({ task: "prompt", coverage: [], semantic: benign }).safe, false, "omitted required coverage cannot allow");
+assert.equal(decide({ task: "prompt", coverage, semantic: unavailable, localBlocking: true }).decision, "block");
+assert.equal(decide({ task: "prompt", coverage, semantic: { ...benign, value: { ...benign.value, verdict: "suspicious" } } }).decision, "review");
+assert.equal(decide({ task: "prompt", coverage, semantic: { ...unavailable, code: "refusal" } }).decision, "review");
+const skillCoverage = [...coverage, completedCheck("skill", 10), completedCheck("capability", 10), completedCheck("hugging_face", 10)];
+assert.equal(decide({ task: "skill", coverage: skillCoverage, semantic: benign }).decision, "allow");
+assert.equal(decide({ task: "skill", coverage: skillCoverage, semantic: benign, needsReview: true }).decision, "review");
+assert.equal(decide({ task: "skill", coverage: skillCoverage.map((entry) => entry.check === "hugging_face" ? { ...entry, status: "partial" as const } : entry), semantic: benign }).decision, "unavailable");
+assert.equal(decide({ task: "descriptor", mode: "shadow", coverage: [completedCheck("local", 10)], semantic: unavailable }).decision, "allow", "shadow results are not authoritative");
+assert.equal(decide({ task: "descriptor", mode: "enforce", coverage: [completedCheck("local", 10)], descriptorQualifiedLow: true, descriptorEvidenceNone: false }).safe, false);
+assert.equal(decide({ task: "capability", mode: "enforce", coverage: [completedCheck("local", 10)], capabilityResolved: false }).safe, false);
+assert.equal(decideBehavior(false, "clean"), "undetermined");
+assert.equal(decideBehavior(true, "clean"), "clean");
+console.log("PASS explicit policy precedence and task coverage requirements");

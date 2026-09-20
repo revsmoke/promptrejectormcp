@@ -1,0 +1,157 @@
+{
+  "synthetic": true,
+  "description": "Synthetic native wire fixtures; no live model output or secrets.",
+  "model": "gpt-6-astra",
+  "success": {
+    "model": "gpt-6-astra",
+    "status": "completed",
+    "output": [
+      {
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "private"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "input_tokens_details": {
+        "cached_tokens": 30,
+        "cache_write_tokens": 10
+      },
+      "output_tokens_details": {
+        "reasoning_tokens": 5
+      }
+    }
+  },
+  "refusal": {
+    "model": "gpt-6-astra",
+    "status": "completed",
+    "output": [
+      {
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "private"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "refusal",
+            "refusal": "synthetic refusal"
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "input_tokens_details": {
+        "cached_tokens": 30,
+        "cache_write_tokens": 10
+      },
+      "output_tokens_details": {
+        "reasoning_tokens": 5
+      }
+    }
+  },
+  "truncated": {
+    "model": "gpt-6-astra",
+    "status": "incomplete",
+    "output": [
+      {
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "private"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "input_tokens_details": {
+        "cached_tokens": 30,
+        "cache_write_tokens": 10
+      },
+      "output_tokens_details": {
+        "reasoning_tokens": 5
+      }
+    },
+    "incomplete_details": {
+      "reason": "max_output_tokens"
+    }
+  },
+  "empty": {
+    "model": "gpt-6-astra",
+    "status": "completed",
+    "output": [],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "input_tokens_details": {
+        "cached_tokens": 30,
+        "cache_write_tokens": 10
+      },
+      "output_tokens_details": {
+        "reasoning_tokens": 5
+      }
+    },
+    "output_text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+  },
+  "invalid": {
+    "model": "gpt-6-astra",
+    "status": "completed",
+    "output": [
+      {
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "private"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{}"
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "input_tokens_details": {
+        "cached_tokens": 30,
+        "cache_write_tokens": 10
+      },
+      "output_tokens_details": {
+        "reasoning_tokens": 5
+      }
+    }
+  }
+}

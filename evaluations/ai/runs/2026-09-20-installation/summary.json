@@ -1,0 +1,27 @@
+{
+  "verifiedAt": "2026-09-20T16:38:37.795Z",
+  "node": "v24.13.0",
+  "npm": "11.8.0",
+  "codeCommit": "89282f3f29ede02a2add1f4aca2e39afd6ab017a",
+  "freshClone": true,
+  "templateChangesAppliedBeforeTest": true,
+  "initialHarnessRun": "MCP and HTTPS succeeded; harness then used the wrong prompt judgment field. Corrected to judgments.intent and repeated; no application change.",
+  "npmCi": "passed",
+  "build": "passed",
+  "configCheck": "active; no inference; no missing required keys",
+  "mcp": {
+    "tools": 11,
+    "initialMcpRunWithoutTlsFiles": true,
+    "decision": "block",
+    "physicalCalls": 1
+  },
+  "https": {
+    "trustedGeneratedCertificate": true,
+    "decision": "allow",
+    "physicalCalls": 2
+  },
+  "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+  "secretsExcludedFromGitAndPackage": true,
+  "credentialValuesInOutput": false,
+  "port": "free temporary loopback port; installed services preserved"
+}

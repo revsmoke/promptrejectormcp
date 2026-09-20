@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { emptyUsage, estimateCost, UsageLedger } from "../../ai/usage.js";
+const prices = { version: "synthetic", inputPerMillion: 2, outputPerMillion: 10, cachedReadPerMillion: .2, cacheWritePerMillion: 2.5 };
+assert.equal(estimateCost({ ...emptyUsage(), inputTokens: 100, outputTokens: 20, cachedReadTokens: 30, cacheWriteTokens: 10, cachedReadIsInputSubset: false, cacheWriteIsInputSubset: false }, prices), .000431);
+assert.equal(estimateCost({ ...emptyUsage(), inputTokens: 100, outputTokens: 20, cachedReadTokens: 30, cacheWriteTokens: 0, reasoningTokens: 5 }, prices), .000346);
+assert.equal(estimateCost({ ...emptyUsage(), inputTokens: 100, outputTokens: 20, cachedReadTokens: 30, cacheWriteTokens: 0, reasoningTokens: 5, reasoningIsOutputSubset: false }, prices), .000396);
+assert.equal(estimateCost({ ...emptyUsage(), inputTokens: 100, outputTokens: 20 }, prices), null);
+assert.equal(estimateCost({ ...emptyUsage(), inputTokens: 100, outputTokens: 20 }, undefined), null);
+const ledger = new UsageLedger();
+ledger.record("one", emptyUsage(), prices);
+ledger.record("one", { ...emptyUsage(), inputTokens: 0, outputTokens: 0 }, prices);
+assert.equal(ledger.summary().calls, 1);
+assert.equal(ledger.summary().estimatedUsd, null);
+console.log("PASS provider usage subsets and unknown cost");

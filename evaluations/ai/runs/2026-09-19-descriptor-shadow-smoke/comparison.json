@@ -1,0 +1,25 @@
+{
+  "evaluationOnly": true,
+  "qualification": false,
+  "comparison": "Full descriptor wrapper off versus shadow; primitive signals reported separately",
+  "pairedCases": 16,
+  "authoritativeDecisionSeverityCategoryEquality": true,
+  "signalThresholds": {
+    "high": 0.9,
+    "low": 0.1
+  },
+  "signalCounts": {
+    "risky": 8,
+    "riskyHighPoison": 8,
+    "benign": 8,
+    "benignHighPoison": 0,
+    "benignLowWithNonNoneEvidence": 2
+  },
+  "limitations": [
+    "Sixteen previously observed development examples, not independently reviewed held-out evidence.",
+    "No service decision improvement is claimed in shadow: authoritative results must remain unchanged.",
+    "Low poison plus speculative non-none selection triggers contextual review under the proposed conservative enforce policy.",
+    "Local descriptor warnings still block in this rollout; TypeSafe cannot remove their false positives.",
+    "No no-network or zero-cost full reasoning comparison is inferred from these measurements."
+  ]
+}

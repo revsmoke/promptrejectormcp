@@ -1,0 +1,18 @@
+{
+  "verifiedAt": "2026-09-19T20:36:39.485Z",
+  "validatedTypeSafeResponses": 178,
+  "missingOrInvalidAnswers": 0,
+  "offlineProbes": {
+    "emptyGeminiObject": {
+      "isInjection": false,
+      "severity": "low",
+      "error": false
+    },
+    "unavailableGemini": {
+      "safe": true,
+      "geminiAvailable": false,
+      "severity": "medium"
+    }
+  },
+  "note": "Offline probes reproduce current behavior; they are findings, not desired acceptance behavior. No provider calls are made by this verifier."
+}

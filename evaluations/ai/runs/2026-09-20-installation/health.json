@@ -1,0 +1,61 @@
+{
+  "status": "ok",
+  "version": "1.1.0",
+  "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+  "roles": {
+    "semantic": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "configured": true,
+      "enabled": true,
+      "readiness": "ready",
+      "fallback": null
+    },
+    "patternDraft": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "configured": true,
+      "enabled": true,
+      "readiness": "ready",
+      "fallback": null
+    },
+    "taster": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "configured": true,
+      "enabled": false,
+      "readiness": "disabled",
+      "fallback": null
+    },
+    "monitor": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "configured": true,
+      "enabled": false,
+      "readiness": "disabled",
+      "fallback": null
+    }
+  },
+  "typesafe": {
+    "model": "jev-1.13.0",
+    "modes": {
+      "descriptor": "enforce",
+      "prompt": "cascade",
+      "skill": "cascade",
+      "capability": "enforce",
+      "modelReference": "enforce"
+    },
+    "configured": true,
+    "readiness": "ready"
+  },
+  "qualificationPolicy": "optional",
+  "qualificationStatus": "unqualified",
+  "qualification": {
+    "tasks": {}
+  },
+  "readinessMeaning": "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
+  "reports": {
+    "schemaVersion": 2,
+    "restPrefix": "/v2"
+  }
+}

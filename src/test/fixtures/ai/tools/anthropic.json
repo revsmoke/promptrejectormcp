@@ -1,0 +1,47 @@
+{
+  "first": {
+    "model": "claude-opus-4-7",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "PRIVATE_REASONING",
+        "signature": "PRIVATE_SIGNATURE"
+      },
+      {
+        "type": "tool_use",
+        "id": "a",
+        "name": "read_file",
+        "input": {
+          "path": "first"
+        }
+      },
+      {
+        "type": "tool_use",
+        "id": "b",
+        "name": "read_file",
+        "input": {
+          "path": "second"
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "usage": {
+      "input_tokens": 10,
+      "output_tokens": 10
+    }
+  },
+  "second": {
+    "model": "claude-opus-4-7",
+    "content": [
+      {
+        "type": "text",
+        "text": "Done"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": {
+      "input_tokens": 10,
+      "output_tokens": 10
+    }
+  }
+}

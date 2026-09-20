@@ -1,5 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
@@ -19,6 +20,10 @@ import { CanaryService } from "../services/CanaryService.js";
 import { McpToolScanner } from "../services/McpToolScanner.js";
 import { TasteTesterService } from "../services/TasteTesterService.js";
 import { UnifiedCveCache, type QueryCveFilters } from "../services/UnifiedCveCache.js";
+import { createServices, type Services } from "../bootstrap.js";
+import { handleMcpScan } from "../api/reportSerializers.js";
+import { handleMcpTaster } from "../api/tasterSerializers.js";
+import { handleMcpJudgment } from "../api/judgmentSerializers.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../package.json");
@@ -40,39 +45,21 @@ export class PromptRejectorMCPServer {
     private tasteTesterService: TasteTesterService;
     private unifiedCveCache: UnifiedCveCache;
 
-    constructor() {
-        this.patternService = new PatternService();
-        this.securityService = new SecurityService(this.patternService);
-        // Pass 8: instantiate HF service before SkillScanService so the same
-        // instance (and its in-memory cache) is shared by every scan.
-        this.huggingFaceService = new HuggingFaceService();
-        this.skillScanService = new SkillScanService(this.patternService, this.huggingFaceService);
-        this.atlasService = new AtlasService();
-        this.osvFeedService = new OsvFeedService();
-        this.ghsaGraphQLService = new GhsaGraphQLService();
-        this.kevFeedService = new KevFeedService();
-        // Pass 7: wire ATLAS + KEV into VulnFeedService so candidates pick up
-        // taxonomy tags and KEV-escalated severity at staging time.
-        this.vulnFeedService = new VulnFeedService(
-            this.patternService,
-            undefined,
-            undefined,
-            this.osvFeedService,
-            this.ghsaGraphQLService,
-            this.atlasService,
-            this.kevFeedService,
-        );
-        this.trifectaAnalyzer = new TrifectaAnalyzer();
-        this.canaryService = new CanaryService();
-        this.mcpToolScanner = new McpToolScanner(this.patternService);
-        this.tasteTesterService = new TasteTesterService();
-        // Pass 9: read-only aggregator over staged CVE candidates. Depends on
-        // vulnFeedService + atlasService + kevFeedService already being live.
-        this.unifiedCveCache = new UnifiedCveCache(
-            this.vulnFeedService,
-            this.atlasService,
-            this.kevFeedService,
-        );
+    constructor(readonly services: Services = createServices()) {
+        this.patternService = services.patternService;
+        this.securityService = services.securityService;
+        this.huggingFaceService = services.huggingFaceService;
+        this.skillScanService = services.skillScanService;
+        this.atlasService = services.atlasService;
+        this.osvFeedService = services.osvFeedService;
+        this.ghsaGraphQLService = services.ghsaGraphQLService;
+        this.kevFeedService = services.kevFeedService;
+        this.vulnFeedService = services.vulnFeedService;
+        this.trifectaAnalyzer = services.trifectaAnalyzer;
+        this.canaryService = services.canaryService;
+        this.mcpToolScanner = services.mcpToolScanner;
+        this.tasteTesterService = services.tasteTesterService;
+        this.unifiedCveCache = services.unifiedCveCache;
         this.server = new Server(
             {
                 name: "prompt-rejector",
@@ -108,10 +95,13 @@ export class PromptRejectorMCPServer {
                             properties: {
                                 prompt: {
                                     type: "string",
+                                    minLength: 1,
+                                    maxLength: 100000,
                                     description: "The user input prompt to check.",
                                 },
                             },
                             required: ["prompt"],
+                            additionalProperties: false,
                         },
                     },
                     {
@@ -122,10 +112,13 @@ export class PromptRejectorMCPServer {
                             properties: {
                                 skillContent: {
                                     type: "string",
+                                    minLength: 1,
+                                    maxLength: 500000,
                                     description: "The raw markdown content of the SKILL.md file to scan.",
                                 },
                             },
                             required: ["skillContent"],
+                            additionalProperties: false,
                         },
                     },
                     {
@@ -254,51 +247,22 @@ export class PromptRejectorMCPServer {
                             required: ["prompt"],
                         },
                     },
-                ],
+                ].map(tool => ({ ...tool, annotations: {
+                    readOnlyHint: !["update_vuln_feeds", "deploy_canary"].includes(tool.name),
+                    destructiveHint: false,
+                    idempotentHint: !["update_vuln_feeds", "deploy_canary", "taste_test"].includes(tool.name),
+                    openWorldHint: !["list_patterns", "verify_pattern_integrity", "query_cve", "deploy_canary", "verify_canary"].includes(tool.name),
+                } })),
             };
         });
 
         // Handle tool calls
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             const { name, arguments: args } = request.params;
 
-            if (name === "check_prompt") {
-                const { prompt } = args as { prompt: string };
-                if (!prompt || prompt.length > 100_000) {
-                    return {
-                        content: [{ type: "text", text: JSON.stringify({ error: "Prompt must be 1-100,000 characters" }) }],
-                    };
-                }
-                const report = await this.securityService.runSecurityScan(prompt);
-
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify(report, null, 2),
-                        },
-                    ],
-                };
-            }
-
-            if (name === "scan_skill") {
-                const { skillContent } = args as { skillContent: string };
-                if (!skillContent || skillContent.length > 500_000) {
-                    return {
-                        content: [{ type: "text", text: JSON.stringify({ error: "Skill content must be 1-500,000 characters" }) }],
-                    };
-                }
-                const report = await this.skillScanService.scanSkill(skillContent);
-
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify(report, null, 2),
-                        },
-                    ],
-                };
-            }
+            if (name === "check_prompt" || name === "scan_skill") return handleMcpScan(this.services, name, args, extra.signal);
+            if (name === "scan_mcp_tool" || name === "check_lethal_trifecta") return handleMcpJudgment(this.services, name, args, extra.signal);
+            if (name === "taste_test") return handleMcpTaster(this.services, args, extra.signal);
 
             if (name === "list_patterns") {
                 const { category } = (args || {}) as { category?: string };
@@ -338,52 +302,6 @@ export class PromptRejectorMCPServer {
                             text: JSON.stringify(result, null, 2),
                         },
                     ],
-                };
-            }
-
-            if (name === "scan_mcp_tool") {
-                const a = (args || {}) as { tool?: unknown; priorHash?: unknown };
-                // tool must be a non-null object (not array, not null, not primitive)
-                if (!a.tool || typeof a.tool !== "object" || Array.isArray(a.tool)) {
-                    return validationError("tool is required and must be a non-null object");
-                }
-                if (a.priorHash !== undefined && typeof a.priorHash !== "string") {
-                    return validationError("priorHash must be a string if provided");
-                }
-                const result = this.mcpToolScanner.scan({ tool: a.tool as object, priorHash: a.priorHash as string | undefined });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-                };
-            }
-
-            if (name === "check_lethal_trifecta") {
-                const a = (args || {}) as { capabilities?: unknown; tools?: unknown; skillContent?: unknown };
-                // At least one of capabilities/tools/skillContent must be present.
-                if (a.capabilities === undefined && a.tools === undefined && a.skillContent === undefined) {
-                    return validationError("at least one of capabilities, tools, or skillContent is required");
-                }
-                if (a.capabilities !== undefined) {
-                    if (!Array.isArray(a.capabilities) || !a.capabilities.every((c) => typeof c === "string")) {
-                        return validationError("capabilities must be an array of strings if provided");
-                    }
-                }
-                if (a.tools !== undefined) {
-                    if (!Array.isArray(a.tools) || !a.tools.every((t) => typeof t === "string")) {
-                        return validationError("tools must be an array of strings if provided");
-                    }
-                }
-                if (a.skillContent !== undefined) {
-                    if (typeof a.skillContent !== "string" || a.skillContent.length > 500_000) {
-                        return validationError("skillContent must be a string of at most 500,000 characters if provided");
-                    }
-                }
-                const result = this.trifectaAnalyzer.analyze({
-                    capabilities: a.capabilities as string[] | undefined,
-                    tools: a.tools as string[] | undefined,
-                    skillContent: a.skillContent as string | undefined,
-                });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
@@ -460,28 +378,6 @@ export class PromptRejectorMCPServer {
                 };
             }
 
-            if (name === "taste_test") {
-                const a = (args || {}) as { prompt?: unknown; mode?: unknown; context?: unknown };
-                if (typeof a.prompt !== "string" || a.prompt.length < 1 || a.prompt.length > 100_000) {
-                    return validationError("prompt is required and must be a string of 1-100,000 characters");
-                }
-                if (a.mode !== undefined && a.mode !== "fast" && a.mode !== "thorough") {
-                    return validationError("mode must be 'fast' or 'thorough' if provided");
-                }
-                if (a.context !== undefined) {
-                    if (typeof a.context !== "string" || a.context.length > 100_000) {
-                        return validationError("context must be a string of at most 100,000 characters if provided");
-                    }
-                }
-                const result = await this.tasteTesterService.run({
-                    prompt: a.prompt,
-                    mode: a.mode as "fast" | "thorough" | undefined,
-                    context: a.context as string | undefined,
-                });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-                };
-            }
 
             // Silence unused-private-member warnings for stub services wired only for future passes
             void this.atlasService;
@@ -494,9 +390,11 @@ export class PromptRejectorMCPServer {
         });
     }
 
+    async connect(transport: Transport) { await this.server.connect(transport); }
+    async close() { await this.server.close(); }
     async run() {
         const transport = new StdioServerTransport();
-        await this.server.connect(transport);
+        await this.connect(transport);
         console.error("[MCP] PromptRejector MCP server running on stdio");
     }
 }

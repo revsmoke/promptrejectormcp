@@ -1,0 +1,25 @@
+name: Build installable plugins
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run plugin:build
+      - run: npm run test:plugins
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prompt-rejector-plugins
+          path: artifacts/plugins/
+          if-no-files-found: error

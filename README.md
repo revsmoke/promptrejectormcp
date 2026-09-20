@@ -8,12 +8,12 @@ Prompt Rejector combines deterministic security checks, focused **TypeSafe Jev j
 | --- | --- | --- |
 | An application or script | **HTTPS API:** `https://localhost:3001` | `npm start` |
 | Codex / Claude Code | **Plugin + MCP over stdio** | [Install the plugin](#plugins-and-skill) or configure the Node launcher |
-| Claude Desktop chat | **Bundled `.mcpb` extension + skill** | [Desktop installation](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugins.md#claude-desktop-chat) |
-| ChatGPT / Claude web | **Skill + tunnel or authenticated remote MCP** | [Web connection guide](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/remote-mcp.md) |
+| Claude Desktop chat | **Bundled `.mcpb` extension + skill** | [Desktop installation](docs/plugins.md#claude-desktop-chat) |
+| ChatGPT / Claude web | **Skill + tunnel or authenticated remote MCP** | [Web connection guide](docs/operations/remote-mcp.md) |
 
 The local API and MCP connections can run together and use the same analysis configuration. Prompt checks use **`POST /v2/check-prompt`**. `/v2` is the only current API; `/v1` is retired. MCP keeps all 11 tool names and needs no version selector.
 
-**Already using Bryan's local installation?** The HTTPS service and Codex MCP entry are configured. Go to the [local service runbook](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/local-server.md#installed-macos-service) for status and restart instructions; do not start a second server on port 3001.
+**Already using Bryan's local installation?** The HTTPS service and Codex MCP entry are configured. Go to the [local service runbook](docs/operations/local-server.md#installed-macos-service) for status and restart instructions; do not start a second server on port 3001.
 
 - [Plugins and skill](#plugins-and-skill)
 - [Installation](#installation)
@@ -47,11 +47,11 @@ claude plugin marketplace add "$PWD"
 claude plugin install prompt-rejector@prompt-rejector --scope user
 ```
 
-Start a new session and ask the agent to use **Prompt Rejector**. The included [skill](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/plugins/prompt-rejector/skills/prompt-rejector/SKILL.md) explains cloning, configuration, startup, verification and tool use. Keys remain in your private environment file; plugin settings save only paths. Use one connection if you already have a manual MCP entry.
+Start a new session and ask the agent to use **Prompt Rejector**. The included [skill](plugins/prompt-rejector/skills/prompt-rejector/SKILL.md) explains cloning, configuration, startup, verification and tool use. Keys remain in your private environment file; plugin settings save only paths. Use one connection if you already have a manual MCP entry.
 
-For **Claude Desktop chat**, build or download the `.mcpb` extension and install the standalone skill ZIP. `npm run plugin:build` creates complete local packages under `artifacts/plugins/`, including the app and production dependencies. [GitHub Actions builds](https://github.com/revsmoke/promptrejectormcp/actions/workflows/plugins.yml) provide downloadable artifacts for the implementation branch.
+For **Claude Desktop chat**, build or download the `.mcpb` extension and install the standalone skill ZIP. `npm run plugin:build` creates complete local packages under `artifacts/plugins/`, including the app and production dependencies. [GitHub Actions builds](https://github.com/revsmoke/promptrejectormcp/actions/workflows/plugins.yml) provide downloadable artifacts for `main`.
 
-For **ChatGPT or Claude on the web**, a skill alone does not connect to your computer. Use OpenAI's private MCP tunnel or the included OAuth-protected remote transport on your own HTTPS host. See the [platform installation guide](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugins.md), [web connection guide](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/remote-mcp.md), and [verified coverage](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugin-verification.md). Public plugin-directory publication and cloud account setup are separate steps.
+For **ChatGPT or Claude on the web**, a skill alone does not connect to your computer. Use OpenAI's private MCP tunnel or the included OAuth-protected remote transport on your own HTTPS host. See the [platform installation guide](docs/plugins.md), [web connection guide](docs/operations/remote-mcp.md), and [verified coverage](docs/plugin-verification.md). Public plugin-directory publication and cloud account setup are separate steps.
 
 ## Installation
 
@@ -76,10 +76,10 @@ The commands below use a macOS/Linux shell. Actual scans send input to the confi
 
 ### 2. Download and build
 
-The `main` checkout does not yet contain this upgrade. The working upgrade is on **`codex/typesafe-model-routing`**; the documentation links below point to that branch. Use the branch in this command; package/registry publication is a separate release step. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
+The current application, plugins and skill are included on **`main`**. Package/registry publication is a separate release step. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
 
 ```sh
-git clone --branch codex/typesafe-model-routing https://github.com/revsmoke/promptrejectormcp.git
+git clone --branch main https://github.com/revsmoke/promptrejectormcp.git
 cd promptrejectormcp
 npm ci
 npm run build
@@ -171,7 +171,7 @@ curl --fail --silent --show-error https://localhost:3001/health
 
 Expect `status: "ok"`, `reports.restPrefix: "/v2"`, and TypeSafe readiness `"ready"` when the required key is present. Readiness is a local configuration check, not a prediction-quality measurement.
 
-Continue with [a real prompt check](#check-a-prompt). Press **Ctrl+C** in the server terminal to stop a manual server. This command does not install a background service; Bryan's existing automatic startup is documented separately in the [runbook](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/local-server.md).
+Continue with [a real prompt check](#check-a-prompt). Press **Ctrl+C** in the server terminal to stop a manual server. This command does not install a background service; Bryan's existing automatic startup is documented separately in the [runbook](docs/operations/local-server.md).
 
 The default binding is local to this computer. Keep Mapbox or other applications on their existing ports. If 3001 is occupied, choose a free `PORT` in `.env` and use it in every API URL.
 
@@ -259,9 +259,9 @@ TypeSafe task modes and the reasoning model are separate settings. To switch con
 3. Change `roles.semantic.primary` to `claude-semantic` or `openai-reasoning`. Leave the other roles unchanged unless you also want to switch them.
 4. Restart the API and reconnect MCP, then make a real scan and check its provider/model attribution.
 
-The supplied profiles are declared in that file. A key must have access to the chosen model; an adapter's existence alone does not establish account access. Drafting, Taster and Monitor are independently selectable. See [model selection](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/ai-models.md) for profiles, bounded access probes and adding models.
+The supplied profiles are declared in that file. A key must have access to the chosen model; an adapter's existence alone does not establish account access. Drafting, Taster and Monitor are independently selectable. See [model selection](docs/operations/ai-models.md) for profiles, bounded access probes and adding models.
 
-The active configuration uses TypeSafe in decisions now. Formal held-out qualification is a separate optional assurance process, described in [TypeSafe operations](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/typesafe-rollout.md).
+The active configuration uses TypeSafe in decisions now. Formal held-out qualification is a separate optional assurance process, described in [TypeSafe operations](docs/operations/typesafe-rollout.md).
 
 ## Update an existing installation
 
@@ -272,16 +272,16 @@ git status --short
 git branch --show-current
 ```
 
-For a clean checkout already on `codex/typesafe-model-routing`:
+For a clean checkout already on `main`:
 
 ```sh
-git pull --ff-only
+git pull --ff-only origin main
 npm ci
 npm run build
 npm run ai:config
 ```
 
-Keep your existing `.env`, keys and certificates. Restart the API and reconnect MCP after rebuilding. If you have local changes or an older checkout on another branch, use a separate clone for this upgrade and point the client/service at it.
+Keep your existing `.env`, keys and certificates. Restart the API and reconnect MCP after rebuilding. If you have local changes, preserve them before updating. For a clean checkout on the earlier `codex/typesafe-model-routing` branch, run `git fetch origin` and `git switch main`, then follow the commands above. A separate clone is also available when you need to keep an older installation intact.
 
 For older installations, set `AI_CONFIG_PATH=config/ai.active.json`, configure the TLS paths, change API clients to `https://localhost:3001/v2/...`, and remove `mcpDefaultReportVersion` from custom configuration. The launcher commands select HTTPS or MCP themselves; an old `START_MODE` entry does not override them.
 
@@ -293,7 +293,7 @@ For older installations, set `AI_CONFIG_PATH=config/ai.active.json`, configure t
 | `dist/scripts/startApi.js` or `startMcp.js` is missing | Run `npm ci` and `npm run build` in the correct checkout. |
 | API startup fails | Check the two TLS file paths, key/certificate pairing, port availability and `npm run ai:config`. Missing TLS never falls back to plaintext HTTP. |
 | Port 3001 is already in use | If it is your existing Prompt Rejector service, use that service. Otherwise select another free port; do not stop an unrelated application. |
-| Certificate is not trusted | Run `mkcert -install` on the client machine and use a certificate covering `localhost`. Some runtimes need an explicit CA file; see [client trust](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/local-server.md#client-certificate-trust). Keep verification enabled. |
+| Certificate is not trusted | Run `mkcert -install` on the client machine and use a certificate covering `localhost`. Some runtimes need an explicit CA file; see [client trust](docs/operations/local-server.md#client-certificate-trust). Keep verification enabled. |
 | `Cannot GET /v2/check-prompt` | Send a JSON **POST**. Use `GET /health` for a browser check. |
 | HTTP 410 / `api_version_retired` | Replace `/v1` with `/v2` and use the current response fields. |
 | `unavailable`, or missing/degraded credentials | Replace placeholder keys; check account access, quota and the selected model. A healthy listener does not guarantee working inference. |
@@ -326,7 +326,7 @@ For older installations, set `AI_CONFIG_PATH=config/ai.active.json`, configure t
 | POST | `/v2/patterns/verify` |
 | GET | `/health` |
 
-REST exposes the endpoints listed above; the other tools are available through MCP. The Taste-Tester is disabled until `TASTE_TESTER_ENABLED=true`. Optional provider/feed/canary settings are explained in [.env.example](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/.env.example) and the [feature reference](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/feature-reference.md).
+REST exposes the endpoints listed above; the other tools are available through MCP. The Taste-Tester is disabled until `TASTE_TESTER_ENABLED=true`. Optional provider/feed/canary settings are explained in [.env.example](.env.example) and the [feature reference](docs/feature-reference.md).
 
 ## Development and documentation
 
@@ -335,18 +335,18 @@ npm run lint
 npm run test:offline
 ```
 
-The guarded offline runner builds first, blocks unexpected network calls and needs no real API keys. It includes HTTPS/MCP startup tests; **OpenSSL** must be available for the temporary test certificates. The original 57-suite delivery is recorded in the [delivery ledger](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/implementation/typesafe-progress.md); the plugin upgrade adds authenticated remote MCP coverage plus separate package/install tests in [plugin verification](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugin-verification.md). These tests do not guarantee detection of every attack.
+The guarded offline runner builds first, blocks unexpected network calls and needs no real API keys. It includes HTTPS/MCP startup tests; **OpenSSL** must be available for the temporary test certificates. The original 57-suite delivery is recorded in the [delivery ledger](docs/implementation/typesafe-progress.md); the plugin upgrade adds authenticated remote MCP coverage plus separate package/install tests in [plugin verification](docs/plugin-verification.md). These tests do not guarantee detection of every attack.
 
-- [Plugin installation, bundles and standalone skill](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugins.md)
-- [Plugin architecture research](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugin-architecture.md)
-- [Remote MCP and web connectors](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/remote-mcp.md)
-- [Local service, HTTPS trust and restart runbook](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/local-server.md)
-- [Model selection and native adapters](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/ai-models.md)
-- [Language integration examples](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/integration-examples.md)
-- [Features, detection categories, feeds and architecture](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/feature-reference.md)
-- [Skill security guide](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/SKILLS_SECURITY.md)
-- [TypeSafe evaluation and rollout](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/operations/typesafe-rollout.md)
-- [Live HTTPS and MCP verification](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/evaluations/ai/runs/2026-09-20-single-api/README.md)
-- [Contributing](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/CONTRIBUTING.md) · [Changelog](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/CHANGELOG.md) · [ISC license](https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/LICENSE)
+- [Plugin installation, bundles and standalone skill](docs/plugins.md)
+- [Plugin architecture research](docs/plugin-architecture.md)
+- [Remote MCP and web connectors](docs/operations/remote-mcp.md)
+- [Local service, HTTPS trust and restart runbook](docs/operations/local-server.md)
+- [Model selection and native adapters](docs/operations/ai-models.md)
+- [Language integration examples](docs/integration-examples.md)
+- [Features, detection categories, feeds and architecture](docs/feature-reference.md)
+- [Skill security guide](SKILLS_SECURITY.md)
+- [TypeSafe evaluation and rollout](docs/operations/typesafe-rollout.md)
+- [Live HTTPS and MCP verification](evaluations/ai/runs/2026-09-20-single-api/README.md)
+- [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [ISC license](LICENSE)
 
 Prompt Rejector is one security layer. Combine screening with restricted tool permissions, sandboxing and application-level controls; a model verdict is not a guarantee that an input or action is safe.
