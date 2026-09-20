@@ -7,6 +7,9 @@ import { completedCheck, semanticCoverage } from "./AnalysisCoverage.js";
 import { decide, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
 import { promptAnalysisReportSchema, type PromptAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
 import { promptInputSchema } from "../ai/schemas.js";
+import { JudgmentService } from "./JudgmentService.js";
+import { promptJudgmentRequest } from "../ai/rubrics/prompt.js";
+import { judgmentCoverage, judgmentRouting } from "../schemas/JudgmentReportSchemas.js";
 
 export interface SecurityReport {
     safe: boolean;
@@ -26,7 +29,7 @@ export class ReportVersionRequiredError extends Error {
 /** The v1 compatibility mapper and v2 policy share the same single analysis. */
 export class SecurityService {
     private readonly staticCheckService: StaticCheckService;
-    constructor(patternService?: PatternService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService()) {
+    constructor(patternService?: PatternService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService(), readonly judgmentService = new JudgmentService(semantic.snapshot)) {
         this.staticCheckService = new StaticCheckService(patternService);
     }
     get supportsV1(): boolean { return this.semantic.supportsV1; }
@@ -41,22 +44,25 @@ export class SecurityService {
             atlasTechniques: report.atlasTechniques, timestamp: report.timestamp };
     }
     async runSecurityScanV2(prompt: string, options: { signal?: AbortSignal } = {}): Promise<PromptAnalysisReport> {
-        return (await this.analyze(prompt, options.signal)).report;
+        return (await this.analyze(prompt, options.signal, true)).report;
     }
-    private async analyze(prompt: string, signal?: AbortSignal) {
+    private async analyze(prompt: string, signal?: AbortSignal, v2 = false) {
         promptInputSchema.parse({ prompt });
         const context = this.semantic.createContext("prompt", signal);
         const local = this.staticCheckService.check(prompt);
         const semantic = await this.semantic.analyze(prompt, "prompt", context);
         const coverage = [completedCheck("local", prompt.length), semanticCoverage(semantic, prompt.length)];
         const outcome = decide({ task: "prompt", coverage, semantic, localBlocking: blockingSeverity(local.severity) });
+        context.budget.authorizeShadow({ requiredWorkComplete: true });
+        const intent = v2 ? await this.judgmentService.evaluate("prompt", promptJudgmentRequest(prompt, "prompt", this.semantic.snapshot.config.typesafe.model), context, { completeSource: true }) : null;
+        if (intent) { coverage.push(judgmentCoverage("intent_judgment", intent, prompt.length, 1)); context.routing?.push(judgmentRouting(intent, this.semantic.snapshot.config.typesafe.model)); }
         const finding = semantic.status === "ok" ? semantic.value : null;
         const categories = [...new Set([...local.categories, ...(finding?.categories ?? [])])];
         const report = promptAnalysisReportSchema.parse({
             schemaVersion: 2, task: "prompt", ...outcome,
             overallSeverity: maximumSeverity(local.severity, finding?.severity ?? "low"), categories,
             findings: [...local.findings], atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? [])])],
-            timestamp: new Date().toISOString(), coverage, semantic, judgments: null,
+            timestamp: new Date().toISOString(), coverage, semantic, judgments: null, shadow: intent?.mode === "shadow" ? { intent, capability: null, modelReference: null, capabilityBuckets: null } : null,
             analysisMode: this.semantic.snapshot.config.typesafe.prompt, policyVersion: POLICY_VERSION, configHash: context.configHash,
             routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(), static: local,
         });

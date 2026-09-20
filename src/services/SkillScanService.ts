@@ -7,6 +7,11 @@ import { decide, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./Dec
 import { skillAnalysisReportSchema, type SkillAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
 import { skillInputSchema } from "../ai/schemas.js";
 import { withDeadline } from "../ai/transport.js";
+import { JudgmentService } from "./JudgmentService.js";
+import { promptJudgmentRequest } from "../ai/rubrics/prompt.js";
+import { judgmentCoverage, judgmentRouting } from "../schemas/JudgmentReportSchemas.js";
+import { CapabilityAnalysisService } from "./CapabilityAnalysisService.js";
+import { ModelReferenceService } from "./ModelReferenceService.js";
 import { StaticCheckService } from "./StaticCheckService.js";
 import type { PatternService, ActivePattern } from "./PatternService.js";
 import { TrifectaAnalyzer, type TrifectaResult } from "./TrifectaAnalyzer.js";
@@ -105,7 +110,7 @@ export class SkillScanService {
     private trifectaAnalyzer: TrifectaAnalyzer;
     private huggingFaceService: HuggingFaceService;
 
-    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService()) {
+    constructor(patternService?: PatternService, huggingFaceService?: HuggingFaceService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService(), readonly judgmentService = new JudgmentService(semantic.snapshot), readonly capabilityAnalysis = new CapabilityAnalysisService(judgmentService), readonly modelReferences = new ModelReferenceService(judgmentService)) {
         this.patternService = patternService ?? null;
         this.staticCheckService = new StaticCheckService(patternService);
         this.trifectaAnalyzer = new TrifectaAnalyzer();
@@ -123,15 +128,16 @@ export class SkillScanService {
     }
 
     async scanSkillV2(skillContent: string, options: { signal?: AbortSignal } = {}): Promise<SkillAnalysisReport> {
-        return (await this.analyze(skillContent, options.signal)).report;
+        return (await this.analyze(skillContent, options.signal, true)).report;
     }
 
-    private async analyze(skillContent: string, signal?: AbortSignal) {
+    private async analyze(skillContent: string, signal?: AbortSignal, v2 = false) {
         skillInputSchema.parse({ skillContent });
         const context = this.semantic.createContext("skill", signal);
         // Pass 8: extract HF model ids first (sync, cheap) so we can fan out
         // network requests in parallel with the LLM + static checks.
-        const allModelIds = this.huggingFaceService.extractModelIds(skillContent);
+        const references = this.modelReferences.extract(skillContent);
+        const allModelIds = references.baselineIds;
         const modelIds = allModelIds.slice(0, 16);
         let failedHfLookups = 0;
         const hfCheckPromise = modelIds.length === 0
@@ -253,13 +259,23 @@ export class SkillScanService {
         const localSeverity = maximumSeverity(staticResult.severity, skillSpecificResult.severity, hfSeverity, trifectaSeverityMapped);
         const outcome = decide({ task: "skill", coverage, semantic: semanticResult, needsReview: capabilityNeedsReview,
             localBlocking: blockingSeverity(localSeverity) || skillSpecificResult.hasDangerousToolUsage || skillSpecificResult.hasNetworkExfiltration || trifectaResult.trifectaPresent });
+        context.budget.authorizeShadow({ requiredWorkComplete: true });
+        const [intent, capabilityObservation, referenceObservation] = v2 ? await Promise.all([
+            this.judgmentService.evaluate("skill", promptJudgmentRequest(skillContent, "skill", this.semantic.snapshot.config.typesafe.model), context, { completeSource: true }),
+            this.capabilityAnalysis.observe({ skillContent }, context, { parentTask: "skill" }),
+            this.modelReferences.observe(skillContent, references, context, "skill"),
+        ]) : [null, null, null];
+        for (const [check, observation] of [["intent_judgment", intent], ["capability_judgment", capabilityObservation?.judgments], ["reference_judgment", referenceObservation?.judgments]] as const) {
+            if (observation) { coverage.push(judgmentCoverage(check, observation, skillContent.length, 1)); context.routing?.push(judgmentRouting(observation, this.semantic.snapshot.config.typesafe.model)); }
+        }
         const finding = semanticResult.status === "ok" ? semanticResult.value : null;
         const v2Categories = [...new Set([...staticResult.categories, ...skillSpecificResult.categories, ...(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["lethal_trifecta"] : [])])];
         const report = skillAnalysisReportSchema.parse({
             schemaVersion: 2, task: "skill", ...outcome, overallSeverity: maximumSeverity(localSeverity, finding?.severity ?? "low"),
             categories: v2Categories, findings: [...staticResult.findings, ...skillSpecificResult.findings, ...huggingFaceSecurityFlags.map((flag) => flag.note)],
             atlasTechniques: [...new Set([...staticResult.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? []), ...(trifectaResult.trifectaPresent ? ["AML.T0024", "AML.T0051"] : [])])],
-            timestamp: legacy.timestamp, coverage, semantic: semanticResult, judgments: null,
+            timestamp: legacy.timestamp, coverage, semantic: semanticResult, judgments: null, shadow: intent?.mode === "shadow" ? { intent, capability: capabilityObservation?.judgments ?? null, modelReference: referenceObservation?.judgments ?? null, capabilityBuckets: capabilityObservation?.judgments.mode === "shadow" ? capabilityObservation.buckets : null } : null,
+            modelReferences: { baselineIds: allModelIds, candidates: references.candidates, candidateCount: references.candidateCount, candidateOverflow: references.candidateOverflow, parserCorrections: references.parserCorrections, shadowAdditions: referenceObservation?.judgments?.mode === "shadow" ? referenceObservation.additions : [] },
             analysisMode: this.semantic.snapshot.config.typesafe.skill, policyVersion: POLICY_VERSION, configHash: context.configHash,
             routing: context.routing ?? [], timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(),
             static: staticResult, skillSpecific: skillSpecificResult, trifectaResult, hasLethalTrifecta: trifectaResult.trifectaPresent,

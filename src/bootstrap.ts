@@ -17,6 +17,11 @@ import { CanaryService } from "./services/CanaryService.js";
 import { McpToolScanner } from "./services/McpToolScanner.js";
 import { TasteTesterService } from "./services/TasteTesterService.js";
 import { UnifiedCveCache } from "./services/UnifiedCveCache.js";
+import { JudgmentService } from "./services/JudgmentService.js";
+import { DescriptorAnalysisService } from "./services/DescriptorAnalysisService.js";
+import { CapabilityAnalysisService } from "./services/CapabilityAnalysisService.js";
+import { ModelReferenceService } from "./services/ModelReferenceService.js";
+import { tokenPrices } from "./ai/pricing.js";
 
 export interface ServiceDependencies {
     env?: NodeJS.ProcessEnv;
@@ -26,6 +31,7 @@ export interface ServiceDependencies {
     patternService?: PatternService;
     huggingFaceService?: HuggingFaceService;
     tasteTesterService?: TasteTesterService;
+    judgmentService?: JudgmentService;
 }
 /** One process graph, constructed only after dotenv. Importing this module
  * performs neither service construction nor provider/account discovery. */
@@ -36,8 +42,11 @@ export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: 
     const semantic = deps.semantic ?? new SemanticAnalysisService(snapshot, registry);
     const patternService = deps.patternService ?? new PatternService();
     const huggingFaceService = deps.huggingFaceService ?? new HuggingFaceService({ token: env.HF_TOKEN });
-    const securityService = new SecurityService(patternService, semantic);
-    const skillScanService = new SkillScanService(patternService, huggingFaceService, semantic);
+    const judgmentService = deps.judgmentService ?? new JudgmentService(snapshot, { apiKey: env.TYPESAFE_API_KEY, fetch: deps.fetch, prices: tokenPrices(snapshot.pricing, "typesafe", snapshot.config.typesafe.model) });
+    const capabilityAnalysis = new CapabilityAnalysisService(judgmentService);
+    const modelReferenceService = new ModelReferenceService(judgmentService);
+    const securityService = new SecurityService(patternService, semantic, judgmentService);
+    const skillScanService = new SkillScanService(patternService, huggingFaceService, semantic, judgmentService, capabilityAnalysis, modelReferenceService);
     const atlasService = new AtlasService();
     const osvFeedService = new OsvFeedService();
     const ghsaGraphQLService = new GhsaGraphQLService();
@@ -47,11 +56,12 @@ export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: 
     const trifectaAnalyzer = new TrifectaAnalyzer();
     const canaryService = new CanaryService();
     const mcpToolScanner = new McpToolScanner(patternService);
+    const descriptorAnalysis = new DescriptorAnalysisService(mcpToolScanner, judgmentService);
     const tasterProfile = snapshot.config.profiles[snapshot.config.roles.taster.primary];
     const tasteTesterService = deps.tasteTesterService ?? new TasteTesterService({ monitor: semantic, model: tasterProfile.model, apiKey: env.ANTHROPIC_API_KEY ?? "", enabled: env.TASTE_TESTER_ENABLED === "true" });
     const unifiedCveCache = new UnifiedCveCache(vulnFeedService, atlasService, kevFeedService);
     return { snapshot, registry, semantic, configuredProviders, patternService, securityService, skillScanService, huggingFaceService,
         atlasService, osvFeedService, ghsaGraphQLService, kevFeedService, geminiService, vulnFeedService,
-        trifectaAnalyzer, canaryService, mcpToolScanner, tasteTesterService, unifiedCveCache };
+        trifectaAnalyzer, canaryService, mcpToolScanner, tasteTesterService, unifiedCveCache, judgmentService, descriptorAnalysis, capabilityAnalysis, modelReferenceService };
 }
 export type Services = ReturnType<typeof createServices>;

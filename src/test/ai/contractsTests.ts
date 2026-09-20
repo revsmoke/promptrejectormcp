@@ -40,19 +40,17 @@ const noKey = new GeminiService(new (await import("../../services/SemanticAnalys
 ));
 assert.equal((await noKey.checkPrompt("hello")).failureCode, "not_configured");
 class FailedHF extends HuggingFaceService {
-    override extractModelIds() { return ["owner/model"]; }
     override async checkModel(): Promise<never> { throw new Error("sensitive provider detail"); }
 }
-const missingHf = await new SkillScanService(undefined, new FailedHF(), fixtureSemantic()).scanSkillV2("Analyze a spreadsheet.");
+const missingHf = await new SkillScanService(undefined, new FailedHF(), fixtureSemantic()).scanSkillV2('Load model from_pretrained("owner/model").');
 assert.equal(missingHf.decision, "unavailable");
 assert.equal(missingHf.coverage.find((check) => check.check === "hugging_face")?.status, "partial");
 class OverflowHF extends HuggingFaceService {
     calls = 0;
-    override extractModelIds() { return Array.from({ length: 17 }, (_, index) => `owner/model${index}`); }
     override async checkModel(modelId: string) { this.calls++; return { modelId, fetchedAt: new Date().toISOString(), flags: [], severity: "safe" as const }; }
 }
 const overflowHf = new OverflowHF();
-const overflow = await new SkillScanService(undefined, overflowHf, fixtureSemantic()).scanSkillV2("Analyze a spreadsheet.");
+const overflow = await new SkillScanService(undefined, overflowHf, fixtureSemantic()).scanSkillV2(Array.from({ length: 17 }, (_, index) => `https://huggingface.co/owner/model${index}`).join("\n"));
 assert.equal(overflow.safe, false);
 assert.equal(overflow.coverage.find((check) => check.check === "hugging_face")?.reason, "reference_limit");
 assert.equal(overflowHf.calls, 16);

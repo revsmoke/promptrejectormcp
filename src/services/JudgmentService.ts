@@ -56,7 +56,10 @@ export class JudgmentService {
         try {
             const cached = await this.cache.run(key, { deadlineMs: call.deadlineMs, signal: call.signal, onJoin: (shared, disposition) => { operation = shared; observation.cache = disposition; } }, async (signal, deadlineMs) => {
                 const estimatedUsd = reserveCost(Buffer.byteLength(JSON.stringify({ model: request.model, state: request.state, questions: request.questions })), 0, this.prices);
-                const envelope = context.budget.reserveSharedCall(this.snapshot.config.limits, { deadlineMs, estimatedUsd, optional: call.optional });
+                // Skill shadow schedules three independent batches. Hold one
+                // slot for this child so a speculative retry cannot starve a
+                // sibling before that sibling has made its first attempt.
+                const envelope = context.budget.reserveSharedCall(this.snapshot.config.limits, { deadlineMs, estimatedUsd, optional: call.optional, maxAttempts: options.parentTask === "skill" && call.optional ? 1 : 2 });
                 if (!envelope.ok) return failed(envelope.code);
                 try { return await invoke({ ...call, signal, deadlineMs, budget: envelope.budget }); }
                 finally { envelope.release(); }

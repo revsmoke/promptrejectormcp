@@ -1,5 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
@@ -22,6 +23,7 @@ import { UnifiedCveCache, type QueryCveFilters } from "../services/UnifiedCveCac
 import { createServices, type Services } from "../bootstrap.js";
 import { handleMcpScan } from "../api/reportSerializers.js";
 import { roleProfiles } from "../ai/config.js";
+import { handleMcpJudgment } from "../api/judgmentSerializers.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../../package.json");
@@ -161,6 +163,7 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
+                                reportVersion: { type: "integer", enum: [1, 2], default: 1 },
                                 tool: {
                                     type: "object",
                                     description: "MCP tool descriptor (name, description, inputSchema).",
@@ -179,6 +182,7 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
+                                reportVersion: { type: "integer", enum: [1, 2], default: 1 },
                                 capabilities: {
                                     type: "array",
                                     items: { type: "string" },
@@ -256,12 +260,13 @@ export class PromptRejectorMCPServer {
             const { name, arguments: args } = request.params;
 
             if (name === "check_prompt" || name === "scan_skill") return handleMcpScan(this.services, name, args, extra.signal);
+            if (name === "scan_mcp_tool" || name === "check_lethal_trifecta") return handleMcpJudgment(this.services, name, args, extra.signal);
             if (name === "taste_test" && [...roleProfiles(this.services.snapshot, "taster"), ...roleProfiles(this.services.snapshot, "monitor")].some((profile) => profile.provider !== "anthropic")) {
                 return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "report_version_required", reportVersion: 2 }) }] };
             }
             // Reserve version validation for later slices without claiming
             // descriptor/capability/Taster v2 behavior before it is implemented.
-            if (["scan_mcp_tool", "check_lethal_trifecta", "taste_test"].includes(name) && args?.reportVersion !== undefined && args.reportVersion !== 1) {
+            if (name === "taste_test" && args?.reportVersion !== undefined && args.reportVersion !== 1) {
                 return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "unsupported_report_version" }) }] };
             }
 
@@ -303,52 +308,6 @@ export class PromptRejectorMCPServer {
                             text: JSON.stringify(result, null, 2),
                         },
                     ],
-                };
-            }
-
-            if (name === "scan_mcp_tool") {
-                const a = (args || {}) as { tool?: unknown; priorHash?: unknown };
-                // tool must be a non-null object (not array, not null, not primitive)
-                if (!a.tool || typeof a.tool !== "object" || Array.isArray(a.tool)) {
-                    return validationError("tool is required and must be a non-null object");
-                }
-                if (a.priorHash !== undefined && typeof a.priorHash !== "string") {
-                    return validationError("priorHash must be a string if provided");
-                }
-                const result = this.mcpToolScanner.scan({ tool: a.tool as object, priorHash: a.priorHash as string | undefined });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-                };
-            }
-
-            if (name === "check_lethal_trifecta") {
-                const a = (args || {}) as { capabilities?: unknown; tools?: unknown; skillContent?: unknown };
-                // At least one of capabilities/tools/skillContent must be present.
-                if (a.capabilities === undefined && a.tools === undefined && a.skillContent === undefined) {
-                    return validationError("at least one of capabilities, tools, or skillContent is required");
-                }
-                if (a.capabilities !== undefined) {
-                    if (!Array.isArray(a.capabilities) || !a.capabilities.every((c) => typeof c === "string")) {
-                        return validationError("capabilities must be an array of strings if provided");
-                    }
-                }
-                if (a.tools !== undefined) {
-                    if (!Array.isArray(a.tools) || !a.tools.every((t) => typeof t === "string")) {
-                        return validationError("tools must be an array of strings if provided");
-                    }
-                }
-                if (a.skillContent !== undefined) {
-                    if (typeof a.skillContent !== "string" || a.skillContent.length > 500_000) {
-                        return validationError("skillContent must be a string of at most 500,000 characters if provided");
-                    }
-                }
-                const result = this.trifectaAnalyzer.analyze({
-                    capabilities: a.capabilities as string[] | undefined,
-                    tools: a.tools as string[] | undefined,
-                    skillContent: a.skillContent as string | undefined,
-                });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
                 };
             }
 
@@ -459,9 +418,10 @@ export class PromptRejectorMCPServer {
         });
     }
 
+    async connect(transport: Transport) { await this.server.connect(transport); }
     async run() {
         const transport = new StdioServerTransport();
-        await this.server.connect(transport);
+        await this.connect(transport);
         console.error("[MCP] PromptRejector MCP server running on stdio");
     }
 }
