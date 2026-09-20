@@ -57,11 +57,12 @@ function codeFiles(relative: string): Array<{ path: string; content: string }> {
     return [{ path: relative.replace(/\.(ts|js)$/, ""), content: readFileSync(location, "utf8") }];
 }
 function sourceDigest(paths: readonly string[]): string { return hashConfiguration(paths.flatMap((path) => codeFiles(path))); }
-export function validateResolutions(snapshot: ConfigSnapshot, now: number): void {
+export function validateResolutions(snapshot: ConfigSnapshot, now: number, requireAll = true): void {
     const setting = snapshot.config.roles.semantic;
     for (const name of [setting.primary, setting.fallback].filter((name): name is string => !!name)) {
         const profile = snapshot.config.profiles[name];
         const resolution = snapshot.config.modelResolutions?.[name];
+        if (!resolution && !requireAll) continue;
         if (!resolution || resolution.configuredModel !== profile.model) throw new Error("Qualification manifest requires an explicit model resolution policy");
         if (resolution.kind === "pinned") {
             if (resolution.resolvedModel !== profile.model || /(?:latest|preview|alias)/i.test(profile.model)) throw new Error("Qualification manifest cannot treat a mutable model alias as pinned");
@@ -129,8 +130,14 @@ function validateEvidence(manifest: QualificationManifest, snapshot: ConfigSnaps
 export function qualifyConfiguration(snapshot: ConfigSnapshot, configDirectory = process.cwd(), patternService?: PatternService): QualificationState {
     const enabled = QUALIFICATION_TASKS.filter((name) => ["enforce", "cascade"].includes(snapshot.config.typesafe[name]));
     if (!enabled.length) return Object.freeze({ tasks: Object.freeze({}) });
-    if (!snapshot.config.evaluationFile) throw new Error("Enforced TypeSafe routes require a matching qualification manifest");
     if (snapshot.config.typesafe.model !== "jev-1.13.0") throw new Error("Qualification manifest requires pinned TypeSafe jev-1.13.0");
+    if (optionalQualification(snapshot)) {
+        // Trusted activation is explicit. It is not passing qualification
+        // evidence, and any supplied model-identity policy still applies.
+        validateResolutions(snapshot, Date.now(), false);
+        return Object.freeze({ tasks: Object.freeze({}) });
+    }
+    if (!snapshot.config.evaluationFile) throw new Error("Enforced TypeSafe routes require a matching qualification manifest");
     const now = Date.now();
     validateResolutions(snapshot, now);
     const semantic = snapshot.config.roles.semantic;
@@ -164,19 +171,37 @@ export function assertServingSnapshot(snapshot: ConfigSnapshot, patternService?:
     if (hashConfiguration(current) !== hashConfiguration(snapshot.qualification ?? { tasks: {} })) throw new Error("Serving configuration qualification state changed");
 }
 
-/** Enforced calls must return the exact qualified identity. A successful native
- * response with a missing or drifted identity is unavailable, never benign. */
+/** A supplied evidence file always selects strict validation, even when the
+ * operator otherwise permits activation without qualification evidence. */
+export function optionalQualification(snapshot: ConfigSnapshot): boolean {
+    return snapshot.config.qualificationPolicy === "optional" && !snapshot.config.evaluationFile;
+}
+export function qualificationStatus(snapshot: ConfigSnapshot): "not_requested" | "unqualified" | "qualified" | "expired" | "unavailable" | "evaluation_only" {
+    if (snapshot.evaluationOnly) return "evaluation_only";
+    const enabled = QUALIFICATION_TASKS.filter((task) => ["enforce", "cascade"].includes(snapshot.config.typesafe[task]));
+    if (!enabled.length) return "not_requested";
+    if (optionalQualification(snapshot)) return "unqualified";
+    if (enabled.some((task) => !snapshot.qualification?.tasks[task])) return "unavailable";
+    return enabled.some((task) => Date.parse(snapshot.qualification!.tasks[task]!.expiresAt) <= Date.now()) ? "expired" : "qualified";
+}
+
+/** Enforced calls require configured route attribution and a native identity.
+ * Supplied qualification/resolution evidence additionally pins that identity;
+ * optional activation never fabricates such evidence for an unresolved alias. */
 export function validateResolvedModel(snapshot: ConfigSnapshot, selected: QualificationTask, provider: "anthropic" | "openai" | "gemini" | "typesafe", requestedModel: string, resolvedModel: string | null): boolean {
     if (!["enforce", "cascade"].includes(snapshot.config.typesafe[selected])) return true;
-    if (!resolvedModel) return false;
-    if (!snapshot.evaluationOnly && (!snapshot.qualification?.tasks[selected] || Date.parse(snapshot.qualification.tasks[selected]!.expiresAt) <= Date.now())) return false;
+    if (!resolvedModel?.trim()) return false;
+    const unqualified = !snapshot.evaluationOnly && optionalQualification(snapshot);
+    if (!unqualified && !snapshot.evaluationOnly && (!snapshot.qualification?.tasks[selected] || Date.parse(snapshot.qualification.tasks[selected]!.expiresAt) <= Date.now())) return false;
     if (provider === "typesafe") return requestedModel === "jev-1.13.0" && resolvedModel === requestedModel;
     const role = snapshot.config.roles.semantic;
     return [role.primary, role.fallback].some((name) => {
         if (!name) return false;
         const profile = snapshot.config.profiles[name];
         const resolution = snapshot.config.modelResolutions?.[name];
-        if (!resolution || profile.provider !== provider || profile.model !== requestedModel || resolution.resolvedModel !== resolvedModel) return false;
+        if (profile.provider !== provider || profile.model !== requestedModel) return false;
+        if (!resolution) return unqualified;
+        if (resolution.configuredModel !== requestedModel || resolution.resolvedModel !== resolvedModel) return false;
         return resolution.kind === "pinned" || Date.parse(resolution.expiresAt) > Date.now();
     });
 }
@@ -186,6 +211,7 @@ export function validateResolvedModel(snapshot: ConfigSnapshot, selected: Qualif
  * qualified allow; they must report unavailable/review coverage. */
 export function validateQualifiedPatterns(snapshot: ConfigSnapshot, selected: QualificationTask, patternService: PatternService): boolean {
     if (!["enforce", "cascade"].includes(snapshot.config.typesafe[selected])) return true;
+    if (!snapshot.evaluationOnly && optionalQualification(snapshot)) return true;
     const qualification = snapshot.qualification?.tasks[selected];
     const expected = snapshot.evaluationOnly ? snapshot.evaluationPatternsSha256 : qualification?.patternsSha256;
     if (!expected || (!snapshot.evaluationOnly && (!qualification || Date.parse(qualification.expiresAt) <= Date.now()))) return false;

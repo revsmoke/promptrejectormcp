@@ -89,7 +89,7 @@ export class CapabilityAnalysisService {
             // assertion of absence from the low Noul values.
             if (!derived.review) coverage[1] = { ...coverage[1], required: false, reason: "capability_states_resolved" };
             coverage.push({ ...completedCheck("capability", serialized.length, "declared"), status: derived.complete ? "complete" : "partial", reason: derived.complete ? "explicit_scope" : "unknown_scope" });
-            coverage.push(qualificationCoverage(before && qualified()));
+            coverage.push(qualificationCoverage(before && qualified(), this.judgments.snapshot));
         }
         const localPresent = buckets.filter((bucket) => local[bucket].present).length;
         const unavailable = semantic?.status === "unavailable" && !["refusal", "incomplete"].includes(semantic.code);

@@ -55,7 +55,7 @@ export class DescriptorAnalysisService {
                 coverage[1] = { ...coverage[1], required: false, reason: "contextual_reasoning_requested" };
             }
             contextualReview = high && !addedBlock;
-            coverage.push(qualificationCoverage(qualifiedBefore && qualified()));
+            coverage.push(qualificationCoverage(qualifiedBefore && qualified(), this.judgments.snapshot));
         }
         const contextWithoutEvidence = semantic?.status === "ok" && semantic.value.evidenceIds.length === 0 &&
             (semantic.value.verdict === "malicious" || blockingSeverity(semantic.value.severity) || semantic.value.isInjection);

@@ -15,8 +15,8 @@ export async function handleMcpScan(services: Services, name: "check_prompt" | "
     if (!parsed.success) return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ error: isSizeError(parsed.error) ? "input_too_large" : "invalid_input" }) }] };
     try {
         const input = parsed.data;
-        const report = "prompt" in input ? await scanPromptReport(services, input.prompt, input.reportVersion ?? 1, signal)
-            : await scanSkillReport(services, input.skillContent, input.reportVersion ?? 1, signal);
+        const report = "prompt" in input ? await scanPromptReport(services, input.prompt, input.reportVersion ?? services.snapshot.config.mcpDefaultReportVersion, signal)
+            : await scanSkillReport(services, input.skillContent, input.reportVersion ?? services.snapshot.config.mcpDefaultReportVersion, signal);
         return { content: [{ type: "text" as const, text: JSON.stringify(report) }] };
     } catch (error) {
         const code = error instanceof ReportVersionRequiredError ? error.code : "internal_error";

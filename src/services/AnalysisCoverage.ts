@@ -1,4 +1,6 @@
 import type { CallResult, ProviderId } from "../ai/contracts.js";
+import type { ConfigSnapshot } from "../ai/config.js";
+import { optionalQualification } from "../ai/qualification.js";
 
 export interface CoverageEntry {
     check: string;
@@ -26,7 +28,8 @@ export function semanticCoverage(result: CallResult<unknown>, characters: number
 export function skippedCheck(check: string, reason: string): CoverageEntry {
     return { ...completedCheck(check, 0, "full_input"), status: "not_requested", reason, inspectedFields: 0 };
 }
-export function qualificationCoverage(valid: boolean): CoverageEntry {
+export function qualificationCoverage(valid: boolean, snapshot?: ConfigSnapshot): CoverageEntry {
+    if (snapshot && !snapshot.evaluationOnly && optionalQualification(snapshot)) return { ...completedCheck("qualification", 0), required: false, status: "not_requested", reason: "qualification_optional_not_supplied", inspectedFields: 0 };
     return { ...completedCheck("qualification", 0), status: valid ? "complete" : "unavailable", reason: valid ? null : "qualification_changed", inspectedFields: 0 };
 }
 export class AnalysisCoverage {

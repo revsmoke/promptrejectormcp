@@ -1,3 +1,4 @@
+import { qualificationStatus } from "../ai/qualification.js";
 import express from "express";
 import cors from "cors";
 import { createRequire } from "module";
@@ -126,6 +127,7 @@ export function createApiApp(services: Services) {
         const enabled = Object.values(modes).some((mode) => mode !== "off");
         res.json({ status: "ok", version, configHash: services.snapshot.hash, roles,
             typesafe: { model, modes, configured: services.configuredProviders.typesafe, readiness: !enabled ? "disabled" : services.configuredProviders.typesafe ? "ready" : "degraded" },
+            qualificationPolicy: services.snapshot.config.qualificationPolicy, qualificationStatus: qualificationStatus(services.snapshot), mcpDefaultReportVersion: services.snapshot.config.mcpDefaultReportVersion,
             qualification: services.snapshot.qualification ?? { tasks: {} }, readinessMeaning: "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
             reports: { prompt: [1, 2], skill: [1, 2], enforcementScope: "v2_only", legacyDescriptorCapability: "local_only", legacySemanticCompatible: services.semantic.supportsV1, legacyTasterCompatible: services.tasteTesterService.supportsV1 } });
     });

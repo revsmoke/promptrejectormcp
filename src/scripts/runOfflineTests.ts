@@ -63,6 +63,8 @@ export const OFFLINE_SUITES: readonly OfflineSuite[] = [
     { file: "ai/enforcementTests.js" },
     { file: "ai/cascadeTests.js" },
     { file: "ai/cascadeTransportTests.js", allowLoopback: true },
+    { file: "ai/activationTests.js", allowLoopback: true },
+    { file: "ai/mcpLauncherTests.js" },
 ];
 
 export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {

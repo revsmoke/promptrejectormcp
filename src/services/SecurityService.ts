@@ -76,7 +76,7 @@ export class SecurityService {
         if (!semantic) coverage.push(skippedCheck("semantic", localBlock || decisiveIntent(intent) ? "conclusive_block" : "qualification_changed"));
         if (!intent) coverage.push(skippedCheck("intent_judgment", localBlock ? "conclusive_block" : "qualification_changed"));
         const current = before && qualified();
-        coverage.push(qualificationCoverage(current));
+        coverage.push(qualificationCoverage(current, snapshot));
         const hazardBlock = current && decisiveIntent(intent);
         const outcome = !current && !localBlock ? { decision: "unavailable" as const, safe: false }
             : decide({ task: "prompt", mode, coverage, semantic: semantic ?? undefined, localBlocking: localBlock || hazardBlock });
@@ -84,7 +84,7 @@ export class SecurityService {
         return promptAnalysisReportSchema.parse({ schemaVersion: 2, task: "prompt", ...outcome,
             overallSeverity: maximumSeverity(local.severity, finding?.severity ?? "low", hazardBlock ? "high" : "low"),
             categories: [...new Set([...local.categories, ...finding?.categories ?? [], ...(hazardBlock ? ["prompt_injection"] : [])])],
-            findings: [...local.findings, ...(hazardBlock ? ["Qualified operative override or private-data disclosure signal."] : [])],
+            findings: [...local.findings, ...(hazardBlock ? ["Operative override or private-data disclosure signal."] : [])],
             atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? [])])],
             timestamp: new Date().toISOString(), coverage, semantic, judgments: { intent, capability: null, modelReference: null, capabilityBuckets: null }, shadow: null,
             analysisMode: mode, policyVersion: POLICY_VERSION, configHash: context.configHash, routing: context.routing ?? [],

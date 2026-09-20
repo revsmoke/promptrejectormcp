@@ -27,6 +27,8 @@ export const aiConfigSchema = z.strictObject({
     roles: z.strictObject({ semantic: roleSchema, patternDraft: roleSchema, taster: roleSchema, monitor: roleSchema }),
     typesafe: z.strictObject({ model: z.string().min(1), descriptor: mode, prompt: cascadeMode, skill: cascadeMode, capability: mode, modelReference: mode }),
     limits: limitsSchema,
+    qualificationPolicy: z.enum(["required", "optional"]).default("required"),
+    mcpDefaultReportVersion: z.union([z.literal(1), z.literal(2)]).default(1),
     modelResolutions: z.record(z.string().min(1), modelResolutionSchema).optional(),
     capabilitiesFile: z.string().min(1).optional(), pricingFile: z.string().min(1).optional(), evaluationFile: z.string().min(1).optional(),
 });

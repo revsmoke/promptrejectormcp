@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "qualificationPolicy": "optional",
+  "mcpDefaultReportVersion": 2,
+  "capabilitiesFile": "model-capabilities.json",
+  "pricingFile": "ai-pricing.example.json",
+  "profiles": {
+    "gemini-compat": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "maxOutputTokens": 2048
+    }
+  },
+  "roles": {
+    "semantic": { "primary": "gemini-compat" },
+    "patternDraft": { "primary": "gemini-compat" },
+    "taster": { "primary": "gemini-compat" },
+    "monitor": { "primary": "gemini-compat" }
+  },
+  "typesafe": {
+    "model": "jev-1.13.0",
+    "descriptor": "enforce",
+    "prompt": "cascade",
+    "skill": "cascade",
+    "capability": "enforce",
+    "modelReference": "enforce"
+  },
+  "limits": {}
+}

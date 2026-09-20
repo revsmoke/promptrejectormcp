@@ -50,6 +50,9 @@ try {
     assert.equal(parseAIConfig(configured, false, { pricing }).qualification?.tasks.descriptor?.operational, "pending");
     save(passing);
     const production = parseAIConfig(configured, false, { pricing });
+    const optionalWithEvidence = parseAIConfig({ ...configured, qualificationPolicy: "optional" }, false, { pricing });
+    assert.deepEqual(optionalWithEvidence.qualification, production.qualification, "supplied evidence remains strict under optional policy");
+    assert.equal(validateResolvedModel(optionalWithEvidence, "descriptor", "gemini", "gemini-3-flash-preview", "changed-model"), false);
     assert.equal(production.evaluationOnly, false);
     assert.equal(production.qualification?.tasks.descriptor?.operational, "passed");
     assert.doesNotThrow(() => assertServingSnapshot(production));
@@ -64,7 +67,7 @@ try {
     const relative = { ...configured, evaluationFile: "manifest.json" };
     const relativeSnapshot = parseAIConfig(relative, false, { pricing, configDirectory: dir });
     assert.doesNotThrow(() => assertServingSnapshot(relativeSnapshot));
-    const reject = (change: (value: ReturnType<typeof manifest>) => void) => { const value = structuredClone(passing); change(value); save(value); assert.throws(() => parseAIConfig(configured, false, { pricing })); };
+    const reject = (change: (value: ReturnType<typeof manifest>) => void) => { const value = structuredClone(passing); change(value); save(value); assert.throws(() => parseAIConfig(configured, false, { pricing })); assert.throws(() => parseAIConfig({ ...configured, qualificationPolicy: "optional" }, false, { pricing })); };
     reject((value) => { value.status = "failed"; });
     reject((value) => { value.review.reviewedAt = iso(-1); });
     reject((value) => { value.resultApproval = { reviewedAt: iso(-100000), reviewer: "result-reviewer", approved: true, resultsSha256: hashConfiguration(value.metrics) }; });

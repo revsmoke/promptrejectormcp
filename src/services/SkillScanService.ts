@@ -225,7 +225,7 @@ export class SkillScanService {
         coverage.push(conclusiveSkip || !before ? skippedCheck("hugging_face", skippedReason) : { ...completedCheck("hugging_face", skillContent.length, "external"), inspectedFields: hfReports.length,
             status: hfComplete ? "complete" : "partial", reason: lookupIds.length > 16 ? "reference_limit" : !referenceComplete ? references.candidateOverflow ? "candidate_limit" : "unresolved_references" : failedLookups ? "lookup_failed" : null });
         const current = before && qualified();
-        coverage.push(qualificationCoverage(current));
+        coverage.push(qualificationCoverage(current, snapshot));
         const flags = hfReports.flatMap((report) => report.flags);
         const hfSeverity = maximumSeverity(...hfReports.map((report) => report.severity === "safe" ? "low" : report.severity));
         const hazardBlock = current && decisiveIntent(intent);
@@ -240,7 +240,7 @@ export class SkillScanService {
         return skillAnalysisReportSchema.parse({ schemaVersion: 2, task: "skill", ...outcome,
             overallSeverity: maximumSeverity(localSeverity, hfSeverity, finding?.severity ?? "low", hazardBlock ? "high" : "low", allTrifecta ? "critical" : "low"),
             categories: [...new Set([...local.categories, ...skillSpecific.categories, ...finding?.categories ?? [], ...(allTrifecta ? ["lethal_trifecta"] : []), ...(hazardBlock ? ["prompt_injection"] : [])])],
-            findings: [...local.findings, ...skillSpecific.findings, ...flags.map((flag) => flag.note), ...(hazardBlock ? ["Qualified operative override or private-data disclosure signal."] : []), ...(capabilityBlock ? ["Three supported capability buckets form a lethal trifecta."] : [])],
+            findings: [...local.findings, ...skillSpecific.findings, ...flags.map((flag) => flag.note), ...(hazardBlock ? ["Operative override or private-data disclosure signal."] : []), ...(capabilityBlock ? ["Three supported capability buckets form a lethal trifecta."] : [])],
             atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? []), ...(allTrifecta ? ["AML.T0024", "AML.T0051"] : [])])],
             timestamp: new Date().toISOString(), coverage, semantic, judgments: { intent, capability: capabilityMode === "enforce" ? capability?.judgments ?? null : null, modelReference: referenceMode === "enforce" ? reference?.judgments ?? null : null, capabilityBuckets: capabilityStates },
             shadow: capabilityMode === "shadow" || referenceMode === "shadow" ? { intent: null, capability: capabilityMode === "shadow" ? capability?.judgments ?? null : null, modelReference: referenceMode === "shadow" ? reference?.judgments ?? null : null, capabilityBuckets: capabilityMode === "shadow" ? capability?.buckets ?? null : null } : null,
