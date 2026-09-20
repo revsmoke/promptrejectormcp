@@ -132,3 +132,27 @@ try {
     await new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done()));
 }
 console.log("PASS genuine serving activation, active TypeSafe verdicts, native clean fallback, MCP defaults/explicit v1, strict evidence and truthful metadata");
+import { ProviderRegistry } from "../../ai/registry.js";
+import { SemanticAnalysisService } from "../../services/SemanticAnalysisService.js";
+{
+    const routeConfig = parseAIConfig({ ...input,
+        profiles: { ...base.config.profiles, "legacy-gemini": { ...base.config.profiles["legacy-gemini"], options: { temperature: 0 } }, fallback: { ...base.config.profiles["legacy-gemini"], options: { temperature: 1 } } },
+        roles: { ...input.roles, semantic: { primary: "legacy-gemini", fallback: "fallback" } },
+        modelResolutions: { "legacy-gemini": { kind: "version_check", configuredModel: "gemini-3-flash-preview", resolvedModel: "gemini-fixture-version-1", checkedAt: new Date(Date.now() - 1000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), evidenceSha256: "a".repeat(64), method: "Synthetic primary route identity" } },
+    });
+    let calls = 0;
+    let failPrimary = false;
+    const registry = new ProviderRegistry(routeConfig, { env: { GEMINI_API_KEY: "fixture" }, fetch: async () => {
+        calls++;
+        if (failPrimary && calls === 1) return new Response("{}", { status: 401 });
+        return new Response(JSON.stringify({ modelVersion: "gemini-fixture-version-2", candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(benignFinding) }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 10 } }));
+    } });
+    const semantic = new SemanticAnalysisService(routeConfig, registry);
+    const changedPrimary = await semantic.analyze("An ordinary request.", "prompt", undefined, true);
+    assert.equal(changedPrimary.status === "unavailable" && changedPrimary.code, "unsupported", "a primary identity mismatch cannot borrow the same-model fallback's weaker policy");
+    assert.equal(calls, 1, "identity mismatches never trigger availability fallback");
+    calls = 0; failPrimary = true;
+    const genuineFallback = await semantic.analyze("An ordinary request.", "prompt", undefined, true);
+    assert.equal(genuineFallback.status, "ok", "an actual selected fallback follows its own explicit optional policy");
+    assert.equal(calls, 2);
+}

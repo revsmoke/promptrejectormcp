@@ -83,7 +83,8 @@ export class SemanticAnalysisService {
             if (index && result?.status === "unavailable" && !["not_configured", "authentication", "rate_limited", "timeout", "transport", "invalid_response", "context_limit"].includes(result.code)) break;
             context.routing?.push({ role, provider: profile.provider, model: profile.model, profileHash: profileHash(profile), status: "attempted", reason: index ? "configured_availability_fallback" : "primary" });
             result = await this.registry.generate({ ...request, profile, maxOutputTokens: Math.min(profile.maxOutputTokens, limits.maxOutputTokens ?? profile.maxOutputTokens) }, bounded);
-            if (result.status === "ok" && limits.qualificationTask && !validateResolvedModel(this.snapshot, limits.qualificationTask, result.meta.provider, result.meta.requestedModel, result.meta.resolvedModel)) {
+            const selectedProfile = index ? this.snapshot.config.roles[role].fallback : this.snapshot.config.roles[role].primary;
+            if (result.status === "ok" && limits.qualificationTask && !validateResolvedModel(this.snapshot, limits.qualificationTask, result.meta.provider, result.meta.requestedModel, result.meta.resolvedModel, selectedProfile)) {
                 // An identity change is not an availability event. Never send
                 // the same verdict through a different model to rescue it.
                 result = { status: "unavailable", code: "unsupported", meta: { ...result.meta, failureCode: "unsupported" } };

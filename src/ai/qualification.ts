@@ -188,22 +188,25 @@ export function qualificationStatus(snapshot: ConfigSnapshot): "not_requested" |
 /** Enforced calls require configured route attribution and a native identity.
  * Supplied qualification/resolution evidence additionally pins that identity;
  * optional activation never fabricates such evidence for an unresolved alias. */
-export function validateResolvedModel(snapshot: ConfigSnapshot, selected: QualificationTask, provider: "anthropic" | "openai" | "gemini" | "typesafe", requestedModel: string, resolvedModel: string | null): boolean {
+export function validateResolvedModel(snapshot: ConfigSnapshot, selected: QualificationTask, provider: "anthropic" | "openai" | "gemini" | "typesafe", requestedModel: string, resolvedModel: string | null, selectedProfile?: string): boolean {
     if (!["enforce", "cascade"].includes(snapshot.config.typesafe[selected])) return true;
     if (!resolvedModel?.trim()) return false;
     const unqualified = !snapshot.evaluationOnly && optionalQualification(snapshot);
     if (!unqualified && !snapshot.evaluationOnly && (!snapshot.qualification?.tasks[selected] || Date.parse(snapshot.qualification.tasks[selected]!.expiresAt) <= Date.now())) return false;
-    if (provider === "typesafe") return requestedModel === "jev-1.13.0" && resolvedModel === requestedModel;
+    if (provider === "typesafe") return !selectedProfile && requestedModel === "jev-1.13.0" && resolvedModel === requestedModel;
     const role = snapshot.config.roles.semantic;
-    return [role.primary, role.fallback].some((name) => {
-        if (!name) return false;
+    const routes = [role.primary, role.fallback].filter((name): name is string => !!name).filter((name) => {
         const profile = snapshot.config.profiles[name];
-        const resolution = snapshot.config.modelResolutions?.[name];
-        if (profile.provider !== provider || profile.model !== requestedModel) return false;
-        if (!resolution) return unqualified;
-        if (resolution.configuredModel !== requestedModel || resolution.resolvedModel !== resolvedModel) return false;
-        return resolution.kind === "pinned" || Date.parse(resolution.expiresAt) > Date.now();
+        return profile.provider === provider && profile.model === requestedModel && (!selectedProfile || name === selectedProfile);
     });
+    // Same-model profiles may have different options and identity policies.
+    // The actual selected route is authoritative; an ambiguous unattributed
+    // result cannot borrow a weaker fallback's resolution policy.
+    if (routes.length !== 1) return false;
+    const resolution = snapshot.config.modelResolutions?.[routes[0]];
+    if (!resolution) return unqualified;
+    if (resolution.configuredModel !== requestedModel || resolution.resolvedModel !== resolvedModel) return false;
+    return resolution.kind === "pinned" || Date.parse(resolution.expiresAt) > Date.now();
 }
 
 /** Check the exact in-process corpus before AND after asynchronous enforced
