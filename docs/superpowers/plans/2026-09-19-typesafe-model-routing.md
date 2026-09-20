@@ -26,7 +26,7 @@ The user explicitly requires an operational TypeSafe integration. The earlier he
 - [x] Register the local Codex MCP server and verify an actual native-client call without an explicit report version.
 - [x] Complete independent SPEC and quality review of the activation correction and launcher.
 - [x] Complete the final offline Node 18/22/24/26 matrix, build, lint and secret/diff checks.
-- [ ] Update operational documentation and evidence ledger, commit and push, and verify remote CI.
+- [x] Update operational documentation and evidence ledger, commit and push, and verify remote CI (`fba8418`, GitHub run `35485138123`, all four jobs passed).
 
 Live evidence: [activation run record](../../../evaluations/ai/runs/2026-09-19-active-mcp/README.md). Formal held-out qualification, other-provider account verification and npm publication remain separately identified work; they do not disable the working local integration.
 
