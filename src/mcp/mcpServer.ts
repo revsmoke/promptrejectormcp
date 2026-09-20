@@ -247,7 +247,12 @@ export class PromptRejectorMCPServer {
                             required: ["prompt"],
                         },
                     },
-                ],
+                ].map(tool => ({ ...tool, annotations: {
+                    readOnlyHint: !["update_vuln_feeds", "deploy_canary"].includes(tool.name),
+                    destructiveHint: false,
+                    idempotentHint: !["update_vuln_feeds", "deploy_canary", "taste_test"].includes(tool.name),
+                    openWorldHint: !["list_patterns", "verify_pattern_integrity", "query_cve", "deploy_canary", "verify_canary"].includes(tool.name),
+                } })),
             };
         });
 
@@ -386,6 +391,7 @@ export class PromptRejectorMCPServer {
     }
 
     async connect(transport: Transport) { await this.server.connect(transport); }
+    async close() { await this.server.close(); }
     async run() {
         const transport = new StdioServerTransport();
         await this.connect(transport);

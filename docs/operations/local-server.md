@@ -1,6 +1,6 @@
 # Running the HTTPS API and MCP together
 
-Prompt Rejector has one current analysis pipeline, available through two connections:
+Prompt Rejector has one current analysis pipeline, available locally through two connections:
 
 | Connection | Address or command | How it runs |
 | --- | --- | --- |
@@ -10,6 +10,8 @@ Prompt Rejector has one current analysis pipeline, available through two connect
 Both select `config/ai.active.json`, enabling TypeSafe Jev judgments and Gemini contextual reasoning. They can run simultaneously. The MCP connection uses the client's input/output pipes and does not need a network port or certificate. The REST connection uses HTTPS with a trusted local certificate. Port 3000 remains available to the existing Mapbox service.
 
 `/v2` is the sole current API prefix. The old `/v1/*` routes return HTTP 410 without running analysis. The number identifies the response format; it does not mean that two scanning versions remain available. All 11 MCP tool names remain, with no advertised version selector.
+
+Plugins package this same local MCP server; see [plugin installation](../plugins.md). Web clients can use a private OpenAI tunnel or an explicitly configured [remote MCP server](remote-mcp.md). The optional remote service is separate and does not change the local API address or the installed service described here.
 
 ## Use the running local installation
 

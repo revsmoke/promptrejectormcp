@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prompt Rejector"
+  short_description: "Set up and use Prompt Rejector security checks"
+  default_prompt: "Use $prompt-rejector to set up or run the requested security check."

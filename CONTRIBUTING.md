@@ -402,3 +402,7 @@ npm deprecate prompt-rejector@1.0.0 "Deprecated; please upgrade to 1.0.1"
 ---
 
 Thank you for helping make AI agents safer! 🛡️
+
+## Plugin packaging
+
+Use Node 24 for `npm run plugin:build`, then `npm run test:plugins`. The offline app suite (`npm run test:offline`) also covers remote MCP authentication. Maintain the shared skill in `plugins/prompt-rejector/skills/prompt-rejector/`; generated ZIP/MCPB files are build artifacts and must not be committed. Bump package, portable, Codex, Claude and Desktop manifest versions together when releasing an update. See [plugin architecture](docs/plugin-architecture.md), [package guide](docs/plugins.md), and [schema provenance](packaging/schemas/README.md). Never include private environment files, certificates, canary state or feed caches in a package.

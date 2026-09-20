@@ -1,0 +1,79 @@
+{
+  "manifest_version": "0.3",
+  "name": "prompt-rejector",
+  "display_name": "Prompt Rejector",
+  "version": "1.1.0",
+  "description": "Screen prompts, skills and MCP tools with TypeSafe judgments and configurable reasoning models.",
+  "author": {
+    "name": "Bryan Rice"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/revsmoke/promptrejectormcp"
+  },
+  "homepage": "https://github.com/revsmoke/promptrejectormcp",
+  "documentation": "https://github.com/revsmoke/promptrejectormcp/blob/codex/typesafe-model-routing/docs/plugins.md",
+  "license": "ISC",
+  "server": {
+    "type": "node",
+    "entry_point": "scripts/launch.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/scripts/launch.mjs"
+      ],
+      "env": {
+        "TYPESAFE_API_KEY": "${user_config.typesafe_api_key}",
+        "GEMINI_API_KEY": "${user_config.gemini_api_key}",
+        "ANTHROPIC_API_KEY": "${user_config.anthropic_api_key}",
+        "OPENAI_API_KEY": "${user_config.openai_api_key}",
+        "PROMPT_REJECTOR_AI_CONFIG": "${user_config.ai_config}",
+        "PROMPT_REJECTOR_BUNDLED_ONLY": "true"
+      }
+    }
+  },
+  "compatibility": {
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "tools_generated": true,
+  "user_config": {
+    "typesafe_api_key": {
+      "type": "string",
+      "title": "TypeSafe API key",
+      "description": "Required for the active TypeSafe judgments. Stored by the host as a secret.",
+      "sensitive": true,
+      "required": true
+    },
+    "gemini_api_key": {
+      "type": "string",
+      "title": "Gemini API key",
+      "description": "Required for the default reasoning model. Can be empty when a custom configuration uses another provider.",
+      "sensitive": true
+    },
+    "anthropic_api_key": {
+      "type": "string",
+      "title": "Anthropic API key (optional)",
+      "description": "Used only when your custom model configuration selects Anthropic.",
+      "sensitive": true
+    },
+    "openai_api_key": {
+      "type": "string",
+      "title": "OpenAI API key (optional)",
+      "description": "Used only when your custom model configuration selects OpenAI.",
+      "sensitive": true
+    },
+    "ai_config": {
+      "type": "file",
+      "title": "Custom AI configuration (optional)",
+      "description": "Select a configuration JSON to change providers/models. Leave empty to use the active TypeSafe and Gemini configuration."
+    }
+  },
+  "privacy_policies": [
+    "https://typesafe.ai/legal/privacy-policy",
+    "https://policies.google.com/privacy",
+    "https://www.anthropic.com/legal/privacy",
+    "https://openai.com/policies/privacy-policy/"
+  ]
+}

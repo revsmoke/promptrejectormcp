@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## Unreleased — installable plugins and remote MCP
+
+- Add a portable plugin with Codex and Claude Code compatibility manifests, repository marketplaces, and one provider-neutral setup/use skill.
+- Build complete local ZIP and Claude Desktop MCPB bundles, a standalone skill ZIP, checksums and CI download artifacts; exclude credentials and mutable state.
+- Add paths-only plugin setup and an MCP doctor with an optional live TypeSafe check.
+- Add a separate OAuth-protected Streamable HTTP MCP transport and remote plugin generator for hosted web connections; preserve the current HTTPS REST API and stdio behavior.
+- Add MCP tool safety annotations and regression tests for authentication, package relocation, credentials, cache-independent state and client startup.
+- Refresh compatible dependency lockfile patches; keep packaging-only interactive CLI dependencies out of delivered runtimes.
+
 ## [Unreleased]
 
 ### Added

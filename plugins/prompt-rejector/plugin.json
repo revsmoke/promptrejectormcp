@@ -1,0 +1,39 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "prompt-rejector",
+  "version": "1.1.0",
+  "description": "Screen prompts, skills and MCP tools with TypeSafe judgments and configurable reasoning models.",
+  "author": {
+    "name": "Bryan Rice"
+  },
+  "homepage": "https://github.com/revsmoke/promptrejectormcp",
+  "repository": "https://github.com/revsmoke/promptrejectormcp",
+  "license": "ISC",
+  "keywords": [
+    "security",
+    "mcp",
+    "prompt-injection",
+    "typesafe"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Prompt Rejector",
+        "shortDescription": "Check prompts, skills and tool descriptions.",
+        "longDescription": "Run Prompt Rejector locally, inspect untrusted text, and review security decisions using active TypeSafe judgments and configurable reasoning models. Scans send content to configured providers.",
+        "developerName": "Bryan Rice",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://github.com/revsmoke/promptrejectormcp",
+        "defaultPrompt": [
+          "Use Prompt Rejector to check this prompt.",
+          "Set up Prompt Rejector and verify its MCP tools.",
+          "Scan this SKILL.md with Prompt Rejector."
+        ]
+      }
+    }
+  }
+}

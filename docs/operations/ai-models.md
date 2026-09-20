@@ -116,3 +116,7 @@ Provider failure is now explicitly unavailable and cannot quietly become benign.
 ## Verification status
 
 See the [implementation ledger](../implementation/typesafe-progress.md) for exact commits, reviewed gates, runtime tests and live access results. Adapter fixtures and green tests do not establish that Claude, OpenAI or Gemini is best for this project's data. Use the same task schema, independently reviewed corpus and total latency/cost measurements when comparing them.
+
+## Plugin configuration
+
+Local plugins reuse these profiles and adapters. `npm run plugin:setup -- --config /absolute/path/config.json` saves the selected configuration path; reconnect MCP after changes. Bundled clients can use `PROMPT_REJECTOR_AI_CONFIG`. Claude Desktop exposes an optional configuration-file picker and secret fields for TypeSafe, Gemini, Anthropic and OpenAI. A client brand does not select the model provider. Keep TypeSafe active when changing reasoning roles. See [plugin installation](../plugins.md).
