@@ -1,5 +1,7 @@
 # 🛡️ Skill Security Guide
 
+> Version 2 scans are available through `/v2/scan-skill` or MCP `scan_skill` with `reportVersion: 2`. They use independently configurable semantic providers and optional qualified TypeSafe judgments. Only `decision: "allow"` has `safe: true`; failed required analysis remains unavailable. Examples below retain the historical version 1 report format. See [model migration](docs/operations/ai-models.md) and [rollout status](docs/implementation/typesafe-progress.md).
+
 This document provides detailed information about scanning Claude Code skills for security vulnerabilities.
 
 ## Table of Contents
@@ -193,7 +195,7 @@ The `SkillScanService` performs these specialized checks:
 | Social Engineering | Fake authority or urgency claims | Medium |
 | Data Exfiltration | Network requests with sensitive data | Critical |
 
-### LLM Analysis (Gemini)
+### LLM Analysis (configurable provider)
 
 Semantic understanding of instruction intent, catching:
 - Novel attack patterns not in static rules
@@ -471,9 +473,9 @@ Flagged conditions (the `class` field of each entry in `huggingFaceSecurityFlags
 | `scanner_warning` | Protect AI / HF scanner emitted a warning other than the above | medium |
 | `gated` | Repository requires license acceptance or manual access grant | low |
 | `no_safetensors` | No `.safetensors` variant; falls back to legacy weight formats | low |
-| `lookup_failed` | 401/403/404/network error — surfaced only, never blocking | safe |
+| `lookup_failed` | Unavailable or malformed required metadata; preserves positive findings | incomplete; cannot authorize safe |
 
-A clean reference returns an empty `huggingFaceSecurityFlags: []`. The check uses a 6-hour in-memory cache and degrades gracefully (returning a `lookup_failed` entry) when `HF_TOKEN` is unset, the Hub is unreachable, or the model is private.
+A successfully inspected clean reference returns an empty `huggingFaceSecurityFlags: []`. The check uses a 6-hour success cache. Anonymous lookups are permitted without `HF_TOKEN`; a failed or malformed lookup returns `lookup_failed`, is not cached as clean, and leaves required coverage incomplete. Repository limits or unresolved required candidates cannot silently disappear from coverage.
 
 ### ATLAS taxonomy tags
 

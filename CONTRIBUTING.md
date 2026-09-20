@@ -134,7 +134,7 @@ npm run dev
 
 - Node.js 18.x or higher
 - npm 9.x or higher
-- A Google AI API key (free at https://aistudio.google.com/apikey)
+- Provider credentials only for explicitly selected live roles; offline tests need no keys
 
 ---
 
@@ -148,12 +148,15 @@ promptrejectormcp/
 │   │   └── server.ts                  # REST API (Express)
 │   ├── mcp/
 │   │   └── mcpServer.ts               # MCP server (11 tools)
+│   ├── ai/                           # Typed contracts, native adapters, budgets and qualification
+│   ├── evaluation/                   # Isolated corpus evaluation and spending caps
+│   ├── bootstrap.ts                  # Shared REST/MCP dependency graph
 │   ├── schemas/
 │   │   └── PatternSchemas.ts          # Zod schemas for the pattern library
 │   ├── services/
 │   │   ├── SecurityService.ts         # Main aggregator (check_prompt)
 │   │   ├── SkillScanService.ts        # scan_skill aggregator
-│   │   ├── GeminiService.ts           # LLM-based semantic detection
+│   │   ├── GeminiService.ts           # Legacy compatibility facade
 │   │   ├── StaticCheckService.ts      # Regex pattern detection
 │   │   ├── PatternService.ts          # File-based pattern library + integrity
 │   │   ├── VulnFeedService.ts         # NVD + GHSA scanning → staged patterns
@@ -169,7 +172,7 @@ promptrejectormcp/
 │   │   ├── TasteTesterService.ts      # Dual-agent sandbox detonator (v1.1)
 │   │   ├── fallbackPatterns.ts        # Hardcoded emergency patterns
 │   │   └── aiPackageAllowlist.ts      # Trusted-package allowlist for HF/PyPI checks
-│   └── test/                          # Standalone test scripts (run via npx tsx)
+│   └── test/                          # Compiled scripts registered in the offline runner
 ├── patterns/                          # JSON pattern library + manifest
 ├── dist/                              # Compiled output
 └── docs/                              # Additional documentation
@@ -179,14 +182,14 @@ promptrejectormcp/
 
 | File | Purpose |
 |------|---------|
-| `SecurityService.ts` | Orchestrates Gemini + static layers for `check_prompt` |
-| `SkillScanService.ts` | Aggregates Gemini + static + skill-specific + trifecta + HF for `scan_skill` |
-| `GeminiService.ts` | Semantic analysis via Gemini API |
+| `SecurityService.ts` | Orchestrates configured semantic, TypeSafe and static layers for `check_prompt` |
+| `SkillScanService.ts` | Aggregates configured semantic + static + skill-specific + capability + HF for `scan_skill` |
+| `GeminiService.ts` | Legacy compatibility wrapper around configured semantic analysis |
 | `StaticCheckService.ts` | Fast regex-based pattern matching |
 | `TrifectaAnalyzer.ts` | Detects co-location of private-read / untrusted-fetch / external-egress |
 | `HuggingFaceService.ts` | Looks up model security flags via the HF Hub API |
 | `AtlasService.ts` | Maps findings to MITRE ATLAS technique IDs |
-| `TasteTesterService.ts` | Dual-agent (Anthropic) dynamic detonator for suspicious prompts |
+| `TasteTesterService.ts` | Portable Taster and independent Monitor dynamic detonator for suspicious prompts |
 | `server.ts` | REST API endpoints |
 | `mcpServer.ts` | MCP protocol implementation |
 
@@ -231,20 +234,9 @@ const checkPrompt = async (input) => {
 - Log errors to stderr (not stdout, to preserve MCP compatibility)
 - Provide meaningful error messages
 
-```typescript
-try {
-  const result = await geminiService.checkPrompt(input);
-  return result;
-} catch (error) {
-  console.error('Gemini check failed:', error);
-  // Return safe default, let static checks handle it
-  return {
-    isInjection: false,
-    confidence: 0,
-    explanation: 'Gemini check failed, relying on static analysis'
-  };
-}
-```
+Do not manufacture a benign result when a provider fails. Return a typed unavailable result with sanitized failure metadata, preserve known local findings, and let `DecisionPolicy` derive the report. Version 2 permits `safe: true` only for `decision: "allow"` with required coverage complete. Never log reflected provider bodies, credentials, prompts or private continuation data.
+
+The provider contracts live in `src/ai/contracts.ts`. Native adapters normalize structured reasoning, focused judgments and tool conversations; services do not parse vendor envelopes. Runtime schema validation, deadlines, attempt accounting and availability-only fallback belong at those boundaries. See [model operations](docs/operations/ai-models.md) and the [rollout specification](docs/specs/2026-09-19-typesafe-model-routing-spec.md).
 
 ---
 
@@ -258,7 +250,7 @@ try {
 
 ### Test Suites
 
-Tests are standalone scripts in `src/test/` — there is no test runner. The `npm test` chain (see `package.json`) runs every offline suite sequentially. Suites that hit a real API (Gemini, Anthropic, Hugging Face) are excluded from `npm test` and must be invoked explicitly with the relevant API key set.
+Tests are standalone scripts registered in `src/scripts/runOfflineTests.ts`. Use `npm run test:offline`: each suite gets a separate temporary filesystem, an allowlisted environment without credentials, and a network guard. Only explicitly marked endpoint suites can use loopback. Swallowed network errors still fail the suite. The historical `npm test` chain is retained but does not cover the new provider and policy suites.
 
 | Suite | Covers | Online? |
 |-------|--------|---------|
@@ -276,12 +268,12 @@ Tests are standalone scripts in `src/test/` — there is no test runner. The `np
 | `queryCveTests.ts` | Unified CVE cache + `query_cve` MCP tool | offline |
 | `canaryTests.ts` | Canary-token issue/verify lifecycle | offline |
 | `tasteTesterTests.ts` | Taste-Tester unit tests with stubs | offline |
-| `tasteTesterCorpusTests.ts` | Real-API Taste-Tester calibration corpus | requires `ANTHROPIC_API_KEY` |
+| `tasteTesterCorpusTests.ts` | Mocked historical Taster corpus, not live accuracy | offline |
 | `manyShotObfuscationTests.ts` | Many-shot jailbreak corpus | offline |
 | `advancedTests.ts` | 7 attack-vector scenarios | requires `GEMINI_API_KEY` |
 | `skillScanTests.ts` | 7 SKILL.md scan scenarios | requires `GEMINI_API_KEY` |
 
-When adding new detection logic, prefer extending one of these suites. New behavior should at minimum be exercised by an offline suite so it lands in `npm test`.
+When adding new detection logic, prefer extending one of these suites. New behavior should at minimum be exercised by an offline suite and registered in `OFFLINE_SUITES`. Contract tests should exercise native response fixtures, cancellation, schema failures and usage; decision tests must cover incomplete analysis never becoming safe.
 
 ### Writing Tests
 
@@ -307,17 +299,16 @@ describe('StaticCheckService', () => {
 
 ```bash
 # Run all offline suites (recommended before opening a PR)
-npm test
+npm run test:offline
 
 # Run a single suite directly (use npx tsx, not ts-node — ESM compat)
 npx tsx src/test/trifectaTests.ts
 
-# Run the online suites — set the relevant key first
-GEMINI_API_KEY=... npx tsx src/test/advancedTests.ts
-ANTHROPIC_API_KEY=... npx tsx src/test/tasteTesterCorpusTests.ts
+# Explicitly bounded synthetic access probe (credentials stay in .env)
+npm run ai:probe -- --live --profile typesafe --pricing config/ai-pricing.example.json --max-requests 1 --max-usd 0.01
 ```
 
-There is no coverage tool wired up yet.
+The guarded suite is also run by the offline CI workflow. For model-quality experiments, use `evaluate:ai` with immutable corpus manifests; live runs require explicit profiles, rates, request and monetary caps. Development fixtures and mocked Taster verdicts cannot qualify enforcement. See [evaluation evidence](evaluations/ai/README.md). There is no line-coverage tool wired up yet.
 
 ---
 

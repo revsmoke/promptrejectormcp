@@ -6,7 +6,7 @@ This ledger tracks the [implementation plan](../superpowers/plans/2026-09-19-typ
 
 - Baseline: `2f3a83c266009afa84cc235c43abd7db3d7e6fe3`, package `prompt-rejector@1.1.0`.
 - Isolated implementation branch: `codex/typesafe-model-routing`.
-- Initial runtime: Node `v24.13.0`, npm `11.8.0`; the package declares Node `>=18.0.0`. Other supported Node runtimes still require verification.
+- Initial runtime: Node `v24.13.0`, npm `11.8.0`; the package declares Node `>=18.0.0`. This was the initial checkpoint; the later runtime matrix is recorded below.
 - Locked dependencies installed with `npm ci --ignore-scripts`. Existing dependency audit findings are outside the baseline task; no dependency versions were changed.
 - Original scripts: `build` runs `tsc`, `lint` runs `tsc --noEmit`, and `test` chains 17 source suites through `npx tsx`. The new `test:offline` uses the installed compiler and current Node executable instead of downloading a runner.
 - Existing `docs/` and `experiments/` were copied into the worktree as planning/evaluation inputs. Original worktree changes, including `.env.example`, skill directories, and skill-lock metadata, are preserved. No `.env` values are copied into this ledger or the offline test environment. Baseline work stages only its own explicitly listed files.
@@ -18,17 +18,17 @@ This ledger tracks the [implementation plan](../superpowers/plans/2026-09-19-typ
 | --- | --- | --- | --- | --- | --- |
 | 0 | Reproducible offline baseline | Implemented; independent spec and quality reviews approved | 18/18 suites pass, Node 24.13.0 | Not applicable | No changes |
 | 1 | Contracts, configuration, service construction, truthful v2 results | Implemented; independent SPEC and quality reviews approved at d37b9e7 | 27/27 suites pass at reviewed snapshot; lint passes, Node 24.13.0 | Pending where needed | TypeSafe off; enforcement blocked |
-| 2 | Claude/OpenAI structured adapters and role selection | In progress | Pending | Pending | Off |
-| 3 | Portable Taste-Tester conversations and monitor role | Pending | Pending | Pending | Off |
-| 4 | TypeSafe client, bounded requests, cache, accounting | Core implemented and independently reviewed; service integration pending | Adapter/cache focused suites pass | Pending | Off |
-| 5 | Descriptor shadow analysis | Source map/rubric prepared; wrapper and transport pending | Primitive tests pass | Pending | Off |
-| 6 | Prompt and skill shadow analysis | Original/revised rubrics prepared; service wiring pending | Source-isolation tests pass | Pending | Off |
-| 7 | Capability provenance and analysis | Private resolver and presence rubric prepared; composition pending | Provenance tests pass | Pending | Off |
-| 8 | HF extraction corrections and semantic candidates | Pure parser prepared; service wiring pending | Parser tests pass | Pending | Off |
-| 9 | Evaluation harness and qualification evidence | Pending | Pending | Pending | Off |
-| 10 | Qualified descriptor/capability/HF enforcement | Pending | Pending | Pending | Off |
-| 11 | Prompt/skill block-only cascade | Pending | Pending | Pending | Off |
-| 12 | Operations, migration documentation, final rollout verification | Pending | Pending | Pending | Off |
+| 2 | Claude/OpenAI structured adapters and role selection | Implemented; independent SPEC and quality reviews approved through a921fec | 37/37 suites at provider checkpoint; 7 focused suites rerun from isolated commit | TypeSafe probe succeeds; Claude account unavailable; OpenAI saved credential rejected | Off |
+| 3 | Portable Taste-Tester conversations and monitor role | Implemented; SPEC and quality approved through a629bd3 | Native 3-provider conversation/service/MCP suites pass, including review regressions | Claude/OpenAI access unavailable; live behavior qualification pending | Off |
+| 4 | TypeSafe client, bounded requests, cache, accounting | Implemented and reviewed, including shared budgets and service graph | Adapter/cache/shared-budget suites pass | Pinned Jev smoke succeeds; qualification pending | Off |
+| 5 | Descriptor shadow analysis | Implemented; SPEC and quality reviews approved at 9587c66 | Wrapper, bounds, source-map and MCP tests pass | 16-case development shadow smoke recorded; qualification pending | Off |
+| 6 | Prompt and skill shadow analysis | Implemented; SPEC and quality reviews approved at 9587c66 | Equality, source isolation, scheduling and transport tests pass | Paired live qualification pending | Off |
+| 7 | Capability provenance and analysis | Implemented; SPEC and independent quality approved through a00a891 | Provenance, complete-scope reasoning and native adapter regressions pass | Independent live qualification pending | Off |
+| 8 | HF extraction corrections and semantic candidates | Implemented; SPEC and independent quality approved through a00a891 | Parser, exact-source additive union, overflow and preserved HF block tests pass | Independent live qualification pending | Off |
+| 9 | Evaluation harness and qualification evidence | Implemented; SPEC and quality approved through 16842c0 | Corpus, quota, private candidate, identity preflight and manifest suites pass | Exploratory probes only; no passing activation manifest | Off |
+| 10 | Qualified descriptor/capability/HF enforcement | Implemented e2e831d; native-schema/HF repair a00a891; SPEC and independent quality approved through a00a891 | Enforcement and transport regressions pass | Held-out and staging gates pending | Off |
+| 11 | Prompt/skill block-only cascade | Implemented e2e831d; SPEC and independent quality approved through a00a891 | Routing, full-skill budget, source provenance and REST/MCP parity pass | Held-out and staging gates pending | Off |
+| 12 | Operations, migration documentation, final rollout verification | Documentation and CI configuration reviewed; implementation verification complete | 54/54 suites on Node 18/22/24/26; build, lint and config checks pass | Actual live switch/rollback drill pending | Off |
 
 ## Pass 0 evidence
 
@@ -80,3 +80,80 @@ Prompt rubrics retain the original experiment and defensive revision under disti
 HF parsing exposes the exact incumbent ablation separately from corrected baseline IDs and broad semantic candidates. Model/dataset/Space URLs are classified before heuristics; adjacent Markdown links, semicolons, pipes, unusual punctuation and escaped newlines cannot erase references. Malformed ambiguous HF paths preserve incumbent IDs. Short and file-like model names remain semantic candidates even when the original heuristic omitted them. No optional semantic model selection is used for authoritative lookups yet.
 
 Primitive checkpoint verification: `npm run test:offline` passes **31/31 suites**, with zero unexpected network violations on Node 24.13.0. Endpoint, policy and runtime activation gates remain pending.
+
+## Provider and shadow integration checkpoint
+
+Pass 2 implementation `a8c23be`, fixes `dcea91c` and `a921fec`, passed independent SPEC and quality reviews. Monitor token caps apply across every primary/fallback provider. Operator config output identifies credential variable names and active versus unused profiles without values. Native OpenAI cache-write tokens are parsed when reported; omitted values remain unknown. The quality reviewer independently tested the exact committed snapshot, excluding concurrent TypeSafe work.
+
+TypeSafe shared budget/service commit `2b13fac` passed independent SPEC and quality review. Descriptor component `41977d9` is also approved: iterative structural validation precedes cloning/local recursion; routing and cache outcomes identify physical calls correctly, including joining waiters that time out. Integration now includes prompt/skill intent batches, capability presence diagnostics and provenance, corrected model-reference parsing, and MCP v2 descriptor/capability dispatch. Integration SPEC and independent quality reviews approved commit `9587c66`. The final review fixed optional-candidate overflow incorrectly affecting baseline coverage and corrected inferred capability provenance.
+
+The complete integration checkpoint passes **43/43 offline suites** with zero unexpected network violations on Node **18.20.8, 22.23.2, 24.13.0 and 26.9.0**. Native MCP tests preserve 11 tool names, v1 inference scope and unchanged shadow decisions, while exposing exact source candidate mappings. Skill shadow uses at most three initial batches; a cached capability retry reservation cannot starve its siblings. No qualifying enforcement or deployment is claimed.
+
+Bounded live probes are saved under `evaluations/ai/runs/2026-09-19-implementation-smoke/probes/`. TypeSafe resolved exactly `jev-1.13.0`: 464 ms, 310 input tokens, estimated $0.00001302. Claude's probe returned unavailable; a subsequent read-only account check confirmed an account availability issue. OpenAI's initial probe was rejected before dispatch by its conservative $0.40 envelope; its read-only account check rejected the saved credential. These are smoke/account-access results, not model-quality evidence. The original `.env` remains only in the original workspace.
+
+## Pricing correction and review
+
+CodeRabbit reviewed committed changes `1ad4afc..9587c66` after a credential scan. No warning/critical findings were reported. Its minor findings identified this stale pass table and the missing Gemini rate; both are corrected. The official Gemini pricing page does list `gemini-3-flash-preview`: standard text input $0.50/M, output including thinking $3.00/M, cached input $0.05/M. Price-card v2 records those rates; historical probe records retain their original v1 pricing provenance. This does not imply model account access or qualification.
+
+## Evaluation and live shadow checkpoint
+
+Evaluation implementation `9b840b0` and strict review/split correction `58cf5fe` add immutable provenance, validated input schemas, separate abstention metrics, fresh-cache repeat observations, read-only historical replay, explicit live preflight and run-wide conservative limits. The isolated evaluator cannot start serving services. The recorded offline command used `evaluations/ai/datasets/exploratory-v1/manifest.json` with `--scenarios off,shadow`; artifact `evaluations/ai/runs/2026-09-19-exploratory-offline-v2` contains 214 reports with no live inference. Evaluation corrections through `c1184d0` passed independent SPEC and quality review. Qualification corrections through `56b5a87` also passed both reviews; the pre-enforcement integration checkpoint passes 51/51 isolated offline suites on Node 24.13.0.
+
+Gemini live probe succeeded in 2,002 ms with 623 input, 58 candidate and 160 thought tokens. Missing cache billing details leave actual estimated cost unknown, preserving the conservative reservation. Descriptor shadow smoke used `descriptor-smoke-v1/manifest.json`: 16 physical Jev calls, estimated $0.000458892; p50 189 ms, p95 420 ms. All 16 authoritative decision/severity/category results match off. All eight risky examples had Noul >=0.9 and none of eight benign examples did; two benign low-poison cases selected a speculative field and would need contextual review under the conservative policy. These are previously observed development cases, not qualification. The implementation demonstration has used 19 inference attempts and remains within its 20-request/$1 envelope.
+
+## Taster review closure
+
+Pass 3 `1ca0950`, `babbf58`, and `a629bd3` passed independent SPEC and quality review. Native regressions reproduced and repaired loss of tool evidence from excessive text-block counts, late Monitor timeout/cancellation accounting, and inherited object-property names in rejected tool calls. All three providers preserve valid and rejected action evidence and final severity floors; Monitor primary/fallback usage is settled before serialization. These checks use synthetic native HTTP fixtures, not paid inference.
+
+## Qualification and operations checkpoint
+
+Qualification fixes `1a54fb8` and `56b5a87` bind evidence to each primary/fallback route, exact runtime code and nested schemas/rubrics, the actual loaded pattern corpus and integrity state, checked model identities and expiry. Runtime consumers recheck model identity and pattern qualification around asynchronous analysis. Two distinct normalized reviewer identities and pre-run label approval are required; optional post-run result approval is separately hash-bound. Unit-test passing manifests are explicitly synthetic. No real passing activation manifest is included. Qualified staging may load with an operational gate still pending, permitting the restart/rollback drill to occur before production activation.
+
+Evaluation correction `c1184d0` records normalized model-answer changes separately from policy-decision changes and reserves its output files exclusively before inference. A second process or unwritable output directory cannot spend first and lose the artifacts. Read-only metadata checkpoint `6a000fc` exposes role readiness, qualification and legacy/v2 scope without calling a provider.
+
+Checkpoint `8c78eed` saves the 16-case descriptor shadow run and verifies cache behavior through the native MCP client: repeated source reuses a judgment, changed source/rubric invalidates it, and descriptor drift is recomputed even when inference is cached. Focused operator, MCP shadow and health suites passed with zero unexpected network access. A scan of the implementation checkout found no exact values from the original credential file. The original checkout and its user changes remain untouched.
+
+## Enforcement review and final corrections
+
+Policy checkpoint `e2e831d` implements complete descriptor reasoning, provenance-aware capability composition, source-exact additive reference selection and prompt/skill enforce/cascade routes. A skill uses one logical full-context reasoning response to resolve security and unresolved capability/reference evidence. Native REST/MCP fixtures cover scope/version compatibility, injected host-only capability facts, six-attempt skill budgeting, cancellation, source limits and qualification changes. Existing deterministic and HF blockers are retained; missing analysis never authorizes allow. All task defaults remain off.
+
+Independent SPEC review reproduced two issues that were not caught by the initial 54-suite run. Repair `a00a891` replaces unrepresentable empty-ID native schemas with provider-compatible arrays and local no-invented-ID checks, then verifies native Claude/OpenAI/Gemini dispatch. It also preserves critical HF block precedence during pattern qualification changes while reporting incomplete qualification. Both regressions failed first and passed after repair.
+
+Root evaluator extension `16842c0` passed independent SPEC and quality review. It enables private enforce/cascade comparisons and records bindings; live candidate preflight rejects invalid identity evidence before even a preceding TypeSafe call. Regressions cover missing, stale, future-dated, mismatched and mutable identities, invalid later jobs and a valid mocked live candidate. Offline/off/shadow exploration remains available.
+
+CodeRabbit's second committed review covered `9587c66..16842c0` and completed with one minor historical replay finding. Repair `38e9a2a` prevents a `no candidates` marker from treating missing prompt/descriptor/capability inference as evaluated; that special empty result is only valid for reference extraction. The historical aggregate still matches its original saved counts and latency. No warning or critical CodeRabbit findings were reported. Independent policy review remains a separate gate.
+
+Documentation review corrected the remaining generic latency claim and made all TypeSafe enforcement/cascade explicitly v2-only, including Gemini prompt/skill callers. Contributor guidance no longer recommends benign defaults on provider failure. Historical root SPEC/PLAN retain their release record with clear links to the current design. Compatibility facades and legacy SDK support are retained where public/positional callers still use them; unrelated cleanup is excluded.
+
+Independent policy quality review archived exact commit `38e9a2a`, rebuilt it and passed six isolated enforcement/cascade/transport/bootstrap/qualification/historical-replay suites with zero unexpected network access. The policy SPEC reviewer separately rebuilt and passed five affected suites. Both approve the repaired policy integration; neither approval claims live model quality or activation.
+
+## Deadline boundary repair
+
+The final parallel runtime matrix at `38e9a2a` exposed an early timer callback on Node 26: the callback could abort before the absolute wall-clock deadline and misclassify a timeout as a transport failure. Two fixtures also assumed unrealistically short process/Taster startup under parallel load. Node 22 and 24 passed all 54 suites at that checkpoint; Node 18 passed 53 and Node 26 passed 52. These failures were investigated before repeating verification.
+
+Repair `4d9fee2` uses a shared timer that rechecks the absolute deadline and reschedules an early callback. It covers the operation wrapper, native transport, cache provider and independent cache waiters; external cancellation remains distinct. Deterministic regressions failed before the repair, then passed while checking physical attempts and timer/listener cleanup. The two fixture startup allowances were increased while retaining bounded completion, phase, severity and accounting assertions. Five affected suites passed concurrently on Node 18.20.8, 22.23.2, 24.13.0 and 26.9.0 with zero network violations.
+
+The prompt regression in `bb38252` uses explicit dispatch gates to verify that cancelling one concurrent prompt cannot affect another prompt's source hash or judgment. A repeated prompt dispatches again, proving prompt judgments remain uncached. Independent SPEC review approved the timing patch and this regression after rebuilding and passing six isolated suites. Independent quality review also approved both changes after an isolated build and five focused suites, with zero network violations.
+
+The next complete parallel matrix passed all 54 suites on Node 18, 24 and 26. Node 22 exposed another fixture assumption in `judgmentServiceTests`: a 20 ms provider window could expire before native dispatch, correctly reporting zero physical attempts while the test expected one. Fixture-only repair `f71bba9` controls the clock and gates advancement on actual dispatch. It explicitly verifies zero attempts before dispatch and one physical attempt afterward, shared operation identity, independent waiter cancellation and settled usage. It passed three consecutive runs on each of the four runtimes (12/12, zero network violations).
+
+## Final implementation verification
+
+The final code/test checkpoint is `f71bba9`, including production timing repair `4d9fee2` and concurrent prompt regression `bb38252`. Independent SPEC and quality reviewers approved all three changes. Each reviewer rebuilt and independently ran the affected guarded tests; no blockers remain in the implementation reviews.
+
+From that checkpoint, `npm run build`, `npm run lint` and `git diff --check` pass. After the build, the complete `dist/scripts/runOfflineTests.js` runner—the runner used by `npm run test:offline`—was run concurrently under each runtime below. All four processes exited zero, and every suite reported zero unexpected network violations.
+
+| Runtime | Complete offline suites | Result |
+| --- | --- | --- |
+| Node 18.20.8 | 54 passed, 0 failed | Pass |
+| Node 22.23.2 | 54 passed, 0 failed | Pass |
+| Node 24.13.0 | 54 passed, 0 failed | Pass |
+| Node 26.9.0 | 54 passed, 0 failed | Development smoke pass |
+
+Read-only configuration validation reports `inferencePerformed:false`, all five TypeSafe tasks off and no active qualification tasks for both configurations. Legacy config hash: `292092198e59751a791194e485ee91c8b1806aa9d5e5864d039da8a0ca6f452d`. Example config hash: `0d66d1c3098472f1fdf078afe7d9339c8b4c73c6550de160adc819bd48633783`. The example selects Claude semantic analysis with OpenAI availability fallback; legacy installations retain Gemini until explicitly reconfigured. This check validates configuration, not account access.
+
+The final documentation covers model roles, native API adaptation, v1/v2 migration, bounded evaluation, qualification and rollback. The README, contributor guide, changelog, configuration guide, historical SPEC/PLAN notices, current checklist, skill-security guide and evaluation guide are updated. The new offline CI workflow runs Node 18/22/24 plus a non-blocking Node 26 smoke job; local results above do not claim a remote CI run.
+
+Delivery is on `codex/typesafe-model-routing`. The original checkout's pre-existing changes are preserved. A credential-value scan covered 240 tracked or unignored implementation files and found zero saved secret values. Package version remains 1.1.0; no tag, registry publication, deployment or production activation is part of this delivery.
+
+**Remaining rollout gates:** restore Claude/OpenAI account access, create and independently review untouched calibration/held-out labels, authorize bounded qualification runs beyond the completed 19-attempt demonstration, qualify every selected primary/fallback route, then perform the actual staging switch/restart/rollback drill. TypeSafe remains off until those gates pass. Smoke timings and development examples do not establish deployed quality, savings or deterministic model answers.

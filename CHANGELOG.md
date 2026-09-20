@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Independent semantic, pattern-drafting, Taster and Monitor model profiles with native Gemini, Claude and OpenAI adapters, validated capabilities and availability-only fallback.
+- TypeSafe Jev judgments for descriptor poisoning, prompt/skill intent, capability presence and exact-source model references; bounded caches and shared request/cost accounting.
+- Opt-in version 2 REST and MCP reports with explicit allow/block/review/unavailable decisions, required coverage, provider attribution and usage. Existing 11 MCP tool names and version 1 defaults remain.
+- Qualified enforcement and prompt/skill cascade policies, isolated candidate evaluation, immutable development datasets, reviewed held-out evidence requirements and code/model/pattern-bound activation manifests.
+- Guarded offline suites, runtime CI matrix, non-inferencing configuration/health diagnostics, bounded live probes and model-switch/rollback documentation.
+
+### Fixed
+
+- Provider failures, malformed output and incomplete required HF metadata can no longer silently authorize a safe scan.
+- HF model/dataset/Space parsing, source-evidence validation, partial Taster action evidence, model identity drift and expired/stale qualification handling.
+
+### Rollout status
+
+TypeSafe defaults **off** and Taster remains opt-in. No production activation or passing held-out qualification manifest is included. Bounded Jev/Gemini smoke evidence is recorded; current Claude/OpenAI account access prevents completing those live probes. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates. Package and registry versions remain 1.1.0 until a separate release.
+
 ## [1.1.0] - 2026-05-14
 
 ### 🚀 LLM/Agentic Threat Expansion

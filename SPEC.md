@@ -1,5 +1,7 @@
 # SPEC.md — Prompt Rejector v1.1.0
 
+> Historical v1.1 design and delivery record. For the current configurable-provider and TypeSafe work, use the [2026-09-19 specification](docs/specs/2026-09-19-typesafe-model-routing-spec.md), [implementation checklist](docs/superpowers/plans/2026-09-19-typesafe-model-routing.md), [progress ledger](docs/implementation/typesafe-progress.md), and [operations guide](docs/operations/typesafe-rollout.md). Historical completion claims below do not qualify or activate the new policies.
+
 **Status:** Draft for implementation
 **Authoring date:** 2026-05-13
 **Target release:** v1.1.0 (delta from v1.0.2)
