@@ -19,6 +19,23 @@ export function semanticSchema(sourceIds: readonly string[] = ["input"]) {
 }
 export const semanticFindingSchema = semanticSchema();
 export type SemanticFinding = z.infer<typeof semanticFindingSchema>;
+export const capabilityBuckets = ["privateDataRead", "untrustedContentFetch", "externalEgress"] as const;
+export function capabilityAssessmentSchema(sourceIds: readonly string[]) {
+    const id = sourceIds.length ? z.enum([...sourceIds] as [string, ...string[]]) : z.never();
+    const bucket = z.strictObject({ state: z.enum(["present", "absent", "unknown"]), evidenceIds: z.array(id).max(64) });
+    return z.strictObject({ completeDeclaredScope: z.boolean(), restrictionEvidenceIds: z.array(id).max(64),
+        privateDataRead: bucket, untrustedContentFetch: bucket, externalEgress: bucket,
+        explanation: z.string().min(1).max(4000) });
+}
+export type CapabilityAssessment = z.infer<ReturnType<typeof capabilityAssessmentSchema>>;
+export function skillReasoningSchema(capabilitySourceIds: readonly string[], referenceIds: readonly string[]) {
+    const id = referenceIds.length ? z.enum([...referenceIds] as [string, ...string[]]) : z.never();
+    return z.strictObject({ security: semanticFindingSchema, capabilities: capabilityAssessmentSchema(capabilitySourceIds).nullable(),
+        references: z.array(z.strictObject({ id, classification: z.enum(["model", "not_model", "unknown"]) })).max(64) });
+}
+/** Output evidence IDs were already validated against generated source IDs at
+ * the provider boundary. Reports retain those IDs without inventing paths. */
+export const sourcedSemanticReportSchema = semanticFindingSchema.extend({ evidenceIds: z.array(z.string()).max(64) });
 export const patternDraftSchema = z.strictObject({ patterns: z.array(z.strictObject({
     pattern: z.string().min(1).max(4000), flags: z.string().max(8), description: z.string().max(2000),
     category: z.enum(["xss", "sqli", "shell_injection", "directory_traversal", "ssrf"]), severity: severitySchema,

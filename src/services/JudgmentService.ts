@@ -6,6 +6,7 @@ import { emptyUsage, reserveCost, type TokenPrices } from "../ai/usage.js";
 import { hashConfiguration } from "../ai/modelProfiles.js";
 import { TypeSafeAdapter, typeSafePreflight } from "../ai/providers/TypeSafeAdapter.js";
 import { JudgmentCache, JudgmentCacheError, judgmentCacheKey } from "./JudgmentCache.js";
+import { validateResolvedModel } from "../ai/qualification.js";
 export type JudgmentTask = "descriptor" | "prompt" | "skill" | "capability" | "modelReference";
 export type JudgmentMode = "off" | "shadow" | "enforce" | "cascade";
 export interface JudgmentObservation { mode: JudgmentMode; cache: "disabled" | "miss" | "hit" | "shared"; ageMs: number; sourceHash: string; completion: "completed" | "waiter_timed_out" | "waiter_cancelled" | "not_requested"; coverage: "complete" | "partial" | "unavailable" | "not_requested"; result: CallResult<JudgmentAnswers> | null }
@@ -39,8 +40,13 @@ export class JudgmentService {
             profileHash: hashConfiguration({ provider: "typesafe", model: request.model }), rubricVersion: request.rubricVersion, schemaVersion: request.schemaVersion,
             elapsedMs: Date.now() - operation.started, attempts: operation.attempts, usage: emptyUsage(), failureCode: code } });
         const call: CallContext = { ...context, role: "judgment", optional: mode === "shadow", deadlineMs: Math.min(context.deadlineMs, context.budget.deadlineMs) };
-        const finish = (result: CallResult<JudgmentAnswers>): JudgmentObservation => ({ ...observation, result, completion: "completed", coverage: result.status !== "ok" ? "unavailable" : options.completeSource ? "complete" : "partial" });
+        const finish = (raw: CallResult<JudgmentAnswers>): JudgmentObservation => {
+            const result: CallResult<JudgmentAnswers> = raw.status === "ok" && ["enforce", "cascade"].includes(mode) && !validateResolvedModel(this.snapshot, task, raw.meta.provider, raw.meta.requestedModel, raw.meta.resolvedModel)
+                ? { status: "unavailable", code: "unsupported", meta: { ...raw.meta, failureCode: "unsupported" } } : raw;
+            return { ...observation, result, completion: "completed", coverage: result.status !== "ok" ? "unavailable" : options.completeSource ? "complete" : "partial" };
+        };
         if (request.model !== this.snapshot.config.typesafe.model) return finish(failed("unsupported"));
+        if (["enforce", "cascade"].includes(mode) && !validateResolvedModel(this.snapshot, task, "typesafe", request.model, request.model)) return finish(failed("unsupported"));
         const preflight = typeSafePreflight(request);
         if (preflight) return finish(failed(preflight));
         if (call.signal?.aborted) return finish(failed("cancelled"));
@@ -59,7 +65,7 @@ export class JudgmentService {
                 // Skill shadow schedules three independent batches. Hold one
                 // slot for this child so a speculative retry cannot starve a
                 // sibling before that sibling has made its first attempt.
-                const envelope = context.budget.reserveSharedCall(this.snapshot.config.limits, { deadlineMs, estimatedUsd, optional: call.optional, maxAttempts: options.parentTask === "skill" && call.optional ? 1 : 2 });
+                const envelope = context.budget.reserveSharedCall(this.snapshot.config.limits, { deadlineMs, estimatedUsd, optional: call.optional, maxAttempts: options.parentTask === "skill" ? 1 : 2 });
                 if (!envelope.ok) return failed(envelope.code);
                 try { return await invoke({ ...call, signal, deadlineMs, budget: envelope.budget }); }
                 finally { envelope.release(); }

@@ -24,7 +24,7 @@ export function judgmentRouting(observation: JudgmentObservation, model: string)
     const cached = observation.cache === "hit" || observation.cache === "shared";
     return { role: "judgment", provider: "typesafe", model, profileHash: result?.meta.profileHash ?? hashConfiguration({ provider: "typesafe", model }),
         status: !cached && (result?.meta.attempts ?? 0) > 0 ? "attempted" : "skipped",
-        reason: cached ? `cache_${observation.cache}` : result?.status === "unavailable" ? result.code : observation.mode === "off" ? "mode_off" : "shadow_observation" };
+        reason: cached ? `cache_${observation.cache}` : result?.status === "unavailable" ? result.code : observation.mode === "off" ? "mode_off" : observation.mode === "shadow" ? "shadow_observation" : "qualified_judgment" };
 }
 export function judgmentCoverage(check: string, observation: JudgmentObservation, characters: number, fields: number): CoverageEntry {
     const result = observation.result;

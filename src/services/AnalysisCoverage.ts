@@ -23,6 +23,12 @@ export function semanticCoverage(result: CallResult<unknown>, characters: number
         scope: "full_input", provider: result.meta.provider, model: result.meta.resolvedModel ?? result.meta.requestedModel,
         rubricVersion: result.meta.rubricVersion };
 }
+export function skippedCheck(check: string, reason: string): CoverageEntry {
+    return { ...completedCheck(check, 0, "full_input"), status: "not_requested", reason, inspectedFields: 0 };
+}
+export function qualificationCoverage(valid: boolean): CoverageEntry {
+    return { ...completedCheck("qualification", 0), status: valid ? "complete" : "unavailable", reason: valid ? null : "qualification_changed", inspectedFields: 0 };
+}
 export class AnalysisCoverage {
     private checks = new Map<string, CoverageEntry>();
     record(entry: CoverageEntry): void { this.checks.set(entry.check, { ...entry }); }

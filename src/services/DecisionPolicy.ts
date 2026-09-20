@@ -1,6 +1,8 @@
 import type { CallResult, Severity } from "../ai/contracts.js";
 import type { SemanticFinding } from "../ai/taskSchemas.js";
 import type { CoverageEntry } from "./AnalysisCoverage.js";
+import type { JudgmentObservation } from "./JudgmentService.js";
+import { QUALIFICATION_THRESHOLDS } from "../ai/qualification.js";
 
 export const POLICY_VERSION = "security-policy-v2.1";
 export type Decision = "allow" | "block" | "review" | "unavailable";
@@ -39,4 +41,13 @@ export function maximumSeverity(...severities: Severity[]): Severity {
 }
 export function decideBehavior(complete: boolean, verdict: "clean" | "suspicious" | "malicious" | "undetermined"): typeof verdict {
     return !complete && verdict === "clean" ? "undetermined" : verdict;
+}
+/** Consequential activity requires contextual authorization analysis; it can
+ * never make this early block predicate true by itself. */
+export function decisiveIntent(observation: JudgmentObservation | null): boolean {
+    if (!observation || !["enforce", "cascade"].includes(observation.mode) || observation.coverage !== "complete" || observation.result?.status !== "ok") return false;
+    return ["override", "disclosure"].some((id) => {
+        const answer = observation.result!.status === "ok" ? observation.result!.value[id] : null;
+        return answer?.type === "noul" && answer.noul >= QUALIFICATION_THRESHOLDS.high;
+    });
 }

@@ -3,8 +3,12 @@ import { StaticCheckService, type StaticCheckResult } from "./StaticCheckService
 import { mapSecurityCategoriesToAtlas } from "./securityTaxonomy.js";
 import type { PatternService } from "./PatternService.js";
 import { SemanticAnalysisService } from "./SemanticAnalysisService.js";
-import { completedCheck, semanticCoverage } from "./AnalysisCoverage.js";
-import { decide, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
+import { completedCheck, semanticCoverage, qualificationCoverage, skippedCheck } from "./AnalysisCoverage.js";
+import { decide, decisiveIntent, blockingSeverity, maximumSeverity, POLICY_VERSION } from "./DecisionPolicy.js";
+import { validateQualifiedPatterns } from "../ai/qualification.js";
+import type { JudgmentObservation } from "./JudgmentService.js";
+import type { CallResult } from "../ai/contracts.js";
+import type { SemanticFinding } from "../ai/taskSchemas.js";
 import { promptAnalysisReportSchema, type PromptAnalysisReport } from "../schemas/AnalysisReportSchemas.js";
 import { promptInputSchema } from "../ai/schemas.js";
 import { JudgmentService } from "./JudgmentService.js";
@@ -29,7 +33,7 @@ export class ReportVersionRequiredError extends Error {
 /** The v1 compatibility mapper and v2 policy share the same single analysis. */
 export class SecurityService {
     private readonly staticCheckService: StaticCheckService;
-    constructor(patternService?: PatternService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService(), readonly judgmentService = new JudgmentService(semantic.snapshot)) {
+    constructor(private readonly patternService?: PatternService, readonly semantic: SemanticAnalysisService = new SemanticAnalysisService(), readonly judgmentService = new JudgmentService(semantic.snapshot)) {
         this.staticCheckService = new StaticCheckService(patternService);
     }
     get supportsV1(): boolean { return this.semantic.supportsV1; }
@@ -44,7 +48,47 @@ export class SecurityService {
             atlasTechniques: report.atlasTechniques, timestamp: report.timestamp };
     }
     async runSecurityScanV2(prompt: string, options: { signal?: AbortSignal } = {}): Promise<PromptAnalysisReport> {
+        if (["enforce", "cascade"].includes(this.semantic.snapshot.config.typesafe.prompt)) return this.analyzeEnforced(prompt, options.signal);
         return (await this.analyze(prompt, options.signal, true)).report;
+    }
+    private async analyzeEnforced(prompt: string, signal?: AbortSignal): Promise<PromptAnalysisReport> {
+        promptInputSchema.parse({ prompt });
+        const context = this.semantic.createContext("prompt", signal);
+        const snapshot = this.semantic.snapshot;
+        const mode = snapshot.config.typesafe.prompt;
+        const qualified = () => !!this.patternService && validateQualifiedPatterns(snapshot, "prompt", this.patternService);
+        const before = qualified();
+        const local = this.staticCheckService.check(prompt);
+        const localBlock = blockingSeverity(local.severity);
+        let intent: JudgmentObservation | null = null;
+        let semantic: CallResult<SemanticFinding> | null = null;
+        const coverage = [completedCheck("local", prompt.length)];
+        if (!localBlock && before) {
+            intent = await this.judgmentService.evaluate("prompt", promptJudgmentRequest(prompt, "prompt", snapshot.config.typesafe.model), context, { completeSource: true });
+            coverage.push(judgmentCoverage("intent_judgment", intent, prompt.length, 1));
+            context.routing?.push(judgmentRouting(intent, snapshot.config.typesafe.model));
+            if (!(mode === "cascade" && decisiveIntent(intent))) {
+                semantic = await this.semantic.analyze(prompt, "prompt", context, true);
+                coverage.push(semanticCoverage(semantic, prompt.length));
+                coverage[1] = { ...coverage[1], required: false, reason: "full_reasoning_retained" };
+            }
+        }
+        if (!semantic) coverage.push(skippedCheck("semantic", localBlock || decisiveIntent(intent) ? "conclusive_block" : "qualification_changed"));
+        if (!intent) coverage.push(skippedCheck("intent_judgment", localBlock ? "conclusive_block" : "qualification_changed"));
+        const current = before && qualified();
+        coverage.push(qualificationCoverage(current));
+        const hazardBlock = current && decisiveIntent(intent);
+        const outcome = !current && !localBlock ? { decision: "unavailable" as const, safe: false }
+            : decide({ task: "prompt", mode, coverage, semantic: semantic ?? undefined, localBlocking: localBlock || hazardBlock });
+        const finding = semantic?.status === "ok" ? semantic.value : null;
+        return promptAnalysisReportSchema.parse({ schemaVersion: 2, task: "prompt", ...outcome,
+            overallSeverity: maximumSeverity(local.severity, finding?.severity ?? "low", hazardBlock ? "high" : "low"),
+            categories: [...new Set([...local.categories, ...finding?.categories ?? [], ...(hazardBlock ? ["prompt_injection"] : [])])],
+            findings: [...local.findings, ...(hazardBlock ? ["Qualified operative override or private-data disclosure signal."] : [])],
+            atlasTechniques: [...new Set([...local.atlasTechniques, ...mapSecurityCategoriesToAtlas(finding?.categories ?? [])])],
+            timestamp: new Date().toISOString(), coverage, semantic, judgments: { intent, capability: null, modelReference: null, capabilityBuckets: null }, shadow: null,
+            analysisMode: mode, policyVersion: POLICY_VERSION, configHash: context.configHash, routing: context.routing ?? [],
+            timings: { totalMs: Date.now() - context.budget.startedAt }, usage: context.budget.usage.summary(), static: local });
     }
     private async analyze(prompt: string, signal?: AbortSignal, v2 = false) {
         promptInputSchema.parse({ prompt });

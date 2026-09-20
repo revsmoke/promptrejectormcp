@@ -116,6 +116,7 @@ function maxSeverity(a: McpSeverity, b: McpSeverity): McpSeverity {
  * hash/drift but skips pattern checks.
  */
 export class McpToolScanner {
+    get qualificationPatterns(): PatternService | null { return this.patternService; }
     private patternService: PatternService | null;
 
     constructor(patternService?: PatternService) {
