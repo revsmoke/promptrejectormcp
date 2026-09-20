@@ -32,21 +32,25 @@ export const qualificationManifestSchema = z.strictObject({
     binding: bindingSchema, bindingSha256: digest,
     dataset: z.strictObject({ id: z.string().min(1), partition: z.literal("heldout"), casesSha256: digest, labelsSha256: digest, familiesSha256: digest, reviewSha256: digest, familyDisjoint: z.boolean(), untouchedAfterTuning: z.boolean(), classifierIndependent: z.boolean() }),
     review: z.strictObject({ reviewedAt: timestamp, adjudication: z.enum(["resolved", "pending"]), unresolvedLabels: count, reviewers: z.array(z.strictObject({ id: z.string().min(1), independent: z.boolean(), approved: z.boolean(), datasetSha256: digest })).min(2).max(20) }),
+    resultApproval: z.strictObject({ reviewedAt: timestamp, reviewer: z.string().min(1), approved: z.boolean(), resultsSha256: digest }).optional(),
     modelResolutions: z.record(z.string(), modelResolutionSchema), evaluatedAt: timestamp, expiresAt: timestamp, pricingVersion: z.string().min(1),
     gates: z.strictObject({ contracts: z.boolean(), compatibility: z.boolean(), shadow: z.boolean(), operational: z.boolean(), liveProfileHashes: z.array(digest), typesafeLiveModel: z.string().min(1) }),
-    metrics: z.strictObject({ strata: z.array(z.strictObject({ task, risky: decisions, benign: decisions, baselineBenignBlocks: count, highCritical: z.strictObject({ total: count, baselineMisses: count, candidateMisses: count, newlyMissed: count }), pairedResultsSha256: digest })).min(1).max(5), latencyP50Ms: z.number().finite().nonnegative(), latencyP95Ms: z.number().finite().nonnegative(), costUsd: z.number().finite().nonnegative(), unknownCostCalls: count }),
+    metrics: z.strictObject({ strata: z.array(z.strictObject({ task,
+        route: z.strictObject({ name: z.string().min(1), selection: z.enum(["primary", "fallback"]), profileHash: digest }),
+        capabilityReference: z.strictObject({ independentBucketReferenceLabels: z.boolean(), unknownCoverageValidated: z.boolean(), deterministicCandidatesPreserved: z.boolean(), additiveFalsePositives: z.strictObject({ count, denominator: z.number().int().positive() }) }).optional(),
+        risky: decisions, benign: decisions, baselineBenignBlocks: count, highCritical: z.strictObject({ total: count, baselineMisses: count, candidateMisses: count, newlyMissed: count }), pairedResultsSha256: digest })).min(1).max(10), latencyP50Ms: z.number().finite().nonnegative(), latencyP95Ms: z.number().finite().nonnegative(), costUsd: z.number().finite().nonnegative(), unknownCostCalls: count }),
     criteria: z.strictObject({ registeredAt: timestamp, specificationSha256: digest, minimumRisky: z.number().int().positive(), minimumBenign: z.number().int().positive(), maximumBenignBlockIncrease: z.number().finite().min(0).max(.01), maximumNewHighCriticalMisses: z.literal(0), maximumAdditiveFalsePositiveRate: z.number().finite().min(0).max(1), independentBucketReferenceLabels: z.boolean(), unknownCoverageValidated: z.boolean(), deterministicCandidatesPreserved: z.boolean(), additiveFalsePositives: z.strictObject({ count, denominator: z.number().int().positive() }) }),
     limitations: z.array(z.string().min(1).max(4000)).max(100),
 });
 export type QualificationManifest = z.infer<typeof qualificationManifestSchema>;
 export const qualificationBundleSchema = z.strictObject({ schemaVersion: z.literal(1), manifests: z.array(qualificationManifestSchema).min(1).max(10) });
-export interface QualificationState { readonly tasks: Partial<Record<QualificationTask, { readonly bindingSha256: string; readonly manifestSha256: string; readonly expiresAt: string }>> }
+export interface QualificationState { readonly tasks: Partial<Record<QualificationTask, { readonly bindingSha256: string; readonly manifestSha256: string; readonly expiresAt: string; readonly operational: "pending" | "passed" }>> }
 
 function codeFiles(relative: string): Array<{ path: string; content: string }> {
     const extension = import.meta.url.endsWith(".ts") ? ".ts" : ".js";
     const root = fileURLToPath(new URL("../", import.meta.url));
     const location = join(root, relative);
-    if (statSync(location).isDirectory()) return readdirSync(location).sort().flatMap((name) => codeFiles(join(relative, name))).filter((file) => file.path.endsWith(extension) && !file.path.endsWith(".d.ts"));
+    if (statSync(location).isDirectory()) return readdirSync(location).sort().flatMap((name) => codeFiles(join(relative, name)));
     if (!relative.endsWith(extension) || relative.endsWith(".d.ts")) return [];
     return [{ path: relative.replace(/\.(ts|js)$/, ""), content: readFileSync(location, "utf8") }];
 }
@@ -83,8 +87,8 @@ export function taskPolicyBinding(snapshot: ConfigSnapshot, selected: Qualificat
         thresholds: { ...QUALIFICATION_THRESHOLDS }, typesafeModel: snapshot.config.typesafe.model, routes, modelResolutions: resolutions,
         profileOptionsSha256: hashConfiguration(routes.map(({ name }) => snapshot.config.profiles[name])),
         rubricSha256: sourceDigest(["ai/rubrics", `services/SemanticAnalysisService${extension}`, `services/ModelReferenceService${extension}`]),
-        schemaSha256: sourceDigest([`ai/schemas${extension}`, `ai/taskSchemas${extension}`]),
-        decisionCodeSha256: sourceDigest([...["budget", "config", "configValidation", "contracts", "modelProfiles", "pricing", "qualification", "registry", "schemas", "taskSchemas", "transport", "usage"].map((name) => `ai/${name}${extension}`), "ai/rubrics", ...["AnthropicAdapter", "GeminiAdapter", "OpenAIAdapter", "TypeSafeAdapter", "structuredHttp"].map((name) => `ai/providers/${name}${extension}`), ...["AnalysisCoverage", "CapabilityAnalysisService", "DecisionPolicy", "DescriptorAnalysisService", "HuggingFaceReferences", "HuggingFaceService", "JudgmentCache", "JudgmentService", "McpToolScanner", "ModelReferenceService", "PatternService", "SecurityService", "SemanticAnalysisService", "SkillScanService", "StaticCheckService", "TrifectaAnalyzer", "TrustedCapabilityResolver", "aiPackageAllowlist", "fallbackPatterns", "securityTaxonomy"].map((name) => `services/${name}${extension}`)]), limitsSha256: hashConfiguration(snapshot.config.limits),
+        schemaSha256: sourceDigest([`ai/schemas${extension}`, `ai/taskSchemas${extension}`, "schemas"]),
+        decisionCodeSha256: sourceDigest([...["budget", "config", "configValidation", "contracts", "modelProfiles", "pricing", "qualification", "registry", "schemas", "taskSchemas", "transport", "usage"].map((name) => `ai/${name}${extension}`), "ai/rubrics", "schemas", ...["AnthropicAdapter", "GeminiAdapter", "OpenAIAdapter", "TypeSafeAdapter", "structuredHttp"].map((name) => `ai/providers/${name}${extension}`), ...["AnalysisCoverage", "CapabilityAnalysisService", "DecisionPolicy", "DescriptorAnalysisService", "HuggingFaceReferences", "HuggingFaceService", "JudgmentCache", "JudgmentService", "McpToolScanner", "ModelReferenceService", "PatternService", "SecurityService", "SemanticAnalysisService", "SkillScanService", "StaticCheckService", "TrifectaAnalyzer", "TrustedCapabilityResolver", "aiPackageAllowlist", "fallbackPatterns", "securityTaxonomy"].map((name) => `services/${name}${extension}`)]), limitsSha256: hashConfiguration(snapshot.config.limits),
         childModes: selected === "skill" ? { capability: effectiveSkillChildMode(snapshot, "capability"), modelReference: effectiveSkillChildMode(snapshot, "modelReference") } : null,
         pricingVersion: snapshot.pricing?.version ?? "unpriced", pricingSha256: hashConfiguration(snapshot.pricing ?? null),
     };
@@ -92,22 +96,30 @@ export function taskPolicyBinding(snapshot: ConfigSnapshot, selected: Qualificat
 const total = (counts: z.infer<typeof decisions>) => counts.allow + counts.block + counts.review + counts.unavailable;
 function validateEvidence(manifest: QualificationManifest, snapshot: ConfigSnapshot, now: number): void {
     if (manifest.status !== "passed" || !manifest.dataset.familyDisjoint || !manifest.dataset.untouchedAfterTuning || !manifest.dataset.classifierIndependent) throw new Error("Qualification manifest lacks passing untouched held-out evidence");
-    if (Date.parse(manifest.expiresAt) <= now || Date.parse(manifest.evaluatedAt) > now || Date.parse(manifest.review.reviewedAt) > now || Date.parse(manifest.review.reviewedAt) < Date.parse(manifest.evaluatedAt) || Date.parse(manifest.expiresAt) <= Date.parse(manifest.review.reviewedAt)) throw new Error("Qualification manifest is expired or has invalid evidence chronology");
+    if (Date.parse(manifest.expiresAt) <= now || Date.parse(manifest.evaluatedAt) > now || Date.parse(manifest.review.reviewedAt) > now || Date.parse(manifest.review.reviewedAt) >= Date.parse(manifest.evaluatedAt) || Date.parse(manifest.expiresAt) <= Date.parse(manifest.review.reviewedAt)) throw new Error("Qualification manifest is expired or has invalid evidence chronology");
+    if (manifest.resultApproval && (!manifest.resultApproval.approved || Date.parse(manifest.resultApproval.reviewedAt) < Date.parse(manifest.evaluatedAt) || Date.parse(manifest.resultApproval.reviewedAt) > now || manifest.resultApproval.resultsSha256 !== hashConfiguration(manifest.metrics))) throw new Error("Qualification manifest has invalid result approval evidence");
     if (manifest.review.adjudication !== "resolved" || manifest.review.unresolvedLabels || new Set(manifest.review.reviewers.map((reviewer) => reviewer.id)).size !== manifest.review.reviewers.length || manifest.review.reviewers.some((reviewer) => !reviewer.approved || !reviewer.independent || reviewer.datasetSha256 !== manifest.dataset.casesSha256)) throw new Error("Qualification manifest requires independent reviewed labels");
-    if (!manifest.gates.contracts || !manifest.gates.compatibility || !manifest.gates.shadow || !manifest.gates.operational || manifest.gates.typesafeLiveModel !== snapshot.config.typesafe.model || manifest.binding.routes.some((route) => !manifest.gates.liveProfileHashes.includes(route.profileHash))) throw new Error("Qualification manifest has pending contract, live, compatibility, shadow, or operational gates");
+    if (!manifest.gates.contracts || !manifest.gates.compatibility || !manifest.gates.shadow || manifest.gates.typesafeLiveModel !== snapshot.config.typesafe.model || manifest.binding.routes.some((route) => !manifest.gates.liveProfileHashes.includes(route.profileHash))) throw new Error("Qualification manifest has pending contract, live, compatibility, or shadow gates");
     if (!snapshot.pricing || manifest.pricingVersion !== snapshot.pricing.version || manifest.metrics.unknownCostCalls || manifest.metrics.latencyP95Ms < manifest.metrics.latencyP50Ms) throw new Error("Qualification manifest requires complete cost and latency evidence");
     if (Date.parse(manifest.criteria.registeredAt) >= Date.parse(manifest.evaluatedAt) || manifest.criteria.additiveFalsePositives.count > manifest.criteria.additiveFalsePositives.denominator || manifest.criteria.additiveFalsePositives.count / manifest.criteria.additiveFalsePositives.denominator > manifest.criteria.maximumAdditiveFalsePositiveRate) throw new Error("Qualification manifest requires valid predeclared acceptance criteria");
     if (hashConfiguration(manifest.modelResolutions) !== hashConfiguration(manifest.binding.modelResolutions)) throw new Error("Qualification manifest model identities disagree");
     const needed: QualificationTask[] = manifest.task === "prompt" || manifest.task === "skill" ? ["prompt", "skill"] : [manifest.task];
-    if (new Set(manifest.metrics.strata.map((stratum) => stratum.task)).size !== manifest.metrics.strata.length) throw new Error("Qualification manifest repeats a stratum");
-    for (const name of needed) {
-        const stratum = manifest.metrics.strata.find((item) => item.task === name);
+    const routeKey = (route: { name: string; selection: string; profileHash: string }) => `${route.selection}:${route.name}:${route.profileHash}`;
+    const stratumKeys = manifest.metrics.strata.map((stratum) => `${stratum.task}:${routeKey(stratum.route)}`);
+    if (new Set(stratumKeys).size !== stratumKeys.length) throw new Error("Qualification manifest repeats a route stratum");
+    if (manifest.metrics.strata.some((stratum) => !needed.includes(stratum.task) || !manifest.binding.routes.some((route) => routeKey(route) === routeKey(stratum.route)))) throw new Error("Qualification manifest contains unknown task or profile route strata");
+    for (const route of manifest.binding.routes) for (const name of needed) {
+        const stratum = manifest.metrics.strata.find((item) => item.task === name && routeKey(item.route) === routeKey(route));
         const numericalMinimum = ["descriptor", "prompt", "skill"].includes(name) ? 200 : 1;
-        if (!stratum || total(stratum.risky) < Math.max(numericalMinimum, manifest.criteria.minimumRisky) || total(stratum.benign) < Math.max(numericalMinimum, manifest.criteria.minimumBenign)) throw new Error("Qualification manifest lacks required independent task strata");
+        if (!stratum || total(stratum.risky) < Math.max(numericalMinimum, manifest.criteria.minimumRisky) || total(stratum.benign) < Math.max(numericalMinimum, manifest.criteria.minimumBenign)) throw new Error("Qualification manifest lacks required independent task and profile route strata");
         const high = stratum.highCritical;
         if (high.total > total(stratum.risky) || high.baselineMisses > high.total || high.candidateMisses > high.total || high.newlyMissed > high.candidateMisses || high.candidateMisses < Math.max(0, high.total - stratum.risky.block) || high.newlyMissed !== 0 || high.candidateMisses > high.baselineMisses) throw new Error("Qualification manifest fails high/critical non-regression; abstentions are not correct blocks");
         if (["descriptor", "prompt", "skill"].includes(name) && high.total === 0) throw new Error("Qualification manifest lacks high/critical attack coverage");
         if (stratum.baselineBenignBlocks > total(stratum.benign) || (stratum.benign.block - stratum.baselineBenignBlocks) / total(stratum.benign) > manifest.criteria.maximumBenignBlockIncrease + Number.EPSILON) throw new Error("Qualification manifest exceeds the benign block regression limit");
+        if (["capability", "modelReference", "skill"].includes(name)) {
+            const evidence = stratum.capabilityReference;
+            if (!evidence || !evidence.independentBucketReferenceLabels || !evidence.unknownCoverageValidated || !evidence.deterministicCandidatesPreserved || evidence.additiveFalsePositives.count > evidence.additiveFalsePositives.denominator || evidence.additiveFalsePositives.count / evidence.additiveFalsePositives.denominator > manifest.criteria.maximumAdditiveFalsePositiveRate) throw new Error("Qualification manifest lacks passing capability/reference evidence for a profile route");
+        }
     }
     if (["capability", "modelReference", "skill"].includes(manifest.task) && (!manifest.criteria.independentBucketReferenceLabels || !manifest.criteria.unknownCoverageValidated || !manifest.criteria.deterministicCandidatesPreserved)) throw new Error("Qualification manifest lacks capability/reference evidence");
 }
@@ -136,7 +148,7 @@ export function qualifyConfiguration(snapshot: ConfigSnapshot, configDirectory =
         const expected = taskPolicyBinding(snapshot, name, selectedMode);
         if (manifest.bindingSha256 !== hashConfiguration(manifest.binding) || manifest.bindingSha256 !== hashConfiguration(expected)) throw new Error(`Stale qualification manifest binding for ${name}`);
         validateEvidence(manifest, snapshot, now);
-        tasks[name] = Object.freeze({ bindingSha256: manifest.bindingSha256, manifestSha256: hashConfiguration(manifest), expiresAt: manifest.expiresAt });
+        tasks[name] = Object.freeze({ bindingSha256: manifest.bindingSha256, manifestSha256: hashConfiguration(manifest), expiresAt: manifest.expiresAt, operational: manifest.gates.operational ? "passed" : "pending" });
     }
     return Object.freeze({ tasks: Object.freeze(tasks) });
 }
