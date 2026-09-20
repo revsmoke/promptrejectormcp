@@ -7,5 +7,5 @@ Each provider fixture contains success, refusal, truncation, empty-content and i
 References checked September 19, 2026:
 
 - [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs): `output_config.format`, content text blocks and native stop handling. Unsupported numeric/string bounds remain descriptions plus original local validation.
-- [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs): Responses `text.format`, native output blocks, refusal and incomplete handling; requests use `store:false`.
+- [OpenAI structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs): Responses `text.format`, native output blocks, refusal and incomplete handling; requests use `store:false`. The [prompt-caching usage fields](https://developers.openai.com/api/docs/guides/prompt-caching) include separate cached-read and cache-write counts within input tokens.
 - [Gemini content generation](https://ai.google.dev/api/generate-content): `responseJsonSchema`, candidates, parts and usage metadata. The Gemini contract suite also exercises malformed fields and transport fallback.

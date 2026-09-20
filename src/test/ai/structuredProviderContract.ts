@@ -44,6 +44,8 @@ export async function verifyStructuredProvider(provider: "anthropic" | "openai")
         assert.equal(sent.text.format.strict, true);
         assert.equal(sent.temperature, undefined);
         assert.deepEqual(sent.reasoning, { effort: "low" });
+        assert.equal(result.meta.usage.cacheWriteTokens, 10);
+        assert.equal(result.meta.usage.cacheWriteIsInputSubset, true);
         assert.equal(result.meta.usage.reasoningTokens, 5);
         assert.equal(result.meta.usage.reasoningIsOutputSubset, true);
     }

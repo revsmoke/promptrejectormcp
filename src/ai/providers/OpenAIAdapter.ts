@@ -16,6 +16,7 @@ export class OpenAIAdapter implements StructuredReasoner {
             const native = object(response.usage);
             const usage = { ...emptyUsage(), inputTokens: tokenCount(native?.input_tokens), outputTokens: tokenCount(native?.output_tokens),
                 cachedReadTokens: tokenCount(object(native?.input_tokens_details)?.cached_tokens),
+                cacheWriteTokens: tokenCount(object(native?.input_tokens_details)?.cache_write_tokens),
                 reasoningTokens: tokenCount(object(native?.output_tokens_details)?.reasoning_tokens) };
             const base = { usage, model: typeof response.model === "string" && response.model ? response.model : null };
             if (response.status === "incomplete") return { ...base, code: "incomplete" };
