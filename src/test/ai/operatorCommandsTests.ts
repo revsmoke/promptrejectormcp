@@ -20,6 +20,8 @@ assert.deepEqual(anthropicReadiness.enabledRoles, []);
 assert.equal(anthropicReadiness.credentialRequired, false);
 assert.deepEqual(readiness.missingCredentialEnvironmentVariables, ["GEMINI_API_KEY"]);
 assert.equal(readiness.typesafe.credentialRequired, false);
+assert.deepEqual(readiness.qualification, { tasks: {} });
+assert.deepEqual(readiness.reportScope, { enforcement: "v2_only", legacyDescriptorCapability: "local_only" });
 const enabled = describeAiConfig(snapshot, { TASTE_TESTER_ENABLED: "true", ANTHROPIC_API_KEY: "never-output-this-value" });
 assert.deepEqual(enabled.profiles.find((profile) => profile.name === "legacy-anthropic")!.enabledRoles, ["taster", "monitor"]);
 assert.ok(!JSON.stringify(enabled).includes("never-output-this-value"));

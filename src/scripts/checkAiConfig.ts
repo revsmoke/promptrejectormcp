@@ -24,7 +24,8 @@ export function describeAiConfig(snapshot: ConfigSnapshot, env: NodeJS.ProcessEn
     return { inferencePerformed: false, configHash: snapshot.hash, legacy: snapshot.legacy, profiles,
         missingCredentialEnvironmentVariables: [...new Set(profiles.filter((profile) => profile.credentialRequired && !profile.credentialPresent).map((profile) => profile.credentialEnvironmentVariable)), ...(judgmentEnabled && !env.TYPESAFE_API_KEY ? [keyNames.typesafe] : [])],
         roles: snapshot.config.roles, typesafe: { ...snapshot.config.typesafe, credentialEnvironmentVariable: keyNames.typesafe, credentialPresent: !!env.TYPESAFE_API_KEY, credentialRequired: judgmentEnabled },
-        limits: snapshot.config.limits,
+        limits: snapshot.config.limits, qualification: snapshot.qualification ?? { tasks: {} },
+        reportScope: { enforcement: "v2_only", legacyDescriptorCapability: "local_only" },
     };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

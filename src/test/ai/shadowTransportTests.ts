@@ -37,6 +37,18 @@ try {
     const modern = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" }, reportVersion: 2 });
     assert.equal(modern.report.schemaVersion, 2); assert.equal(modern.report.configHash, shadow.hash); assert.deepEqual(modern.report.local, legacy.report);
     assert.equal(modern.report.shadow.judgments.result.meta.provider, "typesafe");
+    const descriptorCalls = calls;
+    const drift = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" }, priorHash: "older-hash", reportVersion: 2 });
+    assert.equal(drift.report.local.hash, modern.report.local.hash); assert.equal(drift.report.local.drift, true);
+    assert.equal(drift.report.shadow.judgments.cache, "hit"); assert.equal(calls, descriptorCalls);
+    await read("scan_mcp_tool", { tool: { name: "weather", description: "Updated public forecasts" }, reportVersion: 2 });
+    assert.equal(calls, descriptorCalls + 1);
+    const originalEvaluate = services.judgmentService.evaluate.bind(services.judgmentService);
+    services.judgmentService.evaluate = (task, input, context, options) => originalEvaluate(task, { ...input, rubricVersion: input.rubricVersion + ".fixture-revision" }, context, options);
+    const revised = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" }, reportVersion: 2 });
+    assert.equal(revised.report.shadow.judgments.cache, "miss"); assert.equal(calls, descriptorCalls + 2);
+    assert.equal(revised.report.decision, modern.report.decision);
+    services.judgmentService.evaluate = originalEvaluate;
     const cap = await read("check_lethal_trifecta", { tools: ["read_file"], reportVersion: 2 });
     assert.equal(cap.report.shadow.buckets.privateDataRead.provenance, "inferred");
     assert.equal(cap.report.buckets.privateDataRead.provenance, "declared");
