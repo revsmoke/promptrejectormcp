@@ -152,3 +152,35 @@ for (const provider of Object.keys(models) as ReasoningProviderId[]) for (const 
  await new Promise(resolve=>setTimeout(resolve,10));assert.deepEqual(budget.usage.summary(),result.usage,'Report usage must not change after returning');
 }
 console.log('PASS bounded public transcript and settled Monitor deadline/cancellation accounting');
+// Prototype property names are rejected actions, never registered mock tools.
+// A failed Monitor must still produce normalized unknown evidence and preserve
+// a valid critical action beside those rejected calls.
+for (const provider of Object.keys(models) as ReasoningProviderId[]) for (const withCritical of [false, true]) {
+    const config = structuredClone(loadAIConfig({}).config);
+    config.profiles.selected = { provider, model: models[provider], maxOutputTokens: 512 };
+    config.roles.taster = { primary: 'selected' };
+    const snapshot = parseAIConfig(config);
+    const unknownNames = ['toString', '__proto__', 'constructor', 'hasOwnProperty'];
+    const calls = unknownNames.map((name, index) => ({ id: `unknown-${index}`, name, args: {} as Record<string, unknown> }));
+    if (withCritical) calls.unshift({ id: 'critical', name: 'exec_shell', args: { command: 'synthetic' } });
+    const response = provider === 'anthropic'
+        ? { stop_reason: 'tool_use', content: calls.map(call => ({ type: 'tool_use', id: call.id, name: call.name, input: call.args })) }
+        : provider === 'openai'
+            ? { status: 'completed', output: calls.map(call => ({ type: 'function_call', call_id: call.id, name: call.name, arguments: JSON.stringify(call.args) })) }
+            : { candidates: [{ finishReason: 'STOP', content: { role: 'model', parts: calls.map(call => ({ functionCall: call, thoughtSignature: 'PRIVATE' })) } }] };
+    let requests = 0;
+    const registry = new ProviderRegistry(snapshot, {
+        env: { ANTHROPIC_API_KEY: 'test', OPENAI_API_KEY: 'test', GEMINI_API_KEY: 'test' },
+        fetch: async () => ++requests === 1 ? new Response(JSON.stringify(response)) : new Response('', { status: 401 }),
+    });
+    const report = await new TasteTesterService({ enabled: true, monitor: new SemanticAnalysisService(snapshot, registry) }).runV2({ prompt: 'synthetic' });
+    assert.equal(report.coverage.taster, 'partial');
+    assert.equal(report.coverage.monitor, 'unavailable');
+    assert.equal(report.behaviorReport.severity, withCritical ? 'critical' : 'medium');
+    assert.equal(report.behaviorReport.intents.filter(intent => intent.action === 'unknown').length, unknownNames.length);
+    assert.ok(report.behaviorReport.intents.every(intent => intent.action === 'unknown' || intent.action === 'exec_shell'));
+    const transcript = report.tasterTranscript.flatMap(turn => Array.isArray(turn.content) ? turn.content : []);
+    assert.deepEqual(transcript.filter(block => block.type === 'rejected_tool_call').map(block => (block as any).nameOrNull), unknownNames);
+    assert.equal(transcript.filter(block => block.type === 'tool_result').length, withCritical ? 1 : 0);
+}
+console.log('PASS prototype property tool names remain normalized rejected evidence');
