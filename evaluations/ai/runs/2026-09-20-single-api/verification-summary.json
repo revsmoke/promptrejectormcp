@@ -86,5 +86,12 @@
       "failedSuites": 0,
       "unexpectedNetworkViolations": 0
     }
-  ]
+  ],
+  "deployment": {
+    "codeCommit": "9c4a138a6eb17c72fefdd415b6e6d0e452e5ec52",
+    "service": "net.promptrejector.api",
+    "restartVerifiedAt": "2026-09-20T11:47:10.256739+00:00",
+    "trustedHttpsAfterRestart": true,
+    "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6"
+  }
 }

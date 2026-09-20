@@ -14,6 +14,6 @@ Governing [specification](../../specs/2026-09-20-single-api-https-spec.md). This
 - [x] Update README, configuration guidance, model operations, rollout instructions, changelog and deployment runbook.
 - [x] Complete the full four-runtime offline matrix: 57/57 suites on Node 18.20.8, 22.23.2, 24.13.0 and 26.9.0, with zero unexpected network violations.
 - [x] Recheck persistent HTTPS health, retired/invalid requests and both occupied ports; scan all 265 tracked/new files for saved or inherited credential values (none found).
-- [ ] Review the final diff, commit and push the coordinated change; record remote CI result.
+- [x] Review the final diff, commit and push the coordinated change: `9c4a138` on `origin/codex/typesafe-model-routing`. [GitHub run 35508767987](https://github.com/revsmoke/promptrejectormcp/actions/runs/35508767987) passed all four runtime jobs. The persistent HTTPS service also passed a trusted health check after restart from this build.
 
 For later model switches: copy the active configuration, select the semantic/drafting/Taster/Monitor profiles independently, check configuration and account access, restart both API and MCP processes, and compare configuration hashes and actual attribution. Existing native adapters normalize provider methods and responses; adding a supported model requires catalog/profile configuration, while adding a new provider requires an adapter and contract tests. See [model operations](../../operations/ai-models.md).

@@ -20,11 +20,11 @@ Prompt Rejector protects your AI-powered applications from prompt injection atta
 
 ## ⚡ Quick Start
 
-Run the active TypeSafe profile with Gemini contextual reasoning:
+The current local deployment and instructions use branch `codex/typesafe-model-routing`. Run its active TypeSafe profile with Gemini contextual reasoning:
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/revsmoke/promptrejectormcp.git
+git clone --branch codex/typesafe-model-routing https://github.com/revsmoke/promptrejectormcp.git
 cd promptrejectormcp
 npm install
 
@@ -133,7 +133,7 @@ Results are aggregated with severity levels and categorical tags, giving you act
 
 ```bash
 # Clone the repository
-git clone https://github.com/revsmoke/promptrejectormcp.git
+git clone --branch codex/typesafe-model-routing https://github.com/revsmoke/promptrejectormcp.git
 cd promptrejectormcp
 
 # Install dependencies
