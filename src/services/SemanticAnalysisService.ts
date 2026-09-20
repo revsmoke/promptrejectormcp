@@ -45,7 +45,8 @@ export class SemanticAnalysisService {
             jsonSchema: nativeJsonSchema(semanticFindingSchema), parse: (value) => semanticFindingSchema.parse(value),
         }, context ?? this.createContext(task));
     }
-    async generate<T>(role: Exclude<GenerativeRole, "taster">, request: Omit<StructuredRequest<T>, "profile" | "maxOutputTokens">, context: CallContext): Promise<CallResult<T>> {
+    async generate<T>(role: Exclude<GenerativeRole, "taster">, request: Omit<StructuredRequest<T>, "profile" | "maxOutputTokens">, context: CallContext, limits: { maxOutputTokens?: number } = {}): Promise<CallResult<T>> {
+        if (limits.maxOutputTokens !== undefined && (!Number.isSafeInteger(limits.maxOutputTokens) || limits.maxOutputTokens < 1)) throw new Error("Invalid request output limit");
         const profiles = roleProfiles(this.snapshot, role);
         // Every adapter applies its own per-call cap. Keep the original task
         // deadline here so a timed-out primary can use a fallback within the
@@ -55,7 +56,7 @@ export class SemanticAnalysisService {
         for (const [index, profile] of profiles.entries()) {
             if (index && result?.status === "unavailable" && !["not_configured", "authentication", "rate_limited", "timeout", "transport", "invalid_response", "context_limit"].includes(result.code)) break;
             context.routing?.push({ role, provider: profile.provider, model: profile.model, profileHash: profileHash(profile), status: "attempted", reason: index ? "configured_availability_fallback" : "primary" });
-            result = await this.registry.generate({ ...request, profile, maxOutputTokens: profile.maxOutputTokens }, bounded);
+            result = await this.registry.generate({ ...request, profile, maxOutputTokens: Math.min(profile.maxOutputTokens, limits.maxOutputTokens ?? profile.maxOutputTokens) }, bounded);
             if (result.status === "ok" || ["refusal", "incomplete", "cancelled", "budget_exceeded"].includes(result.code)) break;
             if (context.signal?.aborted || Date.now() >= bounded.deadlineMs) break;
         }

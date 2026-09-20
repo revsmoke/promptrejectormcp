@@ -16,6 +16,38 @@ for (const [provider, model] of [["gemini", "gemini-3-flash-preview"], ["anthrop
     let fixture: unknown = { patterns: [{ pattern: "attack", flags: "gi", description: "Synthetic", category: "xss", severity: "high" }] };
     const native = (value: unknown) => provider === "gemini" ? { candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(value) }] } }] } : provider === "anthropic" ? { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(value) }] } : { status: "completed", output: [{ type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: JSON.stringify(value) }] }] };
     const service = new SemanticAnalysisService(snapshot, new ProviderRegistry(snapshot, { env: { GEMINI_API_KEY: "fake", ANTHROPIC_API_KEY: "fake", OPENAI_API_KEY: "fake" }, fetch: async (_url, init) => { calls.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify(native(fixture))); } }));
+    const cappedSnapshot = parseAIConfig({ ...snapshot.config,
+        profiles: { ...snapshot.config.profiles, smaller: { provider, model, maxOutputTokens: 8 } },
+        roles: { ...snapshot.config.roles, monitor: { primary: "selected", fallback: "smaller" } },
+    });
+    const monitorCaps: number[] = [];
+    const cappedMonitor = new SemanticAnalysisService(cappedSnapshot, new ProviderRegistry(cappedSnapshot, {
+        env: { GEMINI_API_KEY: "fake", ANTHROPIC_API_KEY: "fake", OPENAI_API_KEY: "fake" }, fetch: async (_url, init) => {
+            const body = JSON.parse(String(init?.body));
+            monitorCaps.push(body.max_tokens ?? body.max_output_tokens ?? body.generationConfig.maxOutputTokens);
+            return monitorCaps.length === 1 ? new Response("", { status: 401 }) : new Response(JSON.stringify(native(clean)));
+        },
+    }));
+    const previousTokenCap = process.env.TASTE_TESTER_MAX_TOKENS;
+    try {
+        process.env.TASTE_TESTER_MAX_TOKENS = "32";
+        for (const explicit of [true, false]) {
+            monitorCaps.length = 0;
+            const expectedCap = explicit ? 16 : 32;
+            const capped = new TasteTesterService({ enabled: true, apiKey: "fake", ...(explicit ? { maxTokens: 16 } : {}), monitor: cappedMonitor,
+                anthropicFactory: () => ({ messages: { create: async (request) => {
+                    assert.equal(request.max_tokens, expectedCap, "legacy Taster caller/environment limit remains effective");
+                    return { content: [{ type: "text", text: "Done." }], stop_reason: "end_turn" };
+                } } }),
+            });
+            const cappedResult = await capped.run({ prompt: "synthetic capped Monitor" });
+            assert.equal(cappedResult.monitorStatus, "ok");
+            assert.deepEqual(monitorCaps, [expectedCap, 8], `${provider}: every Monitor primary/fallback must obey both profile and caller/environment limits`);
+        }
+    } finally {
+        if (previousTokenCap === undefined) delete process.env.TASTE_TESTER_MAX_TOKENS;
+        else process.env.TASTE_TESTER_MAX_TOKENS = previousTokenCap;
+    }
     const dir = mkdtempSync(join(tmpdir(), "draft-route-"));
     try {
         cpSync("patterns", dir, { recursive: true });
