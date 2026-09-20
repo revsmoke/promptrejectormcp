@@ -1,22 +1,28 @@
+import { NativeConversationAdapter } from "./NativeConversationAdapter.js";
 import { randomUUID } from "node:crypto";
-import type { CallContext, CallMeta, CallResult, FailureCode, StructuredReasoner, StructuredRequest } from "../contracts.js";
+import type { CallContext, CallMeta, CallResult, FailureCode, StructuredReasoner, StructuredRequest, ToolConversationProvider, ToolSessionRequest, ToolSessionHandle, ToolResult, ToolTurn } from "../contracts.js";
 import { modelCapabilities, profileHash, validateModelProfile, type CapabilityCatalog } from "../modelProfiles.js";
 import { NativeTransport } from "../transport.js";
 import { emptyUsage, estimateCost, reserveCost, tokenCount, type TokenPrices } from "../usage.js";
 
-export class GeminiAdapter implements StructuredReasoner {
+export class GeminiAdapter implements StructuredReasoner, ToolConversationProvider {
+    private readonly conversation: NativeConversationAdapter;
     private readonly apiKey: string;
     private readonly transport: NativeTransport;
     private readonly timeoutMs: number;
     private readonly prices?: TokenPrices;
     private readonly capabilities?: CapabilityCatalog;
     constructor(options: { apiKey?: string; transport?: NativeTransport; timeoutMs?: number; prices?: TokenPrices; capabilities?: CapabilityCatalog } = {}) {
+        this.conversation = new NativeConversationAdapter("gemini", options);
         this.apiKey = options.apiKey ?? "";
         this.transport = options.transport ?? new NativeTransport();
         this.timeoutMs = options.timeoutMs ?? 15000;
         this.prices = options.prices;
         this.capabilities = options.capabilities;
     }
+    start(request: ToolSessionRequest, call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.start(request, call); }
+    resume(session: ToolSessionHandle, results: ToolResult[], call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.resume(session, results, call); }
+    dispose(session: ToolSessionHandle): void { this.conversation.dispose(session); }
     async generate<T>(request: StructuredRequest<T>, call: CallContext): Promise<CallResult<T>> {
         const started = Date.now();
         const meta: CallMeta = { callId: randomUUID(), provider: "gemini", requestedModel: request.profile.model,

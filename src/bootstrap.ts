@@ -57,8 +57,7 @@ export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: 
     const canaryService = new CanaryService();
     const mcpToolScanner = new McpToolScanner(patternService);
     const descriptorAnalysis = new DescriptorAnalysisService(mcpToolScanner, judgmentService);
-    const tasterProfile = snapshot.config.profiles[snapshot.config.roles.taster.primary];
-    const tasteTesterService = deps.tasteTesterService ?? new TasteTesterService({ monitor: semantic, model: tasterProfile.model, apiKey: env.ANTHROPIC_API_KEY ?? "", enabled: env.TASTE_TESTER_ENABLED === "true" });
+    const tasteTesterService = deps.tasteTesterService ?? new TasteTesterService({ monitor: semantic, apiKey: env.ANTHROPIC_API_KEY ?? "", maxTurns: Number(env.TASTE_TESTER_MAX_TURNS) || 5, maxTokens: Number(env.TASTE_TESTER_MAX_TOKENS) || 4096, timeoutMs: Number(env.TASTE_TESTER_TIMEOUT_MS) || 30000, enabled: env.TASTE_TESTER_ENABLED === "true" });
     const unifiedCveCache = new UnifiedCveCache(vulnFeedService, atlasService, kevFeedService);
     return { snapshot, registry, semantic, configuredProviders, patternService, securityService, skillScanService, huggingFaceService,
         atlasService, osvFeedService, ghsaGraphQLService, kevFeedService, geminiService, vulnFeedService,

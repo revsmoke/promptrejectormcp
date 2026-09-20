@@ -22,7 +22,7 @@ import { TasteTesterService } from "../services/TasteTesterService.js";
 import { UnifiedCveCache, type QueryCveFilters } from "../services/UnifiedCveCache.js";
 import { createServices, type Services } from "../bootstrap.js";
 import { handleMcpScan } from "../api/reportSerializers.js";
-import { roleProfiles } from "../ai/config.js";
+import { handleMcpTaster } from "../api/tasterSerializers.js";
 import { handleMcpJudgment } from "../api/judgmentSerializers.js";
 
 const require = createRequire(import.meta.url);
@@ -244,6 +244,7 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
+                                reportVersion: { type: "number", enum: [1, 2], default: 1 },
                                 prompt: { type: "string" },
                                 mode: { type: "string", enum: ["fast", "thorough"] },
                                 context: { type: "string" },
@@ -261,14 +262,7 @@ export class PromptRejectorMCPServer {
 
             if (name === "check_prompt" || name === "scan_skill") return handleMcpScan(this.services, name, args, extra.signal);
             if (name === "scan_mcp_tool" || name === "check_lethal_trifecta") return handleMcpJudgment(this.services, name, args, extra.signal);
-            if (name === "taste_test" && [...roleProfiles(this.services.snapshot, "taster"), ...roleProfiles(this.services.snapshot, "monitor")].some((profile) => profile.provider !== "anthropic")) {
-                return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "report_version_required", reportVersion: 2 }) }] };
-            }
-            // Reserve version validation for later slices without claiming
-            // descriptor/capability/Taster v2 behavior before it is implemented.
-            if (name === "taste_test" && args?.reportVersion !== undefined && args.reportVersion !== 1) {
-                return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "unsupported_report_version" }) }] };
-            }
+            if (name === "taste_test") return handleMcpTaster(this.services, args, extra.signal);
 
             if (name === "list_patterns") {
                 const { category } = (args || {}) as { category?: string };
@@ -384,28 +378,6 @@ export class PromptRejectorMCPServer {
                 };
             }
 
-            if (name === "taste_test") {
-                const a = (args || {}) as { prompt?: unknown; mode?: unknown; context?: unknown };
-                if (typeof a.prompt !== "string" || a.prompt.length < 1 || a.prompt.length > 100_000) {
-                    return validationError("prompt is required and must be a string of 1-100,000 characters");
-                }
-                if (a.mode !== undefined && a.mode !== "fast" && a.mode !== "thorough") {
-                    return validationError("mode must be 'fast' or 'thorough' if provided");
-                }
-                if (a.context !== undefined) {
-                    if (typeof a.context !== "string" || a.context.length > 100_000) {
-                        return validationError("context must be a string of at most 100,000 characters if provided");
-                    }
-                }
-                const result = await this.tasteTesterService.run({
-                    prompt: a.prompt,
-                    mode: a.mode as "fast" | "thorough" | undefined,
-                    context: a.context as string | undefined,
-                });
-                return {
-                    content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-                };
-            }
 
             // Silence unused-private-member warnings for stub services wired only for future passes
             void this.atlasService;

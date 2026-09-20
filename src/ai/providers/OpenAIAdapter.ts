@@ -1,9 +1,14 @@
-import type { CallContext, CallResult, StructuredReasoner, StructuredRequest } from "../contracts.js";
+import { NativeConversationAdapter } from "./NativeConversationAdapter.js";
+import type { CallContext, CallResult, StructuredReasoner, StructuredRequest, ToolConversationProvider, ToolSessionRequest, ToolSessionHandle, ToolResult, ToolTurn } from "../contracts.js";
 import { emptyUsage, tokenCount } from "../usage.js";
 import { object, structuredHttp, type StructuredHttpOptions } from "./structuredHttp.js";
 
-export class OpenAIAdapter implements StructuredReasoner {
-    constructor(private readonly options: StructuredHttpOptions = {}) {}
+export class OpenAIAdapter implements StructuredReasoner, ToolConversationProvider {
+    private readonly conversation: NativeConversationAdapter;
+    constructor(private readonly options: StructuredHttpOptions = {}) { this.conversation = new NativeConversationAdapter("openai", options); }
+    start(request: ToolSessionRequest, call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.start(request, call); }
+    resume(session: ToolSessionHandle, results: ToolResult[], call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.resume(session, results, call); }
+    dispose(session: ToolSessionHandle): void { this.conversation.dispose(session); }
     generate<T>(request: StructuredRequest<T>, call: CallContext): Promise<CallResult<T>> {
         return structuredHttp("openai", request, call, this.options, () => ({
             url: "https://api.openai.com/v1/responses",

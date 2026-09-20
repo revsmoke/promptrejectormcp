@@ -1,9 +1,14 @@
-import type { CallContext, CallResult, StructuredReasoner, StructuredRequest } from "../contracts.js";
+import { NativeConversationAdapter } from "./NativeConversationAdapter.js";
+import type { CallContext, CallResult, StructuredReasoner, StructuredRequest, ToolConversationProvider, ToolSessionRequest, ToolSessionHandle, ToolResult, ToolTurn } from "../contracts.js";
 import { emptyUsage, tokenCount } from "../usage.js";
 import { anthropicJsonSchema, object, structuredHttp, type StructuredHttpOptions } from "./structuredHttp.js";
 
-export class AnthropicAdapter implements StructuredReasoner {
-    constructor(private readonly options: StructuredHttpOptions = {}) {}
+export class AnthropicAdapter implements StructuredReasoner, ToolConversationProvider {
+    private readonly conversation: NativeConversationAdapter;
+    constructor(private readonly options: StructuredHttpOptions = {}) { this.conversation = new NativeConversationAdapter("anthropic", options); }
+    start(request: ToolSessionRequest, call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.start(request, call); }
+    resume(session: ToolSessionHandle, results: ToolResult[], call: CallContext): Promise<CallResult<ToolTurn>> { return this.conversation.resume(session, results, call); }
+    dispose(session: ToolSessionHandle): void { this.conversation.dispose(session); }
     generate<T>(request: StructuredRequest<T>, call: CallContext): Promise<CallResult<T>> {
         return structuredHttp("anthropic", request, call, this.options, () => ({
             url: "https://api.anthropic.com/v1/messages",
