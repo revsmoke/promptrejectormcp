@@ -22,7 +22,7 @@ async function main() {
     const { PromptRejectorMCPServer } = await import("./mcp/mcpServer.js");
     const services = createServices();
     if (mode === "api" || mode === "both") {
-        startApiServer(services);
+        await startApiServer(services);
     }
 
     if (mode === "mcp" || mode === "both") {

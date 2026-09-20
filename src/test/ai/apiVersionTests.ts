@@ -3,11 +3,18 @@ import { createApiApp } from "../../api/server.js";
 import { createServices } from "../../bootstrap.js";
 import { loadAIConfig, parseAIConfig } from "../../ai/config.js";
 import { handleMcpScan } from "../../api/reportSerializers.js";
+import { handleMcpJudgment } from "../../api/judgmentSerializers.js";
+import { handleMcpTaster } from "../../api/tasterSerializers.js";
 import { fixtureSemantic } from "./fixtures.js";
 
 const config = loadAIConfig({});
 let calls = 0;
 const services = createServices(config, { env: {}, semantic: fixtureSemantic({ called: () => { calls++; } }) });
+let legacyCalls = 0;
+services.securityService.runSecurityScan = async () => { legacyCalls++; throw new Error("retired scanner called"); };
+services.skillScanService.scanSkill = async () => { legacyCalls++; throw new Error("retired scanner called"); };
+let feedCalls = 0;
+services.vulnFeedService.updateFeeds = async () => { feedCalls++; return { fetchedCount: 0, relevantCount: 0, patternsGenerated: 0, errors: [], perSource: { nvd: 0, ghsaRest: 0, ghsaGraphql: 0, osv: 0 } }; };
 const server = createApiApp(services).listen(0, "127.0.0.1");
 await new Promise<void>((resolve) => server.on("listening", resolve));
 const address = server.address();
@@ -15,10 +22,19 @@ assert.ok(address && typeof address === "object");
 const endpoint = `http://127.0.0.1:${address.port}`;
 async function post(path: string, body: unknown, raw = false) { return fetch(endpoint + path, { method: "POST", headers: { "content-type": "application/json" }, body: raw ? String(body) : JSON.stringify(body) }); }
 try {
-    const v1 = await post("/v1/check-prompt", { prompt: "Summarize this weather report." });
-    assert.equal(v1.status, 200);
-    const legacy = await v1.json() as { safe: boolean; geminiAvailable: boolean; overallConfidence: number };
-    assert.equal(legacy.safe, true); assert.equal(legacy.geminiAvailable, true); assert.equal(legacy.overallConfidence, 0.9);
+    for (const route of ["check-prompt", "scan-skill", "patterns", "patterns/update-feeds", "patterns/verify"]) {
+        const retired = await post(`/v1/${route}`, { prompt: "Summarize this weather report." });
+        assert.equal(retired.status, 410);
+        assert.deepEqual(await retired.json(), { error: "api_version_retired", route: `/v2/${route}` });
+    }
+    assert.equal((await fetch(endpoint + "/v1/patterns")).status, 410);
+    assert.equal((await fetch(endpoint + "/v1/check-prompt", { method: "OPTIONS" })).status, 410);
+    assert.equal((await post("/v1/check-prompt", "not json", true)).status, 410, "retirement precedes body parsing");
+    assert.equal(calls, 0, "retired routes never infer");
+    assert.equal(legacyCalls, 0, "retired routes never scan"); assert.equal(feedCalls, 0, "retired routes never update feeds");
+    assert.equal((await fetch(endpoint + "/v2/patterns")).status, 200);
+    assert.equal((await post("/v2/patterns/verify", {})).status, 200);
+    assert.equal((await post("/v2/patterns/update-feeds", {})).status, 200); assert.equal(feedCalls, 1);
     const v2 = await post("/v2/check-prompt", { prompt: "Summarize this weather report." });
     const modern = await v2.json() as Record<string, any>;
     assert.equal(modern.schemaVersion, 2); assert.equal(modern.safe, modern.decision === "allow");
@@ -45,21 +61,31 @@ try {
     const details = await health.json() as Record<string, any>;
     assert.equal(details.configHash, config.hash);
     assert.ok(!JSON.stringify(details).includes("_API_KEY"));
+    assert.equal(legacyCalls, 0, "current routes never use retired scanner helpers");
 } finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); }
-const otherConfig = parseAIConfig({ ...config.config, profiles: { ...config.config.profiles, other: { provider: "openai", model: "gpt-6-astra", maxOutputTokens: 2048 } }, roles: { ...config.config.roles, semantic: { primary: "other" } } });
-let otherCalls = 0;
-const other = createServices(otherConfig, { env: {}, semantic: fixtureSemantic({ snapshot: otherConfig, called: () => { otherCalls++; } }) });
-const migration = await handleMcpScan(other, "check_prompt", { prompt: "hello" });
-assert.equal(migration.isError, true); assert.equal(otherCalls, 0);
-assert.equal(JSON.parse(migration.content[0].text).error, "report_version_required");
-const configuredServer = createApiApp(other).listen(0, "127.0.0.1");
-await new Promise<void>((resolve) => configuredServer.on("listening", resolve));
-try {
-    const address = configuredServer.address(); assert.ok(address && typeof address === "object");
-    const migrated = await fetch(`http://127.0.0.1:${address.port}/v1/check-prompt`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: "hello" }) });
-    assert.equal(migrated.status, 409); assert.equal(otherCalls, 0);
-    const report = JSON.parse((await handleMcpScan(other, "check_prompt", { prompt: "hello", reportVersion: 2 })).content[0].text);
-    assert.equal(report.semantic.meta.provider, "openai"); assert.equal(report.gemini, undefined); assert.equal(otherCalls, 1);
-} finally { configuredServer.closeAllConnections(); await new Promise<void>((resolve) => configuredServer.close(() => resolve())); }
+for (const [provider, model] of [["gemini", "gemini-3-flash-preview"], ["anthropic", "claude-sonnet-5"], ["openai", "gpt-6-astra"]] as const) {
+    const otherConfig = parseAIConfig({ ...config.config, profiles: { ...config.config.profiles, other: { provider, model, maxOutputTokens: 2048 } }, roles: { ...config.config.roles, semantic: { primary: "other" } } });
+    let otherCalls = 0;
+    const other = createServices(otherConfig, { env: {}, semantic: fixtureSemantic({ snapshot: otherConfig, called: () => { otherCalls++; } }) });
+    for (const [name, args] of [["check_prompt", { prompt: "hello" }], ["scan_skill", { skillContent: "Summarize a CSV file." }]] as const) {
+        const before = otherCalls;
+        const rejected = await handleMcpScan(other, name, { ...args, reportVersion: 1 });
+        assert.equal(rejected.isError, true); assert.equal(otherCalls, before, "retired MCP report never infers");
+        const result = await handleMcpScan(other, name, args);
+        assert.equal(result.isError, undefined);
+        const report = JSON.parse(result.content[0].text);
+        assert.equal(report.schemaVersion, 2); assert.equal(report.semantic.meta.provider, provider);
+        assert.equal(report.gemini, undefined); assert.equal(otherCalls, before + 1);
+    }
+    for (const [name, args] of [["scan_mcp_tool", { tool: { description: "Public forecasts." } }], ["check_lethal_trifecta", { tools: ["arithmetic"] }]] as const) {
+        assert.equal((await handleMcpJudgment(other, name, { ...args, reportVersion: 1 })).isError, true);
+        const result = await handleMcpJudgment(other, name, args);
+        assert.equal(result.isError, undefined); assert.equal(JSON.parse(result.content[0].text).schemaVersion, 2);
+    }
+    const retiredTaster = await handleMcpTaster(other, { prompt: "hello", reportVersion: 1 });
+    assert.ok("isError" in retiredTaster && retiredTaster.isError);
+    const taster = await handleMcpTaster(other, { prompt: "hello" });
+    assert.ok(!("isError" in taster)); assert.equal(JSON.parse(taster.content[0].text).schemaVersion, 2);
+}
 assert.ok(calls > 0);
-console.log("PASS REST/MCP versions, attribution, compatibility and byte/character bounds");
+console.log("PASS sole REST/MCP report pipeline, retired routes without inference, all-provider attribution and input bounds");

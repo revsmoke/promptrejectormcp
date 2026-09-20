@@ -99,7 +99,6 @@ export class PromptRejectorMCPServer {
                                     maxLength: 100000,
                                     description: "The user input prompt to check.",
                                 },
-                                reportVersion: { type: "integer", enum: [1, 2], default: this.services.snapshot.config.mcpDefaultReportVersion },
                             },
                             required: ["prompt"],
                             additionalProperties: false,
@@ -117,7 +116,6 @@ export class PromptRejectorMCPServer {
                                     maxLength: 500000,
                                     description: "The raw markdown content of the SKILL.md file to scan.",
                                 },
-                                reportVersion: { type: "integer", enum: [1, 2], default: this.services.snapshot.config.mcpDefaultReportVersion },
                             },
                             required: ["skillContent"],
                             additionalProperties: false,
@@ -163,7 +161,6 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                reportVersion: { type: "integer", enum: [1, 2], default: this.services.snapshot.config.mcpDefaultReportVersion },
                                 tool: {
                                     type: "object",
                                     description: "MCP tool descriptor (name, description, inputSchema).",
@@ -182,7 +179,6 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                reportVersion: { type: "integer", enum: [1, 2], default: this.services.snapshot.config.mcpDefaultReportVersion },
                                 capabilities: {
                                     type: "array",
                                     items: { type: "string" },
@@ -244,7 +240,6 @@ export class PromptRejectorMCPServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                reportVersion: { type: "number", enum: [1, 2], default: this.services.snapshot.config.mcpDefaultReportVersion },
                                 prompt: { type: "string" },
                                 mode: { type: "string", enum: ["fast", "thorough"] },
                                 context: { type: "string" },

@@ -1,6 +1,6 @@
 # 🛡️ Skill Security Guide
 
-> Version 2 scans are available through `/v2/scan-skill` or MCP `scan_skill` with `reportVersion: 2`. They use independently configurable semantic providers and optional qualified TypeSafe judgments. Only `decision: "allow"` has `safe: true`; failed required analysis remains unavailable. Examples below retain the historical version 1 report format. See [model migration](docs/operations/ai-models.md) and [rollout status](docs/implementation/typesafe-progress.md).
+> Current scans use `POST https://localhost:3001/v2/scan-skill` or MCP `scan_skill` without a version selector. TypeSafe and contextual reasoning are active through both launchers. Only `decision: "allow"` has `safe: true`; failed required analysis remains unavailable. `/v1` is retired. See [HTTPS and MCP setup](docs/operations/local-server.md), [model selection](docs/operations/ai-models.md) and [rollout status](docs/implementation/typesafe-progress.md). Earlier detection examples below illustrate historical findings rather than the complete current report schema.
 
 This document provides detailed information about scanning Claude Code skills for security vulnerabilities.
 
@@ -218,12 +218,11 @@ Regex patterns for known attack signatures:
 ### Scanning Before Installation
 
 ```bash
-# Scan a local skill file
-SKILL_CONTENT=$(cat ~/Downloads/suspicious-skill.md)
-
-curl -X POST http://localhost:3000/v1/scan-skill \
-  -H "Content-Type: application/json" \
-  -d "{\"skillContent\": \"$SKILL_CONTENT\"}"
+# Encode the entire file as JSON, preserving quotes and newlines.
+jq -n --rawfile skillContent "$HOME/Downloads/suspicious-skill.md" \
+  '{skillContent: $skillContent}' | \
+  curl --fail --silent --show-error https://localhost:3001/v2/scan-skill \
+    -H 'Content-Type: application/json' --data-binary @-
 ```
 
 ### MCP Integration
@@ -239,45 +238,20 @@ console.log(result);
 
 ### Automated CI/CD Check
 
-```yaml
-# .github/workflows/skill-security.yml
-name: Scan Skills
+Start the built HTTPS API with credentials and trusted TLS files as described in the [runbook](docs/operations/local-server.md#manual-startup-or-another-installation). Once it is ready, this CI scan step rejects every result except an explicit allow:
 
-on:
-  pull_request:
-    paths:
-      - '**/*.skill.md'
-
-jobs:
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Start Prompt Rejector
-        run: |
-          git clone https://github.com/revsmoke/promptrejectormcp
-          cd promptrejectormcp
-          npm install
-          npm run build
-          npm start &
-          sleep 5
-
-      - name: Scan Skills
-        run: |
-          for skill in $(find . -name "*.skill.md"); do
-            echo "Scanning $skill..."
-            CONTENT=$(cat "$skill")
-            RESULT=$(curl -s -X POST http://localhost:3000/v1/scan-skill \
-              -H "Content-Type: application/json" \
-              -d "{\"skillContent\": $(jq -Rs . <<< "$CONTENT")}")
-
-            SAFE=$(echo "$RESULT" | jq -r '.safe')
-            if [ "$SAFE" != "true" ]; then
-              echo "❌ $skill failed security scan!"
-              echo "$RESULT" | jq .
-              exit 1
-            fi
-          done
+```bash
+set -euo pipefail
+while IFS= read -r -d '' skill; do
+  result=$(jq -n --rawfile skillContent "$skill" '{skillContent: $skillContent}' |
+    curl --fail --silent --show-error --max-time 25 \
+      https://localhost:3001/v2/scan-skill \
+      -H 'Content-Type: application/json' --data-binary @-)
+  if ! jq -e '.decision == "allow" and .safe == true' <<< "$result" > /dev/null; then
+    echo "Skill was not approved: $skill" >&2
+    exit 1
+  fi
+done < <(find . -name '*.skill.md' -print0)
 ```
 
 ---

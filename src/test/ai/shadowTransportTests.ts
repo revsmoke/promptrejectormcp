@@ -29,13 +29,13 @@ const client = new Client({ name: "shadow-regression", version: "1" });
 await client.connect(clientTransport);
 try {
     const listing = await client.listTools(); assert.equal(listing.tools.length, 11);
-    for (const name of ["scan_mcp_tool", "check_lethal_trifecta"]) assert.ok(listing.tools.find((tool) => tool.name === name)?.inputSchema.properties?.reportVersion);
+    for (const name of ["scan_mcp_tool", "check_lethal_trifecta"]) assert.equal(listing.tools.find((tool) => tool.name === name)?.inputSchema.properties?.reportVersion, undefined);
     const read = async (name: string, args: Record<string, unknown>) => { const result = await client.callTool({ name, arguments: args }); const content = result.content as Array<{ text: string }>; return { error: result.isError, report: JSON.parse(content[0].text) }; };
     const before = calls;
-    const legacy = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" } });
-    assert.equal(legacy.report.schemaVersion, undefined); assert.equal(calls, before);
-    const modern = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" }, reportVersion: 2 });
-    assert.equal(modern.report.schemaVersion, 2); assert.equal(modern.report.configHash, shadow.hash); assert.deepEqual(modern.report.local, legacy.report);
+    const local = services.mcpToolScanner.scan({ tool: { name: "weather", description: "Public forecasts" } });
+    assert.equal(calls, before);
+    const modern = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" } });
+    assert.equal(modern.report.schemaVersion, 2); assert.equal(modern.report.configHash, shadow.hash); assert.deepEqual(modern.report.local, local);
     assert.equal(modern.report.shadow.judgments.result.meta.provider, "typesafe");
     const descriptorCalls = calls;
     const drift = await read("scan_mcp_tool", { tool: { name: "weather", description: "Public forecasts" }, priorHash: "older-hash", reportVersion: 2 });
@@ -83,4 +83,4 @@ try {
         if (reference?.result?.status === "ok") assert.equal(reference.coverage, "partial");
     }
 } finally { await client.close(); await serverTransport.close(); }
-console.log("PASS native MCP shadow transport, legacy scope, exact source diagnostics and preserved HF lookup set");
+console.log("PASS native MCP shadow transport, current pipeline, exact source diagnostics and preserved HF lookup set");

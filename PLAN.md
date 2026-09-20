@@ -2,6 +2,7 @@
 
 > Historical v1.1 design and delivery record. For the current configurable-provider and TypeSafe work, use the [2026-09-19 specification](docs/specs/2026-09-19-typesafe-model-routing-spec.md), [implementation checklist](docs/superpowers/plans/2026-09-19-typesafe-model-routing.md), [progress ledger](docs/implementation/typesafe-progress.md), and [operations guide](docs/operations/typesafe-rollout.md). Historical completion claims below do not qualify or activate the new policies.
 
+> The [2026-09-20 serving correction](docs/specs/2026-09-20-single-api-https-spec.md) establishes the sole `/v2` API over HTTPS and current MCP reports. Use the [local runbook](docs/operations/local-server.md) for the installed service.
 **Status:** Ready to execute
 **Authoring date:** 2026-05-13
 **Methodology:** Vertical-slice / walking-skeleton development (see `/vertical-slice-dev` skill)

@@ -1,0 +1,90 @@
+{
+  "verifiedAt": "2026-09-20T11:41:35.251010+00:00",
+  "tlsVerification": "normal curl certificate and hostname verification; no insecure override",
+  "inferenceRequests": 0,
+  "checks": [
+    {
+      "name": "health",
+      "path": "/health",
+      "method": "GET",
+      "httpStatus": 200,
+      "error": null,
+      "replacement": null
+    },
+    {
+      "name": "retired_prompt",
+      "path": "/v1/check-prompt",
+      "method": "POST",
+      "httpStatus": 410,
+      "error": "api_version_retired",
+      "replacement": "/v2/check-prompt"
+    },
+    {
+      "name": "retired_skill",
+      "path": "/v1/scan-skill",
+      "method": "POST",
+      "httpStatus": 410,
+      "error": "api_version_retired",
+      "replacement": "/v2/scan-skill"
+    },
+    {
+      "name": "retired_feed_update",
+      "path": "/v1/patterns/update-feeds",
+      "method": "POST",
+      "httpStatus": 410,
+      "error": "api_version_retired",
+      "replacement": "/v2/patterns/update-feeds"
+    },
+    {
+      "name": "invalid_prompt",
+      "path": "/v2/check-prompt",
+      "method": "POST",
+      "httpStatus": 400,
+      "error": "invalid_input",
+      "replacement": null
+    },
+    {
+      "name": "invalid_json",
+      "path": "/v2/check-prompt",
+      "method": "POST",
+      "httpStatus": 400,
+      "error": "invalid_json",
+      "replacement": null
+    },
+    {
+      "name": "patterns",
+      "path": "/v2/patterns",
+      "method": "GET",
+      "httpStatus": 200,
+      "error": null,
+      "replacement": null
+    }
+  ],
+  "mapboxHttpStatus": 200,
+  "offlineMatrix": [
+    {
+      "node": "18.20.8",
+      "passedSuites": 57,
+      "failedSuites": 0,
+      "unexpectedNetworkViolations": 0
+    },
+    {
+      "node": "22.23.2",
+      "passedSuites": 57,
+      "failedSuites": 0,
+      "unexpectedNetworkViolations": 0
+    },
+    {
+      "node": "24.13.0",
+      "passedSuites": 57,
+      "failedSuites": 0,
+      "unexpectedNetworkViolations": 0
+    },
+    {
+      "node": "26.9.0",
+      "passedSuites": 57,
+      "failedSuites": 0,
+      "unexpectedNetworkViolations": 0
+    }
+  ]
+}

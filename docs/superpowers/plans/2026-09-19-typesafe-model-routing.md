@@ -1,3 +1,5 @@
+> **Current serving correction (2026-09-20):** [Single API and HTTPS rollout](2026-09-20-single-api-https.md) supersedes all earlier public v1 compatibility and MCP version-selection requirements below. Both HTTPS and MCP run the current TypeSafe pipeline. The earlier checkpoints are retained as history.
+
 # TypeSafe and Interchangeable Reasoning Models Implementation Plan
 
 > **For agentic workers:** Use `subagent-driven-development` if subagents are available and tasks are independent; otherwise use `executing-plans`. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -25,11 +25,10 @@ try {
     const tools = messages.find(message => message.id === 2)?.result.tools;
     assert.equal(tools.length, 11);
     for (const name of ["check_prompt", "scan_skill", "scan_mcp_tool", "check_lethal_trifecta", "taste_test"])
-        assert.equal(tools.find((tool: any) => tool.name === name).inputSchema.properties.reportVersion.default, 2);
+        assert.equal(tools.find((tool: any) => tool.name === name).inputSchema.properties.reportVersion, undefined);
     assert.ok(!`${child.stdout}${child.stderr}`.includes(secret));
 
     const explicit = JSON.parse(readFileSync(join(root, "config/ai.active.json"), "utf8"));
-    explicit.mcpDefaultReportVersion = 1;
     explicit.capabilitiesFile = join(root, "config/model-capabilities.json");
     explicit.pricingFile = join(root, "config/ai-pricing.example.json");
     const configFile = join(temporary, "explicit.json");
@@ -37,7 +36,7 @@ try {
     const selected = run(["--env-file", envFile, "--config", configFile]);
     assert.equal(selected.status, 0, selected.stderr);
     const selectedList = selected.stdout.trim().split("\n").map(line => JSON.parse(line)).find(message => message.id === 2).result;
-    assert.equal(selectedList.tools.find((tool: any) => tool.name === "check_prompt").inputSchema.properties.reportVersion.default, 1);
+    assert.equal(selectedList.tools.find((tool: any) => tool.name === "check_prompt").inputSchema.properties.reportVersion, undefined);
     for (const args of [["--env-file", join(temporary, "missing.env")], ["--unexpected"], ["--config"]]) {
         const invalid = run(args);
         assert.notEqual(invalid.status, 0);

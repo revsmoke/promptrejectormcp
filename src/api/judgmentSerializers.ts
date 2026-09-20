@@ -11,12 +11,12 @@ export async function handleMcpJudgment(services: Services, name: "scan_mcp_tool
         if (name === "scan_mcp_tool") {
             const input = descriptorInput.parse(args);
             descriptorFields(input.tool);
-            report = (input.reportVersion ?? services.snapshot.config.mcpDefaultReportVersion) === 2 ? await services.descriptorAnalysis.analyze(input, { signal }) : services.mcpToolScanner.scan(input);
+            report = await services.descriptorAnalysis.analyze(input, { signal });
         } else {
             const { reportVersion, ...input } = capabilityInput.parse(args);
             if (!Object.keys(input).length) throw new z.ZodError([{ code: "custom", path: [], message: "Missing source" }]);
             const source = capabilityInputSchema.parse(input);
-            report = (reportVersion ?? services.snapshot.config.mcpDefaultReportVersion) === 2 ? await services.capabilityAnalysis.analyze(source, { signal }) : services.trifectaAnalyzer.analyze(source);
+            report = await services.capabilityAnalysis.analyze(source, { signal });
         }
         return { content: [{ type: "text" as const, text: JSON.stringify(report) }] };
     } catch (error) {

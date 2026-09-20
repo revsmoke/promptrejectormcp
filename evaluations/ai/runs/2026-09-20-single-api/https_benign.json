@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 2,
+  "decision": "allow",
+  "safe": true,
+  "overallSeverity": "low",
+  "categories": [],
+  "findings": [],
+  "atlasTechniques": [],
+  "timestamp": "2026-09-20T11:31:42.991Z",
+  "coverage": [
+    {
+      "check": "local",
+      "required": true,
+      "status": "complete",
+      "reason": null,
+      "inspectedCharacters": 100,
+      "inspectedFields": 1,
+      "scope": "local",
+      "provider": null,
+      "model": null,
+      "rubricVersion": null
+    },
+    {
+      "check": "intent_judgment",
+      "required": false,
+      "status": "complete",
+      "reason": "full_reasoning_retained",
+      "inspectedCharacters": 100,
+      "inspectedFields": 1,
+      "scope": "full_input",
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "rubricVersion": "prompt-defensive.2"
+    },
+    {
+      "check": "semantic",
+      "required": true,
+      "status": "complete",
+      "reason": null,
+      "inspectedCharacters": 100,
+      "inspectedFields": 1,
+      "scope": "full_input",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "rubricVersion": "security-eight-categories-v2.1"
+    },
+    {
+      "check": "qualification",
+      "required": false,
+      "status": "not_requested",
+      "reason": "qualification_optional_not_supplied",
+      "inspectedCharacters": 0,
+      "inspectedFields": 0,
+      "scope": "local",
+      "provider": null,
+      "model": null,
+      "rubricVersion": null
+    }
+  ],
+  "semantic": {
+    "status": "ok",
+    "value": {
+      "verdict": "benign",
+      "severity": "low",
+      "categories": [],
+      "explanation": "The input is a straightforward request for a summary of a weather note and contains no signs of prompt injection or malicious intent.",
+      "evidenceIds": [
+        "input"
+      ],
+      "isInjection": false,
+      "selfReportedConfidence": 1
+    },
+    "meta": {
+      "callId": "31e98d9a-4871-4277-9f89-d33805d10cc0",
+      "provider": "gemini",
+      "requestedModel": "gemini-3-flash-preview",
+      "resolvedModel": "gemini-3-flash-preview",
+      "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+      "rubricVersion": "security-eight-categories-v2.1",
+      "schemaVersion": "semantic-v2.1",
+      "elapsedMs": 1935,
+      "attempts": 1,
+      "usage": {
+        "inputTokens": 627,
+        "outputTokens": 60,
+        "cachedReadTokens": null,
+        "cacheWriteTokens": null,
+        "reasoningTokens": 117,
+        "reasoningIsOutputSubset": false,
+        "cachedReadIsInputSubset": true,
+        "cacheWriteIsInputSubset": true
+      },
+      "failureCode": null
+    }
+  },
+  "judgments": {
+    "intent": {
+      "mode": "cascade",
+      "cache": "disabled",
+      "ageMs": 0,
+      "sourceHash": "60b38fdfd3813ab620ae42e0b9d7427792f36be6e82996d53cb1e18f74f0dc47",
+      "completion": "completed",
+      "coverage": "complete",
+      "result": {
+        "status": "ok",
+        "value": {
+          "override": {
+            "type": "noul",
+            "noul": 0.04
+          },
+          "disclosure": {
+            "type": "noul",
+            "noul": 0.01
+          },
+          "consequential": {
+            "type": "noul",
+            "noul": 0.01
+          }
+        },
+        "meta": {
+          "callId": "ecd9a246-6fa6-4573-a49e-9a3eea8316b4",
+          "provider": "typesafe",
+          "requestedModel": "jev-1.13.0",
+          "resolvedModel": "jev-1.13.0",
+          "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+          "rubricVersion": "prompt-defensive.2",
+          "schemaVersion": "judgment.1",
+          "elapsedMs": 394,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 720,
+            "outputTokens": 57,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": true,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "failureCode": null
+        }
+      }
+    },
+    "capability": null,
+    "modelReference": null,
+    "capabilityBuckets": null
+  },
+  "shadow": null,
+  "analysisMode": "cascade",
+  "policyVersion": "security-policy-v2.1",
+  "configHash": "9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6",
+  "routing": [
+    {
+      "role": "judgment",
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+      "status": "attempted",
+      "reason": "enforced_judgment"
+    },
+    {
+      "role": "semantic",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+      "status": "attempted",
+      "reason": "primary"
+    }
+  ],
+  "timings": {
+    "totalMs": 2339
+  },
+  "usage": {
+    "calls": 2,
+    "usage": {
+      "inputTokens": 1347,
+      "outputTokens": 117,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": false,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": null,
+    "pricingVersions": [
+      "2026-09-19-conservative-standard-v2"
+    ]
+  },
+  "static": {
+    "hasXSS": false,
+    "hasSQLi": false,
+    "hasShellInjection": false,
+    "hasObfuscation": false,
+    "hasPolicyPuppetry": false,
+    "hasMarkdownExfil": false,
+    "hasPromptInjection": false,
+    "hasManyShot": false,
+    "severity": "low",
+    "categories": [],
+    "findings": [],
+    "atlasTechniques": []
+  },
+  "task": "prompt"
+}

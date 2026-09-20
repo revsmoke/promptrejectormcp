@@ -44,8 +44,8 @@ for (const mode of ["enforce", "cascade"] as const) {
         assert.equal(descriptor.report.decision, "allow"); assert.equal(descriptor.report.judgments.mode, "enforce");
         const capabilities = await mcp("check_lethal_trifecta", { reportVersion: 2, tools: ["read_file"] });
         assert.equal(capabilities.report.decision, "review"); assert.equal(capabilities.report.buckets.privateDataRead.state, "unknown");
-        assert.equal((await post("/v1/check-prompt", { prompt: "Hello" })).status, 409);
-        assert.equal((await mcp("check_prompt", { prompt: "Hello" })).report.error, "report_version_required");
+        assert.equal((await post("/v1/check-prompt", { prompt: "Hello" })).status, 410);
+        assert.equal((await mcp("check_prompt", { prompt: "Hello" })).report.schemaVersion, 2);
         assert.equal((await post("/v2/check-prompt", { prompt: "Hello", evaluationOnly: true })).status, 400);
         assert.ok((await mcp("check_prompt", { prompt: "Hello", reportVersion: 2, analysisMode: "off" })).error);
         assert.equal((await post("/v2/check-prompt", { prompt: "x".repeat(100001) })).status, 413);

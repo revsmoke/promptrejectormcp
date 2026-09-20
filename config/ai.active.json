@@ -1,7 +1,6 @@
 {
   "schemaVersion": 1,
   "qualificationPolicy": "optional",
-  "mcpDefaultReportVersion": 2,
   "capabilitiesFile": "model-capabilities.json",
   "pricingFile": "ai-pricing.example.json",
   "profiles": {

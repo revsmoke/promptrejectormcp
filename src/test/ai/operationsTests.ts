@@ -18,7 +18,8 @@ try {
   assert.equal(report.roles.semantic.fallback.configured,true);
   assert.equal(report.roles.taster.readiness,'disabled');
   assert.equal(report.typesafe.readiness,'ready');assert.equal(report.typesafe.modes.descriptor,'shadow');
-  assert.equal(report.reports.enforcementScope,'v2_only');assert.equal(report.reports.legacyDescriptorCapability,'local_only');
+  assert.deepEqual(report.reports, {schemaVersion:2,restPrefix:'/v2'});
+  assert.equal(report.mcpDefaultReportVersion,undefined);
   for(const marker of [secret,'_API_KEY','privateContinuation','MOCK_TOKEN_DO_NOT_USE'])assert.ok(!JSON.stringify(report).includes(marker));
   assert.equal(report.qualification.tasks.descriptor,undefined);
 } finally {server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}

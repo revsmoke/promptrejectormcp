@@ -22,7 +22,8 @@ export function callResultSchema<T extends z.ZodType>(value: T) {
         z.strictObject({ status: z.literal("unavailable"), code: failureCodeSchema, meta: callMetaSchema }),
     ]);
 }
-export const reportVersionSchema = z.union([z.literal(1), z.literal(2)]);
+// Accept a redundant current-version marker from existing callers, never a selector.
+export const reportVersionSchema = z.literal(2);
 export const promptInputSchema = z.strictObject({ prompt: z.string().min(1).max(100_000) });
 export const skillInputSchema = z.strictObject({ skillContent: z.string().min(1).max(500_000) });
 export const mcpPromptInputSchema = promptInputSchema.extend({ reportVersion: reportVersionSchema.optional() });

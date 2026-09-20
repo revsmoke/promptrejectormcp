@@ -4,7 +4,7 @@ TypeSafe handles narrow, typed judgments; the chosen reasoning model handles con
 
 ## Default state and modes
 
-Legacy configurations keep TypeSafe off. The dedicated `start:mcp` launcher selects `config/ai.active.json` unless another config is explicitly selected: descriptor/capability/modelReference enforce, prompt/skill cascade, and MCP version 2 by default. `descriptor`, `capability` and `modelReference` accept off/shadow/enforce; `prompt` and `skill` also accept cascade. Modes are independent. Inside a skill, a child cannot exceed its parent: off disables child inference, shadow caps enabled children to shadow, and enforce/cascade permit each child's configured mode. Standalone capability scans use their own mode.
+The `start:api` (also `npm start`) and `start:mcp` launchers select `config/ai.active.json` unless another config is explicitly selected: descriptor/capability/modelReference enforce and prompt/skill cascade. HTTPS and MCP use the same current pipeline. See [local server operations](local-server.md). The low-level environment-only configuration defaults to off; it is not the launcher default. `descriptor`, `capability` and `modelReference` accept off/shadow/enforce; `prompt` and `skill` also accept cascade. Modes are independent. Inside a skill, a child cannot exceed its parent: off disables child inference, shadow caps enabled children to shadow, and enforce/cascade permit each child's configured mode. Standalone capability scans use their own mode.
 
 - **Off:** existing deterministic/reasoning analysis, with reliability fixes retained.
 - **Shadow:** observe TypeSafe answers without changing authoritative decisions or the HF lookup set. Optional failures do not downgrade required coverage.
@@ -68,7 +68,7 @@ Passing security qualification precedes staging exercises; production activation
 7. Roll back by selecting off/shadow or a previously qualified profile and restart. Reliability fixes and explicit unavailable decisions remain active.
 8. Record deployment revision, production task modes and operational proof before claiming activation.
 
-`/health` performs no inference or account discovery. It reports configured/readiness/degraded roles and the v2 scope; legacy descriptor/capability clients still use local compatibility paths. In MCP mode diagnostic logs go to stderr, leaving stdout for JSON-RPC. Raw prompts, credentials, private continuation state and hidden reasoning must not enter operational logs.
+`GET https://localhost:3001/health` performs no inference or account discovery. It reports configured/readiness/degraded roles, the config hash and the sole `/v2` API. Retired `/v1` requests return 410 without inference; MCP always uses current reports. In MCP mode diagnostic logs go to stderr, leaving stdout for JSON-RPC. Raw prompts, credentials, private continuation state and hidden reasoning must not enter operational logs.
 
 ## Rollout record template
 

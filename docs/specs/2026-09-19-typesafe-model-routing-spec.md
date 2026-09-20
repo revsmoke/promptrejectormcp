@@ -1,3 +1,5 @@
+> **Current serving correction (2026-09-20):** [Single API and HTTPS rollout](2026-09-20-single-api-https-spec.md) supersedes all earlier public v1 compatibility and MCP version-selection requirements below. Both HTTPS and MCP run the current TypeSafe pipeline. The earlier checkpoints are retained as history.
+
 # SPEC — TypeSafe judgments and interchangeable reasoning models
 
 **Status:** Implemented. Explicit local TypeSafe activation is verified through MCP, REST and the native Codex client; see the activation correction below and the [delivery ledger](../implementation/typesafe-progress.md).

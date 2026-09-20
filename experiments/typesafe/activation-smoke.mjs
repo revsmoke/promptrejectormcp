@@ -72,7 +72,7 @@ try {
     const tools = (await client.listTools()).tools;
     assert.equal(tools.length, 11);
     for (const name of ["check_prompt", "scan_skill", "scan_mcp_tool", "check_lethal_trifecta", "taste_test"])
-        assert.equal(tools.find(tool => tool.name === name).inputSchema.properties.reportVersion.default, 2);
+        assert.equal(tools.find(tool => tool.name === name).inputSchema.properties.reportVersion, undefined);
     await check("descriptor_added_block", () => call("scan_mcp_tool", { tool: poisoning }), report => {
         assert.equal(report.schemaVersion, 2); assert.equal(report.local.severity, "safe");
         assert.equal(report.decision, "block"); jev(report.judgments);

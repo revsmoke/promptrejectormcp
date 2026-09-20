@@ -41,7 +41,10 @@ try {
     const messages = child.stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     assert.ok(messages.some((message) => message.id === 1 && message.result.serverInfo.version), "stdout contains valid MCP initialization with real package version");
     const scan = messages.find((message) => message.id === 2);
-    assert.equal(JSON.parse(scan.result.content[0].text).error, "report_version_required", ".env AI config was loaded before service construction");
+    const report = JSON.parse(scan.result.content[0].text);
+    assert.equal(report.schemaVersion, 2);
+    assert.equal(report.semantic.meta.provider, "openai", ".env AI config was loaded before service construction");
+    assert.equal(report.semantic.code, "not_configured");
     assert.ok(!child.stdout.includes("PromptRejector MCP server running"));
 } finally { rmSync(temporary, { recursive: true, force: true }); }
 console.log("PASS shared construction, immutable config, dotenv ordering and MCP stdout");

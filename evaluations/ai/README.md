@@ -16,6 +16,8 @@ Code-generated offline test fixtures can exercise manifest validation, but are n
 
 ## Runs
 
+- `2026-09-20-single-api`: persistent HTTPS on localhost:3001 and stdio MCP, both using the sole current pipeline. Normal TLS verification, real benign/attack responses, matching config hashes and rejection of retired paths are recorded in the [run record](runs/2026-09-20-single-api/README.md).
+
 - `2026-09-19-active-mcp`: real active-policy MCP/REST and native Codex verification, with retained initial failures and corrective follow-ups. See its [run record](runs/2026-09-19-active-mcp/README.md). These activation checks are separate from the earlier 19-call implementation demonstration below.
 
 - `2026-09-19-exploratory-offline-v2`: 214 service evaluations (107 inputs × off/shadow), no network inference. This verifies execution/reporting and incomplete-coverage behavior, not live model quality.

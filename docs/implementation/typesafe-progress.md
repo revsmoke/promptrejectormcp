@@ -2,7 +2,19 @@
 
 This ledger tracks the [implementation plan](../superpowers/plans/2026-09-19-typesafe-model-routing.md) against the [specification](../specs/2026-09-19-typesafe-model-routing-spec.md). Code completion, offline verification, live model qualification, and activation are separate statuses.
 
-## Current activation status — supersedes earlier off-state checkpoints
+## Current deployment — HTTPS and MCP, one API
+
+The [2026-09-20 serving correction](../specs/2026-09-20-single-api-https-spec.md) supersedes earlier public version compatibility. The API is running persistently at **`https://localhost:3001`**, with prompt checks at **`POST /v2/check-prompt`**. The registered `prompt-rejector` MCP server uses stdio and the same active TypeSafe configuration. All public analysis uses the current pipeline; `/v1/*` returns 410 before analysis, and MCP rejects version 1.
+
+The current-user `net.promptrejector.api` LaunchAgent reads the original checkout's untracked `.env`, the implementation worktree's active configuration and the existing trusted localhost certificate. Normal HTTPS certificate verification passed. Mapbox remains running on port 3000; Apache was not reconfigured. See [local operations](../operations/local-server.md) for precise paths, client setup and restarts.
+
+The [live run record](../../evaluations/ai/runs/2026-09-20-single-api/README.md) preserves a real HTTPS benign allow, a TypeSafe-only attack block and an actual stdio MCP descriptor block, totaling four physical inference requests. All reports share config hash `9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6`. Live negative checks confirmed retired paths return 410, invalid current requests return 400 and current pattern listing works. Health and negative checks require no inference.
+
+Build and lint pass. **57/57 offline suites pass on each of Node 18.20.8, 22.23.2, 24.13.0 and 26.9.0**, with zero unexpected network violations. The new HTTPS suite verifies an actual trusted TLS connection, arbitrary working directory, active configuration, missing TLS, occupied port, invalid ports and secret-free startup output. Independent SPEC and quality reviewers each rebuilt an isolated copy and passed ten focused suites; both approved the code with no blockers. The final documentation review also approved the corrected client and probe instructions. A scan of all 265 tracked/new files found no saved or inherited credential values. The existing Taster mock contains only its explicitly synthetic fake-key marker. The [rollout checklist](../superpowers/plans/2026-09-20-single-api-https.md) records final delivery checks.
+
+The earlier activation section below is historical evidence for the initial MCP delivery. Its MCP-only deployment scope and version-default description do not describe the current service. Model selection, TypeSafe policy and optional formal qualification remain as implemented.
+
+## Initial activation checkpoint — historical
 
 TypeSafe is active in the local Codex MCP installation using `config/ai.active.json`: descriptor, capability and model-reference enforcement; prompt/skill block-only cascades; MCP v2 by default. All four generative roles currently select the working `gemini-3-flash-preview` profile; Claude and OpenAI profiles are available for independent role selection. Taster remains separately opt-in.
 

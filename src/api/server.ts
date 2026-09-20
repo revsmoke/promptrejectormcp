@@ -2,9 +2,11 @@ import { qualificationStatus } from "../ai/qualification.js";
 import express from "express";
 import cors from "cors";
 import { createRequire } from "module";
+import { readFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import type { Services } from "../bootstrap.js";
 import { promptInputSchema, skillInputSchema, isSizeError } from "../ai/schemas.js";
-import { ReportVersionRequiredError } from "../services/SecurityService.js";
 import { scanPromptReport, scanSkillReport } from "./reportSerializers.js";
 import { z } from "zod";
 
@@ -15,6 +17,8 @@ export function createApiApp(services: Services) {
     const app = express();
     const { patternService, vulnFeedService } = services;
 
+    // Retired requests stop before body parsing or any scanner/feed operation.
+    app.use("/v1", (req, res) => res.status(410).json({ error: "api_version_retired", route: `/v2${req.path === "/" ? "" : req.path}` }));
     const corsOrigin = process.env.CORS_ORIGIN || "*";
     app.use(cors({ origin: corsOrigin === "*" ? true : corsOrigin.split(",") }));
     app.use(express.json({ limit: "4mb" }));
@@ -31,45 +35,41 @@ export function createApiApp(services: Services) {
     });
 
     // Primary Endpoint - Check Prompt
-    for (const reportVersion of [1, 2] as const) {
-        app.post(`/v${reportVersion}/check-prompt`, async (req, res) => {
-            const validatedBody = promptInputSchema.safeParse(req.body);
-            if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
-            const controller = new AbortController();
-            const cancel = () => { if (!res.writableEnded) controller.abort(); };
-            req.on("aborted", cancel); res.on("close", cancel);
-            try {
-                const report = await scanPromptReport(services, validatedBody.data.prompt, reportVersion, controller.signal);
+    app.post("/v2/check-prompt", async (req, res) => {
+        const validatedBody = promptInputSchema.safeParse(req.body);
+        if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
+        const controller = new AbortController();
+        const cancel = () => { if (!res.writableEnded) controller.abort(); };
+        req.on("aborted", cancel); res.on("close", cancel);
+        try {
+            const report = await scanPromptReport(services, validatedBody.data.prompt, controller.signal);
 
-                res.json(report);
-            } catch (error) {
-                if (error instanceof ReportVersionRequiredError) return res.status(409).json({ error: error.code, route: "/v2/check-prompt" });
-                console.error("API scan failed: internal_error");
-                res.status(500).json({ error: "Internal server error" });
-            } finally { req.off("aborted", cancel); res.off("close", cancel); }
-        });
+            res.json(report);
+        } catch (error) {
+            console.error("API scan failed: internal_error");
+            res.status(500).json({ error: "Internal server error" });
+        } finally { req.off("aborted", cancel); res.off("close", cancel); }
+    });
 
-        // Skill Scanning Endpoint
-        app.post(`/v${reportVersion}/scan-skill`, async (req, res) => {
-            const validatedBody = skillInputSchema.safeParse(req.body);
-            if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
-            const controller = new AbortController();
-            const cancel = () => { if (!res.writableEnded) controller.abort(); };
-            req.on("aborted", cancel); res.on("close", cancel);
-            try {
-                const report = await scanSkillReport(services, validatedBody.data.skillContent, reportVersion, controller.signal);
+    // Skill Scanning Endpoint
+    app.post("/v2/scan-skill", async (req, res) => {
+        const validatedBody = skillInputSchema.safeParse(req.body);
+        if (!validatedBody.success) return res.status(isSizeError(validatedBody.error) ? 413 : 400).json({ error: isSizeError(validatedBody.error) ? "input_too_large" : "invalid_input" });
+        const controller = new AbortController();
+        const cancel = () => { if (!res.writableEnded) controller.abort(); };
+        req.on("aborted", cancel); res.on("close", cancel);
+        try {
+            const report = await scanSkillReport(services, validatedBody.data.skillContent, controller.signal);
 
-                res.json(report);
-            } catch (error) {
-                if (error instanceof ReportVersionRequiredError) return res.status(409).json({ error: error.code, route: "/v2/scan-skill" });
-                console.error("API scan failed: internal_error");
-                res.status(500).json({ error: "Internal server error" });
-            } finally { req.off("aborted", cancel); res.off("close", cancel); }
-        });
-    }
+            res.json(report);
+        } catch (error) {
+            console.error("API scan failed: internal_error");
+            res.status(500).json({ error: "Internal server error" });
+        } finally { req.off("aborted", cancel); res.off("close", cancel); }
+    });
 
     // Pattern Library Endpoints
-    app.get("/v1/patterns", (req, res) => {
+    app.get("/v2/patterns", (req, res) => {
         try {
             const query = ListPatternsQuerySchema.parse(req.query);
             const filters: any = {};
@@ -88,7 +88,7 @@ export function createApiApp(services: Services) {
         }
     });
 
-    app.post("/v1/patterns/update-feeds", async (req, res) => {
+    app.post("/v2/patterns/update-feeds", async (req, res) => {
         try {
             const body = UpdateFeedsSchema.parse(req.body);
             const result = await vulnFeedService.updateFeeds(body?.lookbackDays);
@@ -102,7 +102,7 @@ export function createApiApp(services: Services) {
         }
     });
 
-    app.post("/v1/patterns/verify", (req, res) => {
+    app.post("/v2/patterns/verify", (req, res) => {
         try {
             const result = patternService.verify();
             res.json(result);
@@ -127,9 +127,9 @@ export function createApiApp(services: Services) {
         const enabled = Object.values(modes).some((mode) => mode !== "off");
         res.json({ status: "ok", version, configHash: services.snapshot.hash, roles,
             typesafe: { model, modes, configured: services.configuredProviders.typesafe, readiness: !enabled ? "disabled" : services.configuredProviders.typesafe ? "ready" : "degraded" },
-            qualificationPolicy: services.snapshot.config.qualificationPolicy, qualificationStatus: qualificationStatus(services.snapshot), mcpDefaultReportVersion: services.snapshot.config.mcpDefaultReportVersion,
+            qualificationPolicy: services.snapshot.config.qualificationPolicy, qualificationStatus: qualificationStatus(services.snapshot),
             qualification: services.snapshot.qualification ?? { tasks: {} }, readinessMeaning: "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
-            reports: { prompt: [1, 2], skill: [1, 2], enforcementScope: "v2_only", legacyDescriptorCapability: "local_only", legacySemanticCompatible: services.semantic.supportsV1, legacyTasterCompatible: services.tasteTesterService.supportsV1 } });
+            reports: { schemaVersion: 2, restPrefix: "/v2" } });
     });
     app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         if (error.type === "entity.too.large") return res.status(413).json({ error: "input_too_large" });
@@ -138,10 +138,22 @@ export function createApiApp(services: Services) {
     });
     return app;
 }
-export function startApiServer(services: Services, port = process.env.PORT || 3000) {
-    return createApiApp(services).listen(port, () => {
-        console.error(`[API] PromptRejector API running at http://localhost:${port}`);
+export async function startApiServer(services: Services, port = Number(process.env.PORT || 3001), host = process.env.HOST || "127.0.0.1") {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid API port");
+    const protocol = process.env.API_PROTOCOL || "https";
+    if (!["https", "http"].includes(protocol)) throw new Error("Invalid API protocol");
+    const app = createApiApp(services);
+    if (protocol === "https" && (!process.env.TLS_CERT_FILE || !process.env.TLS_KEY_FILE)) throw new Error("HTTPS requires TLS certificate and key files");
+    const server = protocol === "https"
+        ? createHttpsServer({ cert: readFileSync(process.env.TLS_CERT_FILE!), key: readFileSync(process.env.TLS_KEY_FILE!), minVersion: "TLSv1.2" }, app)
+        : createHttpServer(app);
+    await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.once("listening", () => { server.off("error", reject); resolve(); });
+        server.listen(port, host);
     });
+    console.error(`[API] PromptRejector API running at ${protocol}://${host}:${port}`);
+    return server;
 }
 
 export default createApiApp;
