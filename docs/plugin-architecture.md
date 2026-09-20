@@ -34,6 +34,6 @@ Researched 2026-09-20 against current first-party documentation, with installed 
 - [x] Add authenticated remote MCP and a generator for a real remote endpoint package.
 - [x] Verify validators, isolated source/bundle installs, credential exclusions and active TypeSafe calls.
 - [x] Run offline regression and package tests; verify existing HTTPS service and Mapbox port separation.
-- [ ] Commit/push source and documentation; verify CI package artifacts.
+- [x] Commit/push source and documentation; verify CI package artifacts.
 - [ ] Operator-specific: configure a tunnel or public HTTPS/OAuth deployment and complete cloud-client connection tests.
 - [ ] Optional publication: submit to platform directories and complete their approval requirements.

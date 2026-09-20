@@ -26,6 +26,10 @@ The sanitized [live evidence](../evaluations/ai/runs/2026-09-20-plugins/live.jso
 
 The temporary Codex installation was removed after its cache test to avoid duplicating Bryan's existing manual MCP connection. The repository marketplace remains registered and available to install; the paths-only setup is ready. The isolated Claude test configuration does not change the user's normal Claude configuration.
 
+## Published source and CI
+
+Implementation commit: `150cbb6` on `codex/typesafe-model-routing`. The [offline matrix](https://github.com/revsmoke/promptrejectormcp/actions/runs/35528220777) passed on Node 18.20.8, 22, 24 and 26. The [package workflow](https://github.com/revsmoke/promptrejectormcp/actions/runs/35528220806) passed on Linux/Node 24 and uploaded the `prompt-rejector-plugins` artifact with the local ZIP, Desktop MCPB, skill ZIP, checksums and build metadata. The default-branch README was updated separately in `9686b5b` and links to this implementation branch.
+
 ## Reproduce
 
 ```sh
