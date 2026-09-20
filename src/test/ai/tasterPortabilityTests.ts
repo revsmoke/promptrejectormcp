@@ -114,3 +114,41 @@ console.log('PASS partial evidence, provider immutability, turn budgets and unav
  const registry=new ProviderRegistry(snapshot,{env:{ANTHROPIC_API_KEY:'test',OPENAI_API_KEY:'test',GEMINI_API_KEY:'test'},fetch:async(url)=>{urls.push(String(url));if(String(url).includes('anthropic'))return new Response(JSON.stringify(wire('anthropic',false)));if(String(url).includes('openai'))return new Response('',{status:401});return new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(clean)}]}}]}));}});
  const report=await new TasteTesterService({enabled:true,monitor:new SemanticAnalysisService(snapshot,registry)}).runV2({prompt:'synthetic'});assert.equal(report.coverage.monitor,'complete');assert.equal(report.monitorMeta?.provider,'gemini');assert.equal(urls.length,3);assert.equal(report.usage.calls,3);assert.equal(report.reason,null);
 }
+// Many tiny text blocks cannot overflow the public report and erase tool evidence.
+for (const provider of Object.keys(models) as ReasoningProviderId[]) {
+ const cfg=structuredClone(loadAIConfig({}).config);cfg.profiles.selected={provider,model:models[provider],maxOutputTokens:512};cfg.roles.taster={primary:'selected'};
+ const snapshot=parseAIConfig(cfg);let requested=0;
+ const registry=new ProviderRegistry(snapshot,{env:{ANTHROPIC_API_KEY:'test',OPENAI_API_KEY:'test',GEMINI_API_KEY:'test'},fetch:async()=>{
+  requested++;
+  if(requested>1)return new Response(JSON.stringify({stop_reason:'end_turn',content:[{type:'text',text:JSON.stringify(clean)}]}));
+  const response:any=wire(provider,true);const texts=Array.from({length:129},()=>({type:'text',text:'x'}));
+  if(provider==='anthropic')response.content.unshift(...texts);
+  else if(provider==='openai')response.output.unshift({type:'message',role:'assistant',status:'completed',content:texts.map(t=>({...t,type:'output_text'}))});
+  else response.candidates[0].content.parts.unshift(...texts.map(t=>({text:t.text})));
+  return new Response(JSON.stringify(response));
+ }});
+ const result=await new TasteTesterService({enabled:true,monitor:new SemanticAnalysisService(snapshot,registry)}).runV2({prompt:'synthetic'});
+ assert.equal(result.coverage.taster,'partial');assert.equal(result.behaviorReport.severity,'critical');
+ const assistant=result.tasterTranscript.find(t=>t.role==='assistant')!;assert.ok(Array.isArray(assistant.content));
+ const blocks=assistant.content as Array<any>;assert.ok(blocks.length<=128);assert.ok(blocks.some(b=>b.type==='tool_use'&&b.name==='exec_shell'));
+ assert.notEqual(result.behaviorReport.monitorVerdict,'clean');
+}
+// A Monitor deadline/cancellation must settle native attempt accounting before
+// the public report freezes, including when an availability fallback hangs.
+for (const provider of Object.keys(models) as ReasoningProviderId[]) for (const stop of ['timeout','cancelled','fallback','fallback_cancelled'] as const) {
+ const cfg=structuredClone(loadAIConfig({}).config);cfg.profiles.monitor={provider,model:models[provider],maxOutputTokens:512};cfg.roles.monitor=stop.startsWith('fallback')?{primary:'legacy-anthropic',fallback:'monitor'}:{primary:'monitor'};
+ const snapshot=parseAIConfig(cfg);const controller=new AbortController();let physical=0;let activeSignal:AbortSignal|undefined;
+ const budget=new (await import('../../ai/budget.js')).AnalysisBudget('taster',snapshot.config.limits,{tasterTurns:2});
+ const registry=new ProviderRegistry(snapshot,{env:{ANTHROPIC_API_KEY:'test',OPENAI_API_KEY:'test',GEMINI_API_KEY:'test'},fetch:async(_url,init)=>{
+  physical++;if(physical===1)return new Response(JSON.stringify(wire('anthropic',false)));
+  if(stop.startsWith('fallback')&&physical===2)return new Response('',{status:401});
+  activeSignal=init?.signal??undefined;
+  if(stop.endsWith('cancelled'))setTimeout(()=>controller.abort(),5);
+  return new Promise<Response>(()=>{});
+ }});
+ const begin=Date.now();const result=await new TasteTesterService({enabled:true,timeoutMs:25,monitor:new SemanticAnalysisService(snapshot,registry)}).runV2({prompt:'synthetic'},{signal:controller.signal,budget});
+ assert.equal(result.coverage.monitor,'unavailable');assert.equal(result.monitorMeta?.provider,provider);assert.equal(result.monitorMeta?.attempts,1);
+ assert.equal(result.monitorMeta?.failureCode,stop.endsWith('cancelled')?'cancelled':'timeout');assert.equal(result.usage.calls,physical);assert.equal(result.usage.calls,stop.startsWith('fallback')?3:2);assert.equal(activeSignal?.aborted,true);assert.ok(Date.now()-begin<500);
+ await new Promise(resolve=>setTimeout(resolve,10));assert.deepEqual(budget.usage.summary(),result.usage,'Report usage must not change after returning');
+}
+console.log('PASS bounded public transcript and settled Monitor deadline/cancellation accounting');

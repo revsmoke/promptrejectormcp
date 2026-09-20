@@ -34,15 +34,25 @@ export const maxSeverity = (a: Severity, b: Severity): Severity => rank[a] >= ra
 export function observedActions(turn: ToolTurn): ObservedAction[] { return [...turn.calls.map(c => ({ name: c.name, input: c.arguments })), ...turn.rejectedCalls.filter(c => c.nameOrNull).map(c => ({ name: c.nameOrNull! }))]; }
 export function actionIntents(actions: ObservedAction[]) { return actions.slice(0, 40).map(action => { const defaults = TOOL_DEFAULTS[action.name] ?? { severity: 'medium' as Severity, atlas: [] }; const a = action.input ?? {}; return { action: (TOOL_DEFAULTS[action.name] ? action.name : 'unknown') as TasterAction, target: String(a.url ?? a.path ?? a.command ?? a.to ?? a.account ?? a.sql ?? a.key ?? '').slice(0, 4000), severity: defaults.severity, atlasTechniques: defaults.atlas, rationale: 'Derived from observed tool call evidence.' }; }); }
 export function severityFloor(actions: ObservedAction[]): Severity { return actions.reduce<Severity>((max, a) => maxSeverity(max, TOOL_DEFAULTS[a.name]?.severity ?? 'medium'), 'safe'); }
-export function publicAssistant(turn: ToolTurn): {
-    turn: PublicTurn;
-    partial: boolean;
-} { let length = 0; let partial = false; const blocks: TranscriptBlock[] = []; for (const text of turn.text) {
-    const allowed = Math.min(20000, 100000 - length);
-    if (text.length > allowed)
-        partial = true;
-    const clipped = text.slice(0, allowed);
-    length += clipped.length;
-    if (clipped)
-        blocks.push({ type: 'text', text: clipped });
-} blocks.push(...turn.calls.map(c => ({ type: 'tool_use' as const, id: c.id, name: c.name, input: c.arguments })), ...turn.rejectedCalls.map(c => ({ type: 'rejected_tool_call' as const, ...c }))); return { turn: { role: 'assistant', content: blocks }, partial }; }
+/** Native normalization permits at most eight valid calls and 48 rejected-call
+ * records. Reserve room for every one before fitting public text to the schema.
+ * Dropped text marks coverage partial; action evidence is never displaced by it. */
+export function publicAssistant(turn: ToolTurn): { turn: PublicTurn; partial: boolean } {
+    const evidence: TranscriptBlock[] = [
+        ...turn.calls.map(c => ({ type: 'tool_use' as const, id: c.id, name: c.name, input: c.arguments })),
+        ...turn.rejectedCalls.map(c => ({ type: 'rejected_tool_call' as const, ...c })),
+    ];
+    const textSlots = Math.max(0, 128 - evidence.length);
+    const blocks: TranscriptBlock[] = [];
+    let length = 0;
+    let partial = false;
+    for (const text of turn.text) {
+        const allowed = blocks.length < textSlots ? Math.min(20000, 100000 - length) : 0;
+        if (text.length > allowed) partial = true;
+        const clipped = text.slice(0, allowed);
+        length += clipped.length;
+        if (clipped) blocks.push({ type: 'text', text: clipped });
+    }
+    blocks.push(...evidence);
+    return { turn: { role: 'assistant', content: blocks }, partial };
+}

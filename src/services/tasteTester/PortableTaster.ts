@@ -155,7 +155,16 @@ export class PortableTaster {
             const monitorStart = Date.now();
             const monitorDeadline = Math.min(deadline, monitorStart + phaseMs);
             try {
-                const result = await withDeadline(signal => this.semantic.generate('monitor', { systemInstruction: MONITOR_SYSTEM_PROMPT + ' Return the supplied schema, using null for an unavailable rationale.', state: JSON.stringify({ transcript }), schemaId: 'behavior_report', schemaVersion: 'monitor-v2', rubricVersion: 'monitor-v2', jsonSchema: nativeJsonSchema(monitorReportSchema), parse: value => monitorReportSchema.parse(value) }, { ...context, role: 'monitor', signal, deadlineMs: monitorDeadline }, { maxOutputTokens: this.settings.maxTokens }), monitorDeadline, options.signal);
+                // Each native structured adapter enforces this absolute deadline,
+                // including queued work, fetch and body reads, and records usage
+                // before resolving. Await that bounded completion so an outer race
+                // cannot freeze the report before a timed-out/cancelled primary or
+                // fallback has recorded its physical request.
+                const result = await this.semantic.generate('monitor', {
+                    systemInstruction: MONITOR_SYSTEM_PROMPT + ' Return the supplied schema, using null for an unavailable rationale.',
+                    state: JSON.stringify({ transcript }), schemaId: 'behavior_report', schemaVersion: 'monitor-v2', rubricVersion: 'monitor-v2',
+                    jsonSchema: nativeJsonSchema(monitorReportSchema), parse: value => monitorReportSchema.parse(value),
+                }, { ...context, role: 'monitor', signal: options.signal, deadlineMs: monitorDeadline }, { maxOutputTokens: this.settings.maxTokens });
                 monitorMeta = result.meta;
                 if (result.status === 'ok') {
                     coverage.monitor = 'complete';
