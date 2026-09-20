@@ -9,13 +9,36 @@
       "provider": "gemini",
       "model": "gemini-3-flash-preview",
       "maxOutputTokens": 2048
+    },
+    "claude-semantic": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "maxOutputTokens": 2048
+    },
+    "openai-reasoning": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "maxOutputTokens": 4096,
+      "options": {
+        "reasoning": {
+          "effort": "low"
+        }
+      }
     }
   },
   "roles": {
-    "semantic": { "primary": "gemini-compat" },
-    "patternDraft": { "primary": "gemini-compat" },
-    "taster": { "primary": "gemini-compat" },
-    "monitor": { "primary": "gemini-compat" }
+    "semantic": {
+      "primary": "gemini-compat"
+    },
+    "patternDraft": {
+      "primary": "gemini-compat"
+    },
+    "taster": {
+      "primary": "gemini-compat"
+    },
+    "monitor": {
+      "primary": "gemini-compat"
+    }
   },
   "typesafe": {
     "model": "jev-1.13.0",

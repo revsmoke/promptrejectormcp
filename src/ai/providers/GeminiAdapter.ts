@@ -94,9 +94,11 @@ export class GeminiAdapter implements StructuredReasoner, ToolConversationProvid
 function object(value: unknown): Record<string, unknown> | null {
     return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
-/** Gemini documents no native string-length constraints. They remain enforced
- * by the unchanged local parser. Required fields, enum/type constraints and
- * additionalProperties are retained; unsupported semantic operators fail. */
+/** Gemini documents no native string-length constraints. Its combined task
+ * grammar also rejects our multiple maxItems bounds (verified by an otherwise
+ * identical successful live request with those bounds removed). Keep those
+ * bounds in guidance and the unchanged strict local parser. Required fields,
+ * enum/type constraints and additionalProperties remain native constraints. */
 export function geminiJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
     const allowed = new Set(["$id", "$defs", "$ref", "$anchor", "type", "format", "title", "description", "enum", "items", "prefixItems", "minItems", "maxItems", "minimum", "maximum", "anyOf", "properties", "additionalProperties", "required"]);
     const convert = (node: unknown): unknown => {
@@ -106,6 +108,10 @@ export function geminiJsonSchema(schema: Record<string, unknown>): Record<string
         const out: Record<string, unknown> = {};
         for (const [key, child] of Object.entries(value)) {
             if (["$schema", "minLength", "maxLength"].includes(key)) continue;
+            if (key === "maxItems") {
+                if (typeof child !== "number" || !Number.isSafeInteger(child) || child < 0) throw new Error("Unsupported array bound");
+                continue;
+            }
             if (key === "const" && ["string", "number"].includes(typeof child)) { out.enum = [child]; continue; }
             if (!allowed.has(key)) throw new Error("Unsupported schema constraint");
             if (key === "properties" || key === "$defs") out[key] = Object.fromEntries(Object.entries(object(child) ?? {}).map(([name, property]) => [name, convert(property)]));
@@ -113,6 +119,7 @@ export function geminiJsonSchema(schema: Record<string, unknown>): Record<string
             else if (["anyOf", "prefixItems"].includes(key) && Array.isArray(child)) out[key] = child.map(convert);
             else out[key] = child;
         }
+        if (typeof value.maxItems === "number") out.description = [out.description, `Maximum array items: ${value.maxItems}; this bound is also enforced by the local parser.`].filter(Boolean).join(" ");
         return out;
     };
     return convert(schema) as Record<string, unknown>;

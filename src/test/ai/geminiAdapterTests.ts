@@ -85,3 +85,31 @@ const expiredResult = await expiredService.analyze("A harmless request", "prompt
 assert.equal(expiredResult.status === "unavailable" && expiredResult.code, "timeout");
 assert.equal(expiredFallbackCalls, 1, "no fallback may dispatch after the actual request deadline");
 console.log("PASS Gemini native schema, strict parsing, termination and attribution");
+import { skillReasoningSchema } from "../../ai/taskSchemas.js";
+const skillSchema = skillReasoningSchema(["skillContent"], []);
+const skillValue = { security: benign, capabilities: { completeDeclaredScope: true, restrictionEvidenceIds: ["skillContent"], privateDataRead: { state: "absent", evidenceIds: ["skillContent"] }, untrustedContentFetch: { state: "absent", evidenceIds: ["skillContent"] }, externalEgress: { state: "absent", evidenceIds: ["skillContent"] }, explanation: "Explicit complete arithmetic-only scope." }, references: [] };
+const hasMaxItems = (value: unknown): boolean => value !== null && typeof value === "object" && (Object.prototype.hasOwnProperty.call(value, "maxItems") || Object.values(value).some(hasMaxItems));
+let wireResponse: unknown = skillValue;
+let skillCalls = 0;
+const skillAdapter = new GeminiAdapter({ apiKey: "fixture-key", transport: new NativeTransport({ fetch: async (_url, init) => {
+    skillCalls++;
+    const request = JSON.parse(String(init?.body));
+    // Mirrors the observed API rejection: the combined bounded-array task
+    // grammar failed; removing maxItems alone made this same request work.
+    if (hasMaxItems(request.generationConfig.responseJsonSchema)) return new Response(JSON.stringify({ error: { code: 400, status: "INVALID_ARGUMENT" } }), { status: 400 });
+    return new Response(JSON.stringify(native(wireResponse)));
+} }) });
+const skillRequest = { ...req, schemaId: "skill_context", jsonSchema: nativeJsonSchema(skillSchema), parse: (value: unknown) => skillSchema.parse(value) };
+const nativeSkill = await skillAdapter.generate(skillRequest, ctx());
+assert.equal(nativeSkill.status, "ok", "whole-skill Gemini grammar must not encode the rejected maxItems constraints");
+assert.equal(skillCalls, 1);
+for (const oversized of [
+    { ...skillValue, security: { ...benign, categories: Array(9).fill("prompt_injection") } },
+    { ...skillValue, capabilities: { ...skillValue.capabilities, restrictionEvidenceIds: Array(65).fill("skillContent") } },
+    { ...skillValue, references: [{ id: "invented", classification: "model" }] },
+]) {
+    wireResponse = oversized;
+    const invalid = await skillAdapter.generate(skillRequest, ctx());
+    assert.equal(invalid.status === "unavailable" && invalid.code, "invalid_response", "local strict array bounds remain authoritative");
+}
+console.log("PASS Gemini whole-skill wire grammar and local strict array bounds");
