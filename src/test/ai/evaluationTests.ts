@@ -21,3 +21,33 @@ assert.throws(() => validateCases([{ ...first, input: { tool: null }, sourceSha2
 assert.throws(() => validateCases([{ ...first, task: "prompt", input: { prompt: 42 }, sourceSha256: sha256(JSON.stringify({ prompt: 42 })) }]));
 assert.equal(repeatedAnswerChanges([rows]).changed, null);
 console.log("PASS immutable corpus provenance, partition isolation and abstention-aware metrics");
+// Acceptance fixtures are generated only inside this offline test. They are
+// never shipped as real held-out data or activation evidence.
+const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
+const directory=mkdtempSync(join(tmpdir(),'acceptance-fixture-'));
+function writeAcceptance(items: typeof corpus.cases) {
+    const data=items.map((item)=>JSON.stringify(item)).join('\n')+'\n';
+    const split=JSON.stringify({schemaVersion:1,families:Object.fromEntries(items.map((item)=>[item.family,item.partition])),sources:Object.fromEntries(items.map((item)=>[`${item.task}:${item.sourceSha256}`,item.partition]))});
+    const caseSha256=sha256(data), splitSha256=sha256(split);
+    const review={schemaVersion:1,caseSha256,splitSha256,reviewedAt:'2026-01-01T00:00:00.000Z',qualificationEligible:true,familiesReviewed:true,classifierIndependent:true,adjudication:'resolved',unresolvedCases:[],reviewers:['fixture-A','fixture-B'].map((id)=>({id,approved:true,independent:true,caseSha256,splitSha256}))};
+    writeFileSync(join(directory,'cases.jsonl'),data);writeFileSync(join(directory,'split.json'),split);writeFileSync(join(directory,'review.json'),JSON.stringify(review));
+    writeFileSync(join(directory,'manifest.json'),JSON.stringify({schemaVersion:1,id:'offline-fixture',path:'cases.jsonl',sha256:caseSha256,count:items.length,qualificationEligible:true,reviewFile:'review.json',splitFile:'split.json',splitSha256,limitations:['Offline programming fixture only']}));
+    return review;
+}
+try {
+    const fresh=corpus.cases.slice(0,400).map((item,index)=>{const input={tool:{description:`Offline acceptance fixture ${index}`}};return {...item,id:`fixture-${index}`,family:`new-fixture-${index}`,partition:'held-out' as const,input,sourceSha256:sha256(JSON.stringify(input))};});
+    const manifest=join(directory,'manifest.json');
+    const review=writeAcceptance(fresh);
+    assert.equal(loadCorpus(manifest,{acceptance:true}).cases.length,400);
+    writeFileSync(join(directory,'review.json'),JSON.stringify({...review,reviewers:[{...review.reviewers[0],id:undefined},{...review.reviewers[1],id:{}}],unresolvedCases:undefined}));
+    assert.throws(()=>loadCorpus(manifest,{acceptance:true}));
+    writeAcceptance(corpus.cases.slice(0,400).map((item)=>({...item,partition:'held-out'})));
+    assert.throws(()=>loadCorpus(manifest,{acceptance:true}),/Known development/);
+    writeAcceptance(corpus.cases.slice(0,400).map((item,index)=>({...item,family:`renamed-${index}`,partition:'held-out'})));
+    assert.throws(()=>loadCorpus(manifest,{acceptance:true}),/Known development/,'renaming a family cannot erase exact development source provenance');
+    writeAcceptance(fresh);writeFileSync(join(directory,'split.json'),'{}');
+    assert.throws(()=>loadCorpus(manifest,{acceptance:true}),/split hash/);
+} finally { rmSync(directory,{recursive:true,force:true}); }
+console.log('PASS strict pre-run label reviews and hash-bound reviewed family/source partitions');

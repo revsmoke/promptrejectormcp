@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { descriptorFields } from "../ai/rubrics/descriptor.js";
 import { capabilityInputSchema } from "../services/CapabilityAnalysisService.js";
@@ -24,7 +25,32 @@ export function validateCaseInput(item: EvaluationCase): void {
     inputSchemas[item.task].parse(item.input);
     if (item.task === "descriptor") descriptorFields(item.input.tool as Record<string, unknown>);
 }
-const manifestSchema = z.object({ schemaVersion: z.literal(1), id: z.string().min(1), path: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/), count: z.number().int().positive(), qualificationEligible: z.boolean(), reviewFile: z.string().optional(), limitations: z.array(z.string()) });
+const hash = z.string().regex(/^[a-f0-9]{64}$/);
+const partition = z.enum(["development", "calibration", "held-out"]);
+const manifestSchema = z.object({ schemaVersion: z.literal(1), id: z.string().min(1), path: z.string().min(1), sha256: hash, count: z.number().int().positive(), qualificationEligible: z.boolean(), reviewFile: z.string().optional(), splitFile: z.string().optional(), splitSha256: hash.optional(), limitations: z.array(z.string()) });
+const acceptanceReviewSchema = z.strictObject({ schemaVersion: z.literal(1), caseSha256: hash, splitSha256: hash, reviewedAt: z.string().datetime(), qualificationEligible: z.literal(true),
+    familiesReviewed: z.literal(true), classifierIndependent: z.literal(true), adjudication: z.literal("resolved"), unresolvedCases: z.array(z.string()).length(0),
+    reviewers: z.array(z.strictObject({ id: z.string().trim().min(1).max(200), approved: z.literal(true), independent: z.literal(true), caseSha256: hash, splitSha256: hash })).min(2).max(20) });
+const splitSchema = z.strictObject({ schemaVersion: z.literal(1), families: z.record(z.string().min(1), partition), sources: z.record(z.string().regex(/^(descriptor|prompt|skill|capability|modelReference|taster):[a-f0-9]{64}$/), partition) });
+/** Committed development evidence is always included in acceptance split
+ * validation. A new manifest cannot quietly rename its partition or families. */
+function knownPartitions() {
+    const root = fileURLToPath(new URL("../../evaluations/ai/datasets/", import.meta.url));
+    const families: Record<string, string> = {}, sources: Record<string, string> = {};
+    for (const name of readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory() && existsSync(resolve(root, entry.name, "manifest.json"))).map((entry) => entry.name)) {
+        const manifest = manifestSchema.parse(JSON.parse(readFileSync(resolve(root, name, "manifest.json"), "utf8")));
+        const data = readFileSync(resolve(root, name, manifest.path), "utf8");
+        if (sha256(data) !== manifest.sha256) throw new Error("Known development evidence hash mismatch");
+        for (const line of data.trim().split("\n")) {
+            const item = evaluationCaseSchema.parse(JSON.parse(line));
+            const value = ["exploratory-v1", "synthetic-stress-v1"].includes(name) ? "development" : item.partition;
+            if (value === "held-out") continue;
+            if (families[item.family] && families[item.family] !== value) throw new Error("Known family partition conflict");
+            families[item.family] = value; sources[`${item.task}:${item.sourceSha256}`] = value;
+        }
+    }
+    return { families, sources };
+}
 export function validateCases(inputs: unknown[], options: { acceptance?: boolean; knownFamilies?: Readonly<Record<string, string>> } = {}): EvaluationCase[] {
     const ids = new Set<string>(), sources = new Map<string, EvaluationCase>(), families = new Map<string, string>(Object.entries(options.knownFamilies ?? {}));
     return inputs.map((input) => {
@@ -51,11 +77,21 @@ export function loadCorpus(manifestPath: string, options: { acceptance?: boolean
     const cases = validateCases(data.trim().split("\n").map((line) => JSON.parse(line)), options);
     if (cases.length !== manifest.count) throw new Error("Dataset count mismatch");
     if (options.acceptance) {
-        if (!manifest.qualificationEligible || !manifest.reviewFile) throw new Error("Dataset is not qualified for acceptance");
-        const review = JSON.parse(readFileSync(resolve(dirname(manifestPath), manifest.reviewFile), "utf8"));
-        if (review.caseSha256 !== manifest.sha256 || review.unresolvedCases?.length || review.qualificationEligible !== true || review.familiesReviewed !== true || review.classifierIndependent !== true) throw new Error("Acceptance labels or family review incomplete");
-        const reviewers = review.reviewers as Array<{ id: string; approved: boolean; independent: boolean; caseSha256: string }>;
-        if (!Array.isArray(reviewers) || new Set(reviewers.filter((entry) => entry.approved && entry.independent && entry.caseSha256 === manifest.sha256).map((entry) => entry.id)).size < 2) throw new Error("Acceptance needs two independent label reviews");
+        if (!manifest.qualificationEligible || !manifest.reviewFile || !manifest.splitFile || !manifest.splitSha256) throw new Error("Dataset is not qualified for acceptance");
+        const review = acceptanceReviewSchema.parse(JSON.parse(readFileSync(resolve(dirname(manifestPath), manifest.reviewFile), "utf8")));
+        if (review.caseSha256 !== manifest.sha256 || review.splitSha256 !== manifest.splitSha256 || Date.parse(review.reviewedAt) > Date.now()) throw new Error("Acceptance labels or family review incomplete");
+        const reviewers = review.reviewers;
+        if (new Set(reviewers.map((entry) => entry.id)).size !== reviewers.length || reviewers.some((entry) => entry.caseSha256 !== manifest.sha256 || entry.splitSha256 !== manifest.splitSha256)) throw new Error("Acceptance needs two independent label reviews");
+        const splitData = readFileSync(resolve(dirname(manifestPath), manifest.splitFile), "utf8");
+        if (sha256(splitData) !== manifest.splitSha256) throw new Error("Reviewed family split hash mismatch");
+        const split = splitSchema.parse(JSON.parse(splitData)), known = knownPartitions();
+        for (const item of cases) {
+            const source = `${item.task}:${item.sourceSha256}`;
+            if (split.families[item.family] !== item.partition || split.sources[source] !== item.partition) throw new Error("Acceptance case missing from reviewed split");
+            if (known.families[item.family] || known.sources[source]) throw new Error("Known development family or source cannot become held-out");
+        }
+        for (const [family, value] of Object.entries(split.families)) if (known.families[family] && known.families[family] !== value) throw new Error("Reviewed split contradicts known development families");
+        for (const [source, value] of Object.entries(split.sources)) if (known.sources[source] && known.sources[source] !== value) throw new Error("Reviewed split contradicts known development sources");
         for (const task of new Set(cases.map((item) => item.task))) if (["descriptor", "prompt", "skill"].includes(task)) {
             for (const risk of [true, false]) if (cases.filter((item) => item.task === task && item.label.risk === risk).length < 200) throw new Error("Acceptance stratum is below 200 risky and 200 benign");
         }
