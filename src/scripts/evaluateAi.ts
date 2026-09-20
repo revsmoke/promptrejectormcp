@@ -8,6 +8,10 @@ import { loadCorpus } from "../evaluation/Corpus.js";
 import { summarizeObservations, repeatedAnswerChanges } from "../evaluation/Metrics.js";
 import { evaluationServices, evaluateCase } from "../evaluation/Runner.js";
 import { RunQuota } from "../evaluation/RunQuota.js";
+import { createCandidateSnapshot } from "../evaluation/candidateConfig.js";
+import { PatternService } from "../services/PatternService.js";
+import { taskPolicyBinding, validateResolutions, type QualificationTask } from "../ai/qualification.js";
+type Scenario = "off" | "shadow" | "enforce" | "cascade";
 export function parseEvaluationArgs(args: string[]) {
     const values: Record<string, string | true> = {};
     const switches = new Set(["--live", "--offline", "--acceptance"]);
@@ -25,12 +29,12 @@ export function parseEvaluationArgs(args: string[]) {
     const maxRequests = Number(values["--max-requests"]), maxUsd = Number(values["--max-usd"]);
     if (live && (!profiles?.length || profiles.some((name) => !name) || typeof values["--pricing"] !== "string" || !Number.isSafeInteger(maxRequests) || maxRequests < 1 || !Number.isFinite(maxUsd) || maxUsd <= 0)) throw new Error("Live evaluation requires profiles, pricing, request limit and USD limit");
     const scenarios = String(values["--scenarios"] ?? "off").split(",");
-    if (scenarios.some((mode) => mode !== "off" && mode !== "shadow")) throw new Error("Evaluation scenario is not implemented");
+    if (scenarios.some((mode) => !["off", "shadow", "enforce", "cascade"].includes(mode))) throw new Error("Unknown evaluation scenario");
     const tasks = values["--tasks"] ? String(values["--tasks"]).split(",") : undefined;
     if (tasks?.some((task) => !["descriptor", "prompt", "skill", "capability", "modelReference", "taster"].includes(task))) throw new Error("Unknown evaluation task");
     const limit = values["--limit"] === undefined ? Infinity : Number(values["--limit"]), repeats = Number(values["--repeats"] ?? 1);
     if ((limit !== Infinity && (!Number.isSafeInteger(limit) || limit < 1)) || !Number.isSafeInteger(repeats) || repeats < 1 || repeats > 100) throw new Error("Invalid evaluation size");
-    return { live, dataset, profiles, scenarios: scenarios as Array<"off" | "shadow">, tasks, maxRequests, maxUsd, limit, repeats,
+    return { live, dataset, profiles, scenarios: scenarios as Scenario[], tasks, maxRequests, maxUsd, limit, repeats,
         pricing: values["--pricing"] as string | undefined, config: values["--config"] as string | undefined, envFile: values["--env-file"] as string | undefined,
         output: typeof values["--output"] === "string" ? values["--output"] : `evaluations/ai/runs/${new Date().toISOString().replace(/[:.]/g, "-")}`,
         acceptance: values["--acceptance"] === true };
@@ -40,6 +44,7 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
     const corpus = loadCorpus(flags.dataset, { acceptance: flags.acceptance });
     const cases = corpus.cases.filter((item) => !flags.tasks || flags.tasks.includes(item.task)).slice(0, flags.limit);
     if (!cases.length) throw new Error("No selected evaluation cases");
+    if (flags.scenarios.includes("cascade") && cases.some((item) => !["prompt", "skill"].includes(item.task))) throw new Error("Cascade evaluation requires only prompt or skill cases");
     if (existsSync(flags.output) && readdirSync(flags.output).length) throw new Error("Evaluation output directory must be empty");
     // Offline ignores ambient secrets and configuration. An explicit config
     // file may be inspected, but never enables provider access without --live.
@@ -51,7 +56,8 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
     const records: Array<Awaited<ReturnType<typeof evaluateCase>> & { profile: string; scenario: string; repeat: number; configHash: string }> = [];
     const groups: Record<string, ReturnType<typeof summarizeObservations>> = {};
     const changes: Record<string, ReturnType<typeof repeatedAnswerChanges>> = {};
-    const jobs: Array<{ profile: string; scenario: "off" | "shadow"; snapshot: ConfigSnapshot }> = [];
+    const patterns = new PatternService();
+    const jobs: Array<{ profile: string; scenario: Scenario; snapshot: ConfigSnapshot; bindings: unknown[] }> = [];
     // Preflight every route before any dispatch. A later invalid profile must
     // not cause a partly billed run whose configuration never validated.
     for (const profile of profiles) for (const scenario of flags.scenarios) {
@@ -59,21 +65,36 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
         const config = structuredClone(initial.config);
         if (profile !== "typesafe") config.roles.semantic = { primary: profile };
         if (cases.some((item) => item.task === "taster") && profile !== "typesafe") config.roles.taster = { primary: profile };
-        config.typesafe = { model: config.typesafe.model, descriptor: scenario, prompt: scenario, skill: scenario, capability: scenario, modelReference: scenario };
-        const snapshot = parseAIConfig(config, false, { capabilities: initial.capabilities, pricing });
+        const childMode = scenario === "cascade" ? "enforce" : scenario;
+        config.typesafe = { model: config.typesafe.model, descriptor: childMode, prompt: scenario, skill: scenario, capability: childMode, modelReference: childMode };
+        const enforced = scenario === "enforce" || scenario === "cascade";
+        const configOptions = { capabilities: initial.capabilities, pricing, patternService: patterns };
+        const snapshot = enforced ? createCandidateSnapshot(config, configOptions) : parseAIConfig(config, false, configOptions);
         if (flags.live) {
+            if (enforced && config.typesafe.model !== "jev-1.13.0") throw new Error("Enforced candidate requires pinned TypeSafe identity jev-1.13.0");
             if (scenario !== "off" && !tokenPrices(pricing, "typesafe", config.typesafe.model)) throw new Error("TypeSafe rate missing; live dispatch refused");
-            if (cases.some((item) => ["prompt", "skill", "taster"].includes(item.task))) {
-                if (profile === "typesafe") throw new Error("Full prompt/skill evaluation requires a reasoning profile");
-                const selected = config.profiles[profile];
-                if (!tokenPrices(pricing, selected.provider, selected.model)) throw new Error("Reasoning rate missing; live dispatch refused");
+            if (cases.some((item) => ["prompt", "skill", "taster"].includes(item.task)) && profile === "typesafe") throw new Error("Full prompt/skill evaluation requires a reasoning profile");
+            if (cases.some((item) => ["prompt", "skill"].includes(item.task) || enforced && ["descriptor", "capability"].includes(item.task))) {
+                for (const name of [config.roles.semantic.primary, config.roles.semantic.fallback].filter((name): name is string => !!name)) {
+                    const selected = config.profiles[name];
+                    if (!tokenPrices(pricing, selected.provider, selected.model)) throw new Error("Reasoning rate missing; live dispatch refused");
+                }
+            }
+            if (cases.some((item) => item.task === "taster")) {
+                const selected = config.profiles[config.roles.taster.primary];
+                if (!tokenPrices(pricing, selected.provider, selected.model)) throw new Error("Taster rate missing; live dispatch refused");
             }
             if (cases.some((item) => item.task === "taster")) for (const name of [config.roles.monitor.primary, config.roles.monitor.fallback].filter((name): name is string => !!name)) {
                 const selected = config.profiles[name];
                 if (!tokenPrices(pricing, selected.provider, selected.model)) throw new Error("Monitor rate missing; live dispatch refused");
             }
+            if (enforced) {
+                validateResolutions(snapshot, Date.now());
+            }
         }
-        jobs.push({ profile, scenario, snapshot });
+        const bindings = enforced ? [...new Set(cases.map((item) => item.task).filter((task): task is QualificationTask => task !== "taster"))]
+            .map((task) => taskPolicyBinding(snapshot, task, scenario, patterns)) : [];
+        jobs.push({ profile, scenario, snapshot, bindings });
     }
     mkdirSync(flags.output, { recursive: true });
     const owned: Array<{ path: string; fd: number }> = [];
@@ -90,7 +111,7 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
     let completed = true;
     const executionErrors: Array<{ id: string; profile: string; scenario: string; reason: string }> = [];
     outer: for (const { profile, scenario, snapshot } of jobs) for (let repeat = 0; repeat < flags.repeats; repeat++) {
-        const services = evaluationServices(snapshot, { live: flags.live, env, quota });
+        const services = evaluationServices(snapshot, { live: flags.live, env, quota, patterns });
         for (const item of cases) {
             if (quota?.exhausted) { completed = false; break outer; }
             try { records.push({ ...await evaluateCase(services, item), profile, scenario, repeat, configHash: snapshot.hash }); }
@@ -108,6 +129,7 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
         limits: flags.live ? { maxRequests: flags.maxRequests, maxUsd: flags.maxUsd } : null,
         budget: quota ? { attempts: quota.attempts, conservativeReservedUsd: quota.reservedUsd, unknownSpend: quota.unknownSpend } : null,
         groups, repeatedChanges: changes, exactReferenceExtraction: { cases: records.filter((row) => row.exactReferences !== null).length, correct: records.filter((row) => row.exactReferences === true).length },
+        candidates: jobs.filter((job) => job.snapshot.evaluationOnly).map(({ profile, scenario, snapshot, bindings }) => ({ profile, scenario, configHash: snapshot.hash, evaluationOnly: true, bindings })),
         executionErrors, limitations: [...corpus.manifest.limitations, ...flags.live ? [] : ["Offline full scans explicitly lack live semantic and HF metadata coverage."], "A successful run is not an activation manifest. Review and unavailable remain abstentions."] };
     writeFileSync(owned[0].fd, records.map((item) => JSON.stringify(item)).join("\n") + "\n");
     writeFileSync(owned[1].fd, JSON.stringify(summary, null, 2) + "\n");

@@ -57,7 +57,7 @@ function codeFiles(relative: string): Array<{ path: string; content: string }> {
     return [{ path: relative.replace(/\.(ts|js)$/, ""), content: readFileSync(location, "utf8") }];
 }
 function sourceDigest(paths: readonly string[]): string { return hashConfiguration(paths.flatMap((path) => codeFiles(path))); }
-function validateResolutions(snapshot: ConfigSnapshot, now: number): void {
+export function validateResolutions(snapshot: ConfigSnapshot, now: number): void {
     const setting = snapshot.config.roles.semantic;
     for (const name of [setting.primary, setting.fallback].filter((name): name is string => !!name)) {
         const profile = snapshot.config.profiles[name];
