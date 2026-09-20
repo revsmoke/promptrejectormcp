@@ -16,6 +16,12 @@ Delivery commit `9c4a138` is pushed to `origin/codex/typesafe-model-routing`. [G
 
 The earlier activation section below is historical evidence for the initial MCP delivery. Its MCP-only deployment scope and version-default description do not describe the current service. Model selection, TypeSafe policy and optional formal qualification remain as implemented.
 
+## Installation documentation verification
+
+The README now provides one installation path with separate HTTPS and MCP steps, explicit certificate generation, a minimal required-key setup, troubleshooting and upgrade instructions. Longer feature and language examples are linked as reference guides. The environment template explicitly selects the active configuration so `ai:config`, probes and launchers agree; generated `.certs` files are excluded from Git and npm packages.
+
+A fresh source clone completed dependency installation, build, active configuration checks, stdio MCP discovery/live TypeSafe analysis, trusted HTTPS startup and a real benign prompt check. The [installation record](../../evaluations/ai/runs/2026-09-20-installation/README.md) includes the artifacts and the corrected verification-harness assertion. No application code or running service configuration changed. The default-branch README directs installation and supporting documentation to the working implementation branch.
+
 ## Initial activation checkpoint — historical
 
 TypeSafe is active in the local Codex MCP installation using `config/ai.active.json`: descriptor, capability and model-reference enforcement; prompt/skill block-only cascades; MCP v2 by default. All four generative roles currently select the working `gemini-3-flash-preview` profile; Claude and OpenAI profiles are available for independent role selection. Taster remains separately opt-in.

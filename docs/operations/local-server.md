@@ -61,6 +61,8 @@ Do not start a second manual API process while the LaunchAgent already owns port
 
 ## Manual startup or another installation
 
+For the complete first-time walkthrough, including certificate generation, follow the [README installation steps](../../README.md#installation) and [HTTPS setup](../../README.md#https-api-setup). The details below cover alternate paths and an existing installation.
+
 Build from the installation directory. Keep credentials and local certificate paths in an untracked environment file:
 
 ```dotenv

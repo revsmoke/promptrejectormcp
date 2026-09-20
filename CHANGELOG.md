@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A single first-time installation walkthrough covering prerequisites, keys, trusted localhost HTTPS, MCP-only setup, model changes, upgrades and troubleshooting. The example environment selects active TypeSafe consistently; local certificates are excluded from Git and npm packaging. Verified with a fresh source checkout.
 - Independent semantic, pattern-drafting, Taster and Monitor model profiles with native Gemini, Claude and OpenAI adapters, validated capabilities and availability-only fallback.
 - TypeSafe Jev judgments for descriptor poisoning, prompt/skill intent, capability presence and exact-source model references; bounded caches and shared request/cost accounting.
 - One current `/v2` REST API and matching MCP reports with explicit allow/block/review/unavailable decisions, required coverage, provider attribution and usage. Existing 11 MCP tool names remain; version selection is removed. Retired `/v1/*` requests return 410 before analysis.
