@@ -28,12 +28,13 @@ Severity: critical for direct successful-looking jailbreak or malicious command 
 export class SemanticAnalysisService {
     readonly snapshot: ConfigSnapshot;
     readonly registry: ProviderRegistry;
-    constructor(snapshot: ConfigSnapshot = loadAIConfig(), registry?: ProviderRegistry) {
+    constructor(snapshot: ConfigSnapshot = loadAIConfig(), registry?: ProviderRegistry, private readonly contextFactory?: (task: AnalysisTask, signal?: AbortSignal) => CallContext) {
         this.snapshot = snapshot;
         this.registry = registry ?? new ProviderRegistry(snapshot);
     }
     get supportsV1(): boolean { return legacySemanticCompatible(this.snapshot); }
     createContext(task: AnalysisTask, signal?: AbortSignal): CallContext {
+        if (this.contextFactory) return this.contextFactory(task, signal);
         const budget = new AnalysisBudget(task, this.snapshot.config.limits);
         return { budget, deadlineMs: budget.deadlineMs, signal, runId: randomUUID(), role: "semantic", configHash: this.snapshot.hash, routing: [] };
     }

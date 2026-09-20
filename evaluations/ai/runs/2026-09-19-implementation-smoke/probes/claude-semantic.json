@@ -1,0 +1,51 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "profile": "claude-semantic",
+  "status": "unavailable",
+  "code": "unsupported",
+  "meta": {
+    "callId": "fe3a3b3b-d43f-4fdc-ba9b-a0fa205c5546",
+    "provider": "anthropic",
+    "requestedModel": "claude-sonnet-5",
+    "resolvedModel": null,
+    "profileHash": "f51fd0a4a390a509f5c930cae48bf43f8bcda51b0eb15365fee271d3e7462f64",
+    "rubricVersion": "security-eight-categories-v2.1",
+    "schemaVersion": "semantic-v2.1",
+    "elapsedMs": 267,
+    "attempts": 1,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "failureCode": "unsupported"
+  },
+  "limits": {
+    "maxRequests": 2,
+    "maxUsd": 0.15
+  },
+  "actualAttempts": 1,
+  "usage": {
+    "calls": 1,
+    "usage": {
+      "inputTokens": null,
+      "outputTokens": null,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": null,
+    "pricingVersions": [
+      "2026-09-19-conservative-standard-v1"
+    ]
+  }
+}

@@ -10,6 +10,7 @@ import { TrustedCapabilityResolver, type CapabilityBucket, type TrustedCapabilit
 import { completedCheck } from "./AnalysisCoverage.js";
 import { POLICY_VERSION } from "./DecisionPolicy.js";
 import { capabilityReportSchema } from "../schemas/CapabilityReportSchema.js";
+import type { SemanticAnalysisService } from "./SemanticAnalysisService.js";
 
 export const capabilityInputSchema = z.strictObject({ tools: z.array(z.string().max(4000)).max(512).optional(), capabilities: z.array(z.string().max(4000)).max(512).optional(), skillContent: z.string().max(500000).optional() }).superRefine((input, ctx) => {
     if ([...input.tools ?? [], ...input.capabilities ?? [], input.skillContent ?? ""].reduce((sum, text) => sum + text.length, 0) > 500000) ctx.addIssue({ code: "too_big", origin: "string", maximum: 500000, inclusive: true, message: "Capability input too large" });
@@ -19,7 +20,7 @@ export type CapabilityStates = Record<CapabilityBucket, CapabilityState>;
 const buckets = ["privateDataRead", "untrustedContentFetch", "externalEgress"] as const;
 const questionIds = { privateDataRead: "private", untrustedContentFetch: "untrusted", externalEgress: "egress" } as const;
 export class CapabilityAnalysisService {
-    constructor(readonly judgments: JudgmentService, readonly local = new TrifectaAnalyzer(), readonly trusted = new TrustedCapabilityResolver(judgments.snapshot.hash)) {}
+    constructor(readonly judgments: JudgmentService, readonly local = new TrifectaAnalyzer(), readonly trusted = new TrustedCapabilityResolver(judgments.snapshot.hash), readonly semantic?: SemanticAnalysisService) {}
     async observe(input: TrifectaInput, context: CallContext, options: { parentTask?: "skill"; trustedContext?: TrustedCapabilityContext } = {}): Promise<{ judgments: JudgmentObservation; buckets: CapabilityStates }> {
         const source = capabilityInputSchema.parse(input);
         const facts = this.trusted.resolve(options.trustedContext);
@@ -39,8 +40,9 @@ export class CapabilityAnalysisService {
         const source = capabilityInputSchema.parse(input);
         const serialized = JSON.stringify(source);
         const local = this.local.analyze(source);
-        const budget = new AnalysisBudget("capability", this.judgments.snapshot.config.limits);
-        const context: CallContext = { budget, deadlineMs: budget.deadlineMs, signal: options.signal, role: "judgment", runId: randomUUID(), configHash: this.judgments.snapshot.hash };
+        const inherited = this.semantic?.createContext("capability", options.signal);
+        const budget = inherited?.budget ?? new AnalysisBudget("capability", this.judgments.snapshot.config.limits);
+        const context: CallContext = inherited ?? { budget, deadlineMs: budget.deadlineMs, signal: options.signal, role: "judgment", runId: randomUUID(), configHash: this.judgments.snapshot.hash };
         budget.authorizeShadow({ requiredWorkComplete: true });
         const observed = await this.observe(source, context, options);
         const present = buckets.filter((bucket) => local[bucket].present).length;

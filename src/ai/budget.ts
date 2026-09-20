@@ -19,14 +19,24 @@ export class AnalysisBudget {
     private reservations = new Map<string, number | null>();
     private readonly maxUsd?: number;
     private readonly maxShadowAttempts: number;
-    constructor(task: AnalysisTask, limits: AnalysisLimits, options: { deadlineMs?: number; maxUsd?: number; tasterTurns?: number } = {}) {
+    private readonly maxTotalAttempts: number;
+    constructor(task: AnalysisTask, limits: AnalysisLimits, options: { deadlineMs?: number; maxUsd?: number; tasterTurns?: number; maxTotalAttempts?: number } = {}) {
         this.deadlineMs = Math.min(options.deadlineMs ?? Infinity, this.startedAt + (task === "taster" ? 60000 : limits.analysisDeadlineMs));
         this.maxAttempts = task === "taster" ? (options.tasterTurns ?? 5) + 2 : limits.maxInferenceAttempts[task];
         this.maxShadowAttempts = limits.maxShadowAttempts;
+        if (options.maxTotalAttempts !== undefined && (!Number.isSafeInteger(options.maxTotalAttempts) || options.maxTotalAttempts < 0)) throw new Error("Invalid total attempt budget");
+        this.maxTotalAttempts = options.maxTotalAttempts ?? Infinity;
         if (options.maxUsd !== undefined && (!Number.isFinite(options.maxUsd) || options.maxUsd <= 0)) throw new Error("Invalid monetary budget");
         this.maxUsd = options.maxUsd;
     }
     get attempts(): number { return this.requiredAttempts + this.optionalAttempts; }
+    /** Conservative committed spend, including unknown-outcome reservations.
+     * The evaluator uses this between sequential cases, never a guessed zero
+     * from an incomplete usage response. */
+    get reservedUsd(): number | null {
+        const values = [...this.reservations.values()];
+        return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + value!, 0);
+    }
     get remainingMs(): number { return Math.max(0, this.deadlineMs - Date.now()); }
     /** Hold capacity before starting a coalesced call. The call owns its own
      * short provider deadline while all actual attempts and usage are charged
@@ -87,6 +97,7 @@ export class AnalysisBudget {
         return { ok: true, id };
     }
     private capacityAvailable(optional: boolean, estimate: number | null): boolean {
+        if (this.attempts + this.heldRequiredAttempts + this.heldOptionalAttempts >= this.maxTotalAttempts) return false;
         if (!optional && this.requiredWorkComplete) return false;
         if (optional ? !this.shadowAuthorized || this.optionalAttempts + this.heldOptionalAttempts >= this.maxShadowAttempts : this.requiredAttempts + this.heldRequiredAttempts >= this.maxAttempts) return false;
         if (estimate !== null && (!Number.isFinite(estimate) || estimate < 0)) return false;

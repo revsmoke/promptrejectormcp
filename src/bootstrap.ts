@@ -22,6 +22,7 @@ import { DescriptorAnalysisService } from "./services/DescriptorAnalysisService.
 import { CapabilityAnalysisService } from "./services/CapabilityAnalysisService.js";
 import { ModelReferenceService } from "./services/ModelReferenceService.js";
 import { tokenPrices } from "./ai/pricing.js";
+import { assertServingSnapshot } from "./ai/qualification.js";
 
 export interface ServiceDependencies {
     env?: NodeJS.ProcessEnv;
@@ -36,6 +37,7 @@ export interface ServiceDependencies {
 /** One process graph, constructed only after dotenv. Importing this module
  * performs neither service construction nor provider/account discovery. */
 export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: ServiceDependencies = {}) {
+    assertServingSnapshot(snapshot);
     const env = deps.env ?? process.env;
     const configuredProviders = Object.fromEntries(Object.entries(keyNames).map(([provider, key]) => [provider, !!env[key]]));
     const registry = deps.registry ?? new ProviderRegistry(snapshot, { env, fetch: deps.fetch });
@@ -43,7 +45,7 @@ export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: 
     const patternService = deps.patternService ?? new PatternService();
     const huggingFaceService = deps.huggingFaceService ?? new HuggingFaceService({ token: env.HF_TOKEN });
     const judgmentService = deps.judgmentService ?? new JudgmentService(snapshot, { apiKey: env.TYPESAFE_API_KEY, fetch: deps.fetch, prices: tokenPrices(snapshot.pricing, "typesafe", snapshot.config.typesafe.model) });
-    const capabilityAnalysis = new CapabilityAnalysisService(judgmentService);
+    const capabilityAnalysis = new CapabilityAnalysisService(judgmentService, undefined, undefined, semantic);
     const modelReferenceService = new ModelReferenceService(judgmentService);
     const securityService = new SecurityService(patternService, semantic, judgmentService);
     const skillScanService = new SkillScanService(patternService, huggingFaceService, semantic, judgmentService, capabilityAnalysis, modelReferenceService);
@@ -56,7 +58,7 @@ export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: 
     const trifectaAnalyzer = new TrifectaAnalyzer();
     const canaryService = new CanaryService();
     const mcpToolScanner = new McpToolScanner(patternService);
-    const descriptorAnalysis = new DescriptorAnalysisService(mcpToolScanner, judgmentService);
+    const descriptorAnalysis = new DescriptorAnalysisService(mcpToolScanner, judgmentService, semantic);
     const tasteTesterService = deps.tasteTesterService ?? new TasteTesterService({ monitor: semantic, apiKey: env.ANTHROPIC_API_KEY ?? "", maxTurns: Number(env.TASTE_TESTER_MAX_TURNS) || 5, maxTokens: Number(env.TASTE_TESTER_MAX_TOKENS) || 4096, timeoutMs: Number(env.TASTE_TESTER_TIMEOUT_MS) || 30000, enabled: env.TASTE_TESTER_ENABLED === "true" });
     const unifiedCveCache = new UnifiedCveCache(vulnFeedService, atlasService, kevFeedService);
     return { snapshot, registry, semantic, configuredProviders, patternService, securityService, skillScanService, huggingFaceService,

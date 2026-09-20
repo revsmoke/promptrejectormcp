@@ -1,0 +1,50 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "profile": "typesafe",
+  "status": "ok",
+  "meta": {
+    "callId": "8b4ca523-566a-4034-b3b5-b567b1a3949e",
+    "provider": "typesafe",
+    "requestedModel": "jev-1.13.0",
+    "resolvedModel": "jev-1.13.0",
+    "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+    "rubricVersion": "synthetic-probe-v1",
+    "schemaVersion": "noul-v1",
+    "elapsedMs": 464,
+    "attempts": 1,
+    "usage": {
+      "inputTokens": 310,
+      "outputTokens": 21,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "failureCode": null
+  },
+  "limits": {
+    "maxRequests": 2,
+    "maxUsd": 0.01
+  },
+  "actualAttempts": 1,
+  "usage": {
+    "calls": 1,
+    "usage": {
+      "inputTokens": 310,
+      "outputTokens": 21,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": null,
+      "reasoningIsOutputSubset": true,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": 0.00001302,
+    "pricingVersions": [
+      "2026-09-19-conservative-standard-v1"
+    ]
+  }
+}

@@ -7,19 +7,21 @@ import { completedCheck } from "./AnalysisCoverage.js";
 import { decide, POLICY_VERSION } from "./DecisionPolicy.js";
 import { judgmentCoverage, judgmentRouting } from "../schemas/JudgmentReportSchemas.js";
 import { descriptorReportSchema, type DescriptorReport } from "../schemas/DescriptorReportSchema.js";
+import type { SemanticAnalysisService } from "./SemanticAnalysisService.js";
 export class DescriptorAnalysisService {
-    constructor(readonly local: McpToolScanner, readonly judgments: JudgmentService) {}
+    constructor(readonly local: McpToolScanner, readonly judgments: JudgmentService, readonly semantic?: SemanticAnalysisService) {}
     async analyze(input: { tool: Record<string, unknown>; priorHash?: string }, options: { signal?: AbortSignal } = {}): Promise<DescriptorReport> {
         // Validate bounds before the incumbent recursive walker or any provider.
         descriptorFields(input.tool);
         const source = structuredClone(input.tool);
         const { request, fields } = descriptorRequest(source, this.judgments.snapshot.config.typesafe.model);
-        const budget = new AnalysisBudget("descriptor", this.judgments.snapshot.config.limits);
+        const context = this.semantic?.createContext("descriptor", options.signal);
+        const budget = context?.budget ?? new AnalysisBudget("descriptor", this.judgments.snapshot.config.limits);
         const local = this.local.scan({ tool: source, priorHash: input.priorHash });
         const coverage = [{ ...completedCheck("local", JSON.stringify(source).length), inspectedFields: fields.length }];
         const mode = this.judgments.snapshot.config.typesafe.descriptor;
         budget.authorizeShadow({ requiredWorkComplete: true });
-        const observation = await this.judgments.evaluate("descriptor", request, { budget, deadlineMs: budget.deadlineMs, signal: options.signal,
+        const observation = await this.judgments.evaluate("descriptor", request, context ?? { budget, deadlineMs: budget.deadlineMs, signal: options.signal,
             runId: randomUUID(), role: "judgment", configHash: this.judgments.snapshot.hash }, { completeSource: true, coverage: { fields: fields.length, characters: request.state.length } });
         coverage.push(judgmentCoverage("descriptor_judgment", observation, JSON.stringify(source).length, fields.length));
         const answers = observation.result?.status === "ok" ? observation.result.value : null;

@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "ai:config": "npm run build --silent && node dist/scripts/checkAiConfig.js",
-    "ai:probe": "npm run build --silent && node dist/scripts/probeAi.js"
+    "ai:probe": "npm run build --silent && node dist/scripts/probeAi.js",
+    "evaluate:ai": "npm run build && node dist/scripts/evaluateAi.js"
   },
   "keywords": [
     "mcp",

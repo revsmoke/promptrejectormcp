@@ -1,0 +1,50 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "profile": "legacy-gemini",
+  "status": "ok",
+  "meta": {
+    "callId": "1b470c43-9404-4a34-9cbe-462ff145d819",
+    "provider": "gemini",
+    "requestedModel": "gemini-3-flash-preview",
+    "resolvedModel": "gemini-3-flash-preview",
+    "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+    "rubricVersion": "security-eight-categories-v2.1",
+    "schemaVersion": "semantic-v2.1",
+    "elapsedMs": 2002,
+    "attempts": 1,
+    "usage": {
+      "inputTokens": 623,
+      "outputTokens": 58,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": 160,
+      "reasoningIsOutputSubset": false,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "failureCode": null
+  },
+  "limits": {
+    "maxRequests": 1,
+    "maxUsd": 0.03
+  },
+  "actualAttempts": 1,
+  "usage": {
+    "calls": 1,
+    "usage": {
+      "inputTokens": 623,
+      "outputTokens": 58,
+      "cachedReadTokens": null,
+      "cacheWriteTokens": null,
+      "reasoningTokens": 160,
+      "reasoningIsOutputSubset": false,
+      "cachedReadIsInputSubset": true,
+      "cacheWriteIsInputSubset": true
+    },
+    "estimatedUsd": null,
+    "pricingVersions": [
+      "2026-09-19-conservative-standard-v2"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { replayHistorical } from '../../evaluation/HistoricalReplay.js';
+const path='experiments/typesafe/results/2026-09-19T20-27-01.476Z';
+const stored=JSON.parse(readFileSync(`${path}/summary.json`,'utf8'));
+const replay=replayHistorical(path);
+for (const [name,group] of Object.entries(replay.groups)) for (const [key,value] of Object.entries(group)) assert.deepEqual(value,stored.groups[name][key],`${name}.${key}`);
+assert.equal(replay.qualification,false);
+assert.equal(replay.groups.prompt.typesafeExact,39);
+assert.equal(replay.groups.descriptor.typesafeExact,12);
+console.log('PASS read-only historical primitive replay reproduces saved counts and latency');

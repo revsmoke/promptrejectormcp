@@ -55,6 +55,10 @@ export const OFFLINE_SUITES: readonly OfflineSuite[] = [
     { file: "ai/toolConversationTests.js" },
     { file: "ai/tasterPortabilityTests.js" },
     { file: "ai/tasterTransportTests.js" },
+    { file: "ai/evaluationTests.js" },
+    { file: "ai/evaluationCommandsTests.js" },
+    { file: "ai/historicalReplayTests.js" },
+    { file: "ai/qualificationTests.js" },
 ];
 
 export function offlineEnvironment(source: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {
@@ -131,6 +135,8 @@ export function runOfflineTests(projectRoot: string): boolean {
             // Some existing tests inspect source next to their compiled imports.
             copyFixtures(join(projectRoot, "src"), join(cwd, "dist"));
             cpSync(join(projectRoot, "config"), join(cwd, "config"), { recursive: true, filter: excludeEnvironmentFiles });
+            if (suite.file === "ai/historicalReplayTests.js") cpSync(join(projectRoot, "experiments/typesafe/results"), join(cwd, "experiments/typesafe/results"), { recursive: true, filter: excludeEnvironmentFiles });
+            cpSync(join(projectRoot, "evaluations/ai/datasets"), join(cwd, "evaluations/ai/datasets"), { recursive: true, filter: excludeEnvironmentFiles });
             cpSync(join(projectRoot, "patterns"), join(cwd, "patterns"), { recursive: true, filter: excludeEnvironmentFiles });
             // REST/MCP read the actual package version. This manifest contains
             // no credentials; preserve it instead of inventing a test version.
