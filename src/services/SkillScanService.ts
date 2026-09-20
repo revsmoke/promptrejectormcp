@@ -230,9 +230,12 @@ export class SkillScanService {
         const hfSeverity = maximumSeverity(...hfReports.map((report) => report.severity === "safe" ? "low" : report.severity));
         const hazardBlock = current && decisiveIntent(intent);
         const finding = semantic?.status === "ok" ? semantic.value : null;
-        const outcome = !current && !localBlock ? { decision: "unavailable" as const, safe: false }
+        // Qualification drift disables new model decisions, but cannot erase
+        // an independently observed local or Hugging Face blocking finding.
+        const incumbentBlock = localBlock || blockingSeverity(hfSeverity);
+        const outcome = !current && !incumbentBlock ? { decision: "unavailable" as const, safe: false }
             : decide({ task: "skill", mode, coverage, semantic: semantic ?? undefined, needsReview: capabilityReview || unresolvedIds.length > 0,
-                localBlocking: localBlock || hazardBlock || capabilityBlock || blockingSeverity(hfSeverity) });
+                localBlocking: incumbentBlock || hazardBlock || current && capabilityBlock });
         const allTrifecta = trifecta.trifectaPresent || (current && capabilityBlock);
         return skillAnalysisReportSchema.parse({ schemaVersion: 2, task: "skill", ...outcome,
             overallSeverity: maximumSeverity(localSeverity, hfSeverity, finding?.severity ?? "low", hazardBlock ? "high" : "low", allTrifecta ? "critical" : "low"),

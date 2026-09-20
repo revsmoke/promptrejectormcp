@@ -161,3 +161,15 @@ for (const failure of [undefined, "refusal"] as const) {
     assert.equal(f.calls.judgment, 0, "oversized TypeSafe input is not truncated or sent");
     assert.equal(f.calls.reason, 1); assert.equal(report.semantic?.status, "ok");
 }
+{
+    let mutate = () => {};
+    const f = policyFixture({ modes: { skill: "enforce" }, onReason: () => mutate() });
+    const original = f.patterns.getQualificationState.bind(f.patterns);
+    mutate = () => { f.patterns.getQualificationState = () => ({ ...original(), qualificationFixtureDrift: true } as ReturnType<typeof original>); };
+    const hf = new HF(true);
+    const result = await skillService(f, hf).scanSkillV2("Audit https://huggingface.co/acme/model-repo.");
+    assert.deepEqual(hf.ids, ["acme/model-repo"]);
+    assert.equal(result.decision, "block", "qualification drift cannot erase an incumbent critical HF finding");
+    assert.equal(result.overallSeverity, "critical");
+    assert.equal(result.coverage.find((entry) => entry.check === "qualification")?.status, "unavailable");
+}
