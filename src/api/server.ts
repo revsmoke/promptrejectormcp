@@ -115,9 +115,19 @@ export function createApiApp(services: Services) {
     app.get("/health", (req, res) => {
         const roles = Object.fromEntries(Object.entries(services.snapshot.config.roles).map(([role, setting]) => {
             const profile = services.snapshot.config.profiles[setting.primary];
-            return [role, { provider: profile.provider, model: profile.model, configured: services.configuredProviders[profile.provider] }];
+            const enabled = !["taster", "monitor"].includes(role) || services.tasterEnabled;
+            const configured = services.configuredProviders[profile.provider];
+            const fallback = setting.fallback ? services.snapshot.config.profiles[setting.fallback] : undefined;
+            return [role, { provider: profile.provider, model: profile.model, configured, enabled,
+                readiness: !enabled ? "disabled" : configured && (!fallback || services.configuredProviders[fallback.provider]) ? "ready" : "degraded",
+                fallback: fallback ? { provider: fallback.provider, model: fallback.model, configured: services.configuredProviders[fallback.provider] } : null }];
         }));
-        res.json({ status: "ok", version, configHash: services.snapshot.hash, roles, reports: { prompt: [1, 2], skill: [1, 2], enforcementScope: "v2_only", legacySemanticCompatible: services.semantic.supportsV1 } });
+        const { model, ...modes } = services.snapshot.config.typesafe;
+        const enabled = Object.values(modes).some((mode) => mode !== "off");
+        res.json({ status: "ok", version, configHash: services.snapshot.hash, roles,
+            typesafe: { model, modes, configured: services.configuredProviders.typesafe, readiness: !enabled ? "disabled" : services.configuredProviders.typesafe ? "ready" : "degraded" },
+            qualification: services.snapshot.qualification ?? { tasks: {} }, readinessMeaning: "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
+            reports: { prompt: [1, 2], skill: [1, 2], enforcementScope: "v2_only", legacyDescriptorCapability: "local_only", legacySemanticCompatible: services.semantic.supportsV1, legacyTasterCompatible: services.tasteTesterService.supportsV1 } });
     });
     app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         if (error.type === "entity.too.large") return res.status(413).json({ error: "input_too_large" });
