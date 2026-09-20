@@ -1,10 +1,20 @@
 # SPEC — TypeSafe judgments and interchangeable reasoning models
 
-**Status:** Implementation specification; no production implementation performed.
+**Status:** Implemented. Explicit local TypeSafe activation is verified through MCP, REST and the native Codex client; see the activation correction below and the [delivery ledger](../implementation/typesafe-progress.md).
 **Date:** 2026-09-19. **Baseline:** `2f3a83c266009afa84cc235c43abd7db3d7e6fe3`, package 1.1.0.
 **Plan:** [Implementation checklist](../superpowers/plans/2026-09-19-typesafe-model-routing.md).
 **Evidence:** [Experiment report](../../experiments/typesafe/REPORT.md), [reproduction instructions](../../experiments/typesafe/README.md).
 **Relationship to existing documents:** This is a new feature specification. Root `SPEC.md` and `PLAN.md` remain the historical v1.1 specification and execution record.
+
+## Activation correction
+
+The user's subsequent instruction requires TypeSafe to work in ordinary MCP use, rather than remain disabled behind a research qualification exercise. This correction governs the earlier rollout language below.
+
+- Trusted configuration supports `qualificationPolicy: "required" | "optional"`, defaulting to required for compatibility. Optional activation without an `evaluationFile` permits the implemented enforce/cascade policies and explicitly reports that formal qualification was not performed. It never creates a passing manifest. If an evaluation file is supplied, all existing evidence, identity, expiry and pattern checks remain mandatory under either policy.
+- `config/ai.active.json` explicitly enables pinned Jev descriptor/capability/reference enforcement and prompt/skill block-only cascades, with working Gemini reasoning. Strict response validation, complete input handling, source evidence, existing blockers, bounded attempts and clean-path reasoning remain mandatory.
+- Trusted `mcpDefaultReportVersion` defaults to 1 for existing configurations. The active configuration sets 2, so ordinary calls to all five versioned MCP tools use the new behavior without extra caller arguments. Explicit version 1 remains available; REST routes retain explicit versions.
+- The dedicated MCP launcher anchors the working directory and loads an explicit local credential file. It defaults to the active configuration; no credentials are stored in tracked configuration or client arguments.
+- Acceptance for this correction is real TypeSafe responses through MCP and REST, an added security block with exact source evidence, a clean full-reasoning path, cache reuse, model/reference coverage, negative-input checks and actual native-client startup. Independent held-out evaluation remains available as stronger optional assurance; it is not falsely claimed or used to prevent explicitly requested activation.
 
 ## 1. Outcome and scope
 

@@ -4,14 +4,14 @@ TypeSafe handles narrow, typed judgments; the chosen reasoning model handles con
 
 ## Default state and modes
 
-All TypeSafe task modes default off. `descriptor`, `capability` and `modelReference` accept off/shadow/enforce; `prompt` and `skill` also accept cascade. Modes are independent. Inside a skill, a child cannot exceed its parent: off disables child inference, shadow caps enabled children to shadow, and enforce/cascade permit each child's configured mode. Standalone capability scans use their own mode.
+Legacy configurations keep TypeSafe off. The dedicated `start:mcp` launcher selects `config/ai.active.json` unless another config is explicitly selected: descriptor/capability/modelReference enforce, prompt/skill cascade, and MCP version 2 by default. `descriptor`, `capability` and `modelReference` accept off/shadow/enforce; `prompt` and `skill` also accept cascade. Modes are independent. Inside a skill, a child cannot exceed its parent: off disables child inference, shadow caps enabled children to shadow, and enforce/cascade permit each child's configured mode. Standalone capability scans use their own mode.
 
 - **Off:** existing deterministic/reasoning analysis, with reliability fixes retained.
 - **Shadow:** observe TypeSafe answers without changing authoritative decisions or the HF lookup set. Optional failures do not downgrade required coverage.
-- **Enforce:** apply the qualified task policy, preserving existing local blocks.
+- **Enforce:** apply the configured task policy, preserving existing local blocks.
 - **Cascade:** prompt/skill reasoning may be skipped only after a conclusive block. Low TypeSafe probabilities never allow a clean prompt or skill without required reasoning.
 
-These are implementation capabilities, not a statement that production enforcement is active. Consult the ledger before changing modes.
+The active profile uses trusted `qualificationPolicy: "optional"` and does not claim held-out qualification. It uses real judgments in decisions. `qualificationPolicy: "required"` retains the evidence-gated process described below; supplying an evaluation file always validates it strictly, even under optional policy. No request can override activation policy. Consult the ledger for actual local activation and transport evidence.
 
 ## Limits and evidence boundaries
 
@@ -45,17 +45,19 @@ Use `--env-file /absolute/path/.env` if needed. Larger qualification runs requir
 
 The exploratory corpus has 107 unique development inputs from 111 historical occurrences. Its labels are authored hypotheses. The synthetic stress corpus has 1,200 development cases with correlated templates. Neither corpus qualifies enforcement. Do not promote those observed examples into held-out evidence. The acceptance classifier cannot label its own ground truth.
 
-## Qualification and activation
+## Optional formal qualification
+
+The following procedure applies when qualification is required or an `evaluationFile` is supplied. It provides stronger measured assurance; it is separate from explicit operator activation through the active profile.
 
 Use distinct development, calibration and untouched held-out families. Obtain two independent label reviews and resolve disagreements before evaluation. Freeze thresholds, rubrics, source policy, model options and dataset hashes before viewing acceptance results. Descriptor, prompt and skill each require at least 200 risky and 200 benign cases; capability/reference criteria must be independently labeled and predeclared. Require zero newly missed known high/critical attacks versus baseline and no more than a one percentage point increase in benign blocks. Report review/unavailable separately; abstention does not count as a correct prediction.
 
 The local evaluator may exercise candidate policies without a prior activation manifest. Its configuration cannot start REST/MCP serving services. Public requests and environment flags cannot enable that evaluation privilege.
 
-Enforced serving configuration selects trusted local evidence through `evaluationFile`. Manifests bind the task/mode, all decision-affecting primary/fallback profiles, options, model resolution, deployed code, schemas, rubrics, thresholds, source policy and price card. Expired, failed or changed bindings reject startup. Evaluate and deploy the same built artifact. A model alias needs checked resolution evidence and expiry; TypeSafe enforcement uses pinned `jev-1.13.0`.
+Qualified serving configuration selects trusted local evidence through `evaluationFile`. Manifests bind the task/mode, all decision-affecting primary/fallback profiles, options, model resolution, deployed code, schemas, rubrics, thresholds, source policy and price card. Expired, failed or changed supplied bindings reject startup under either policy. Evaluate and deploy the same built artifact. Formal qualification of a model alias needs checked resolution evidence and expiry; all TypeSafe enforcement uses pinned `jev-1.13.0`.
 
 Passing security qualification precedes staging exercises; production activation requires recorded runtime and rollback proof. A failed gate leaves the task off/shadow. Changing behavior after inspecting held-out failures turns those examples into regressions and requires a fresh untouched acceptance set.
 
-## Operator sequence
+## Qualified rollout sequence
 
 1. Validate configuration without inference; record commit and config hash.
 2. Run a bounded synthetic access probe for every selected primary/fallback role and inspect actual model attribution.

@@ -12,9 +12,11 @@ Live runs require `--live --profiles <names> --dataset <manifest> --max-requests
 
 Acceptance datasets need a hashed case file and reviewed split registry. The manifest supplies `reviewFile`, `splitFile` and `splitSha256`. The strict review record requires explicit identities for at least two distinct independent reviewers, approvals tied to both hashes, resolved adjudication, no unresolved cases and a pre-run review date. The split records each family and each `task:sourceSha256` as development, calibration or held-out. Acceptance runs cross-check the committed corpus registry; known development/calibration sources cannot become held-out by renaming families. Near-duplicate family review remains an explicit annotation responsibility, not an inferred promise from exact hashing.
 
-Code-generated offline test fixtures can exercise manifest validation, but are not real passing activation evidence. No real passing qualification manifest exists in this delivery.
+Code-generated offline test fixtures can exercise manifest validation, but are not real passing activation evidence. No real passing qualification manifest is claimed. The explicit active profile runs under optional qualification; that policy does not fabricate or bypass validation of supplied evidence.
 
 ## Runs
+
+- `2026-09-19-active-mcp`: real active-policy MCP/REST and native Codex verification, with retained initial failures and corrective follow-ups. See its [run record](runs/2026-09-19-active-mcp/README.md). These activation checks are separate from the earlier 19-call implementation demonstration below.
 
 - `2026-09-19-exploratory-offline-v2`: 214 service evaluations (107 inputs × off/shadow), no network inference. This verifies execution/reporting and incomplete-coverage behavior, not live model quality.
 - `2026-09-19-implementation-smoke/probes`: bounded synthetic access checks. TypeSafe and Gemini succeeded; Claude account access was unavailable; OpenAI's initial inference preflight exceeded its conservative cost envelope and a separate read-only credential check rejected the saved key. Missing billable cache details leave Gemini actual cost unknown.

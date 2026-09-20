@@ -2,6 +2,27 @@
 
 Prompt Rejector separates focused TypeSafe judgments from generative analysis. Scanners consume three typed contracts: `StructuredReasoner`, `JudgmentProvider` and `ToolConversationProvider`. Code validates responses, preserves deterministic findings and decides what to block or review. A probability or valid JSON response is not proof of correctness.
 
+## Run with TypeSafe active
+
+```sh
+npm run build
+npm run start:mcp -- --env-file /absolute/path/to/.env
+```
+
+The launcher uses `config/ai.active.json`, anchors the project directory, and keeps stdout exclusively for MCP messages. The active profile uses Jev for all five judgment tasks, Gemini for contextual reasoning, and version 2 by default for ordinary MCP calls. It needs `TYPESAFE_API_KEY` and `GEMINI_API_KEY` in the local environment file. Taster remains separately opt-in. `--config /absolute/path/ai.json` explicitly selects another configuration; otherwise an existing `AI_CONFIG_PATH` takes precedence over the active default.
+
+For Codex, register the built launcher (use absolute paths):
+
+```sh
+codex mcp add prompt-rejector -- /absolute/path/to/node \
+  /absolute/path/to/promptrejectormcp/dist/scripts/startMcp.js \
+  --env-file /absolute/path/to/.env
+```
+
+A new Codex session loads the configured server. Keep the installation directory available; the launcher resolves patterns and catalogs there. Normal client tool-approval preferences still apply. Bryan's local server is registered against the implementation worktree and was verified through the native Codex client.
+
+The active profile sets `qualificationPolicy: "optional"`: this is explicit activation, with formal qualification reported as not performed. Supplying an `evaluationFile` still requires that evidence to pass every validation. The earlier required-qualification workflow remains available by selecting `qualificationPolicy: "required"`. Model adapters, response validation and security policy are the same in both cases.
+
 ## Roles and credentials
 
 | Role | Purpose | Providers |
@@ -14,11 +35,11 @@ Prompt Rejector separates focused TypeSafe judgments from generative analysis. S
 
 Credentials are `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `TYPESAFE_API_KEY`. Keep them in the server environment or a local untracked `.env`. Configuration and logs contain no key values. Possessing a key does not enable a role or prove the account can use its selected model.
 
-Without `AI_CONFIG_PATH`, semantic analysis and drafting keep `gemini-3-flash-preview`; Taster and Monitor use the legacy Anthropic profile. TypeSafe defaults off. Existing installations need no new key merely to start, although missing required inference credentials produce degraded/unavailable analysis rather than a safe verdict.
+For legacy `npm start` (without `AI_CONFIG_PATH`), semantic analysis and drafting keep `gemini-3-flash-preview`; Taster and Monitor use the legacy Anthropic profile. TypeSafe defaults off. Existing installations need no new key merely to start, although missing required inference credentials produce degraded/unavailable analysis rather than a safe verdict.
 
 ## Configuration and a model switch
 
-Copy `config/ai.example.json` to a local file. Set `AI_CONFIG_PATH` to its absolute path and restart the process after changes. The service loads a single immutable snapshot after dotenv; REST and MCP share its configuration hash. Relative capability, price and evaluation files resolve beside that configuration file.
+Copy `config/ai.active.json` beside the original (for example, `config/ai.local.json`) to keep TypeSafe enabled and preserve relative catalog paths while changing models. Use `config/ai.example.json` only when you want an initially disabled rollout. Set `AI_CONFIG_PATH` to its absolute path and restart the process after changes. The service loads a single immutable snapshot after dotenv; REST and MCP share its configuration hash. Relative capability, price and evaluation files resolve beside that configuration file.
 
 For example, select the existing Claude semantic profile:
 
@@ -32,7 +53,7 @@ Then change only that role to the configured OpenAI profile:
 "semantic": { "primary": "openai-reasoning" }
 ```
 
-Taster, Monitor and drafting settings remain independent. A Monitor-only switch changes `roles.monitor.primary`. Use profile names actually present in your file; the configuration checker rejects unknown references. In enforced modes, every decision-affecting primary and fallback profile must have matching qualification evidence. Switching back to an old profile also requires current evidence.
+Taster, Monitor and drafting settings remain independent. A Monitor-only switch changes `roles.monitor.primary`. Use profile names actually present in your file; the configuration checker rejects unknown references. With required qualification or a supplied evaluation file, every decision-affecting primary and fallback profile must have matching qualification evidence. The optional active profile permits an explicit provider switch without manufacturing qualification records; test the selected account/model before relying on it.
 
 A configured fallback runs once only for eligible availability failures, within the same request deadline and attempt allowance. It does not run because a model judged a prompt suspicious, refused a request, returned incomplete output or hit a budget limit. Taster sessions never switch provider halfway through a conversation. Monitor may use its independently configured availability fallback.
 
@@ -42,7 +63,7 @@ A configured fallback runs once only for eligible availability failures, within 
 | --- | --- | --- |
 | Claude | Messages, structured output and tool-use blocks | Parse refusal/stop reasons; preserve private thinking/signatures between turns; normalize cache-read and cache-write usage |
 | OpenAI | Responses, JSON schema and function calls | Handle completed/incomplete/refusal status; preserve private reasoning items; normalize output/reasoning and cached input subsets |
-| Gemini | `generateContent`, response schema and function calls | Handle candidates/finish reasons; preserve thought signatures; account separately for candidate and thought tokens |
+| Gemini | `generateContent`, response schema and function calls | Handle candidates/finish reasons; preserve thought signatures; account separately for candidate and thought tokens; enforce array/string limits in the local parser because complex native array bounds can reject valid skill schemas |
 | TypeSafe | `/v1/systemone`, batched Noul and Choice | Validate exact question IDs, probabilities, selected source IDs, pinned/resolved model and usage |
 
 Only public text and normalized valid/rejected tool-call evidence enter the Taster report and Monitor prompt. Private continuation objects remain inside the provider adapter, are disposed after the run and are never logged. The eight tools return deterministic synthetic results; no shell command, email, transfer, database operation or external URL supplied by a model is executed.
@@ -57,7 +78,7 @@ npm run ai:probe -- --live --profile typesafe --pricing config/ai-pricing.exampl
 npm run ai:probe -- --live --profile claude-semantic --pricing config/ai-pricing.example.json --max-requests 1 --max-usd 0.15
 ```
 
-The last profile requires the example configuration to be selected. `--env-file /absolute/path/.env` loads an explicit local secret file for a probe. Probes use synthetic input, require live opt-in and count physical retries against the request cap. They do not establish security quality. A missing rate, unsupported profile or insufficient conservative reservation stops dispatch. Inspect `actualAttempts`: a failed preflight is not an attempted model call.
+The Claude profile is available in the active and example configurations; it requires a working Anthropic account. `--env-file /absolute/path/.env` loads an explicit local secret file for a probe. Probes use synthetic input, require live opt-in and count physical retries against the request cap. They do not establish security quality. A missing rate, unsupported profile or insufficient conservative reservation stops dispatch. Inspect `actualAttempts`: a failed preflight is not an attempted model call.
 
 The example price card is dated, uses standard text rates, and deliberately overestimates OpenAI Astra with its long-context upper rates. Review prices for your account before spending. Missing usage or billable token details remain unknown; a known conservative reservation remains held. Limits are process-local, not a shared account-wide cap.
 
@@ -65,9 +86,9 @@ The example price card is dated, uses standard text rates, and deliberately over
 
 REST v1 remains at `/v1/check-prompt` and `/v1/scan-skill`; v2 is `/v2/check-prompt` and `/v2/scan-skill`. Bodies keep their existing `prompt` or `skillContent` fields. V2 reports provide `decision`, `safe`, coverage, provider/model attribution, usage and routing. Only `decision: "allow"` gives `safe: true`.
 
-**TypeSafe enforcement and cascade apply only to version 2.** Version 1 prompt and skill calls retain their validated legacy analysis path even when the server is configured for enforce/cascade. Existing Gemini clients must explicitly migrate to v2 before expecting those policies. Version 1 descriptor/capability calls likewise remain local.
+**TypeSafe enforcement and cascade apply only to version 2.** Version 1 prompt and skill calls retain their validated legacy analysis path even when the server is configured for enforce/cascade. Legacy REST clients must migrate to v2; the active MCP profile selects v2 automatically when the caller omits the version. Version 1 descriptor/capability calls likewise remain local.
 
-The existing 11 MCP tools remain. Set `reportVersion: 2` on `check_prompt`, `scan_skill`, `scan_mcp_tool`, `check_lethal_trifecta` or `taste_test` to opt in. Default version is 1. Non-Gemini semantic primary/fallback profiles require v2; v1 returns `report_version_required` before inference (REST 409, MCP error). Version 1 Taster requires Anthropic for both Taster and Monitor routes. Legacy descriptor/capability paths remain local and do not acquire TypeSafe enforcement silently.
+The existing 11 MCP tools remain. `mcpDefaultReportVersion` controls omitted versions for `check_prompt`, `scan_skill`, `scan_mcp_tool`, `check_lethal_trifecta` and `taste_test`: legacy configurations default to 1; the active profile selects 2. An explicit `reportVersion` overrides that default. Non-Gemini semantic primary/fallback profiles require v2; v1 returns `report_version_required` before inference (REST 409, MCP error). Version 1 Taster requires Anthropic for both Taster and Monitor routes. Explicit legacy descriptor/capability calls remain local.
 
 Example MCP arguments:
 

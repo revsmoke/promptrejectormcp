@@ -4,13 +4,31 @@
 
 **Goal:** Add evaluated TypeSafe judgments and configuration-driven Claude/OpenAI/Gemini selection while preserving deterministic protections, explicit availability, and bounded execution.
 
-**Architecture:** Shared configuration and a single application dependency graph inject separate structured-reasoning, typed-judgment and tool-conversation interfaces. Small native-HTTP adapters translate provider APIs; services own their task schemas, and deterministic policy owns allow/block/review/unavailable decisions. TypeSafe progresses from descriptor shadow analysis to separately qualified additive enforcement and a prompt/skill cascade.
+**Architecture:** Shared configuration and a single application dependency graph inject separate structured-reasoning, typed-judgment and tool-conversation interfaces. Small native-HTTP adapters translate provider APIs; services own their task schemas, and deterministic policy owns allow/block/review/unavailable decisions. TypeSafe provides additive enforcement and a prompt/skill cascade, with an explicit optional or required formal qualification policy.
 
 **Tech Stack:** Existing Node >=18, TypeScript/ESM, Zod, Express and MCP SDK; native fetch adapters; compiled Node test scripts; no new model framework.
 
 ---
 
-**Status:** Implementation, independent reviews, documentation and final offline verification complete on `codex/typesafe-model-routing`. All 54 registered suites pass on Node 18.20.8, 22.23.2, 24.13.0 and 26.9.0. Live qualification and deployment remain pending. Checked items have recorded evidence in [the progress ledger](../../implementation/typesafe-progress.md); live qualification and activation are tracked separately.
+**Status:** Implemented; active TypeSafe is verified through live MCP, REST and the native Codex client. The activation completion checklist below governs the earlier qualification-first rollout.
+
+
+## Activation completion correction
+
+The user explicitly requires an operational TypeSafe integration. The earlier held-out qualification and staging requirements remain an optional assurance track, not prerequisites for this requested local activation.
+
+- [x] Add trusted optional/required qualification policy; preserve strict validation for every supplied evidence file and report absent qualification truthfully.
+- [x] Ship `config/ai.active.json` with all five Jev tasks active, MCP v2 as the omitted-version default, working Gemini reasoning and ready-to-select Claude/OpenAI profiles.
+- [x] Add a quiet, directory-independent MCP launcher that reads the existing local key file and honors explicit configuration.
+- [x] Verify an added descriptor block, a prompt cascade block, benign full reasoning, cached reuse, model-reference lookup, REST parity and rejected request policy overrides with real provider responses.
+- [x] Fix the Gemini combined-skill schema incompatibility found by live testing; retain strict local limits and add native adapter regressions.
+- [x] Bind returned model identity to the actual selected primary/fallback profile, with a regression for same-model routes.
+- [x] Register the local Codex MCP server and verify an actual native-client call without an explicit report version.
+- [x] Complete independent SPEC and quality review of the activation correction and launcher.
+- [x] Complete the final offline Node 18/22/24/26 matrix, build, lint and secret/diff checks.
+- [ ] Update operational documentation and evidence ledger, commit and push, and verify remote CI.
+
+Live evidence: [activation run record](../../../evaluations/ai/runs/2026-09-19-active-mcp/README.md). Formal held-out qualification, other-provider account verification and npm publication remain separately identified work; they do not disable the working local integration.
 
 **Implementation file consolidation:** The delivered tests consolidate planned `skillShadowTests`/`coverageTests` into `promptShadowTests`, `shadowTransportTests` and policy suites; `manifestTests`/`rolloutConfigTests` into `qualificationTests`; and capability/reference integration into `enforcementTests`, `capabilityReferenceShadowTests` and `cascadeTests`. The reference wrapper is `ModelReferenceService.ts`; deterministic extraction is `HuggingFaceReferences.ts`. Manifest validation is `src/ai/qualification.ts`, with the private evaluator factory in `src/evaluation/candidateConfig.ts`. These are naming/consolidation changes, not omitted gates.
 
@@ -341,4 +359,4 @@ At the end of implementation, report the current modes, chosen models per role, 
 
 ## Delivery gate interpretation
 
-Checked implementation items are backed by committed code, offline/native fixtures and independent reviews. Unchecked mixed items that include live latency, held-out quality, restart, model-switch or rollback evidence remain open even when their offline portion has passed. The bounded demonstration is complete; larger qualifying runs, restored Claude/OpenAI account access, independently reviewed untouched labels and staging are the next rollout gates. No acceptance threshold is weakened to close a checkbox.
+Checked implementation items are backed by committed code, offline/native fixtures and independent reviews. Unchecked mixed items that include live latency, held-out quality, restart, model-switch or rollback evidence remain open even when their offline portion has passed. The original bounded demonstration is complete. The activation correction above adds verified local operation. Larger qualifying runs, restored Claude/OpenAI account access and independently reviewed untouched labels remain optional qualification/provider expansion work. No acceptance threshold is weakened to close a checkbox.

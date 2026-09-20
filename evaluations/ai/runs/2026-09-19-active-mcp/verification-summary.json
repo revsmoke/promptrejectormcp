@@ -1,0 +1,130 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "active": true,
+  "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+  "upstreamInferenceAttempts": 22,
+  "nativeCodexVerified": true,
+  "runtimeSuites": [
+    {
+      "node": "18.20.8",
+      "passed": 56,
+      "failed": 0
+    },
+    {
+      "node": "22.23.2",
+      "passed": 56,
+      "failed": 0
+    },
+    {
+      "node": "24.13.0",
+      "passed": 56,
+      "failed": 0
+    },
+    {
+      "node": "26.9.0",
+      "passed": 56,
+      "failed": 0
+    }
+  ],
+  "checks": [
+    {
+      "artifact": "live-smoke.json",
+      "id": "descriptor_added_block",
+      "decision": "block",
+      "physicalCalls": 1,
+      "totalMs": 520
+    },
+    {
+      "artifact": "live-smoke.json",
+      "id": "descriptor_cached_repeat",
+      "decision": "block",
+      "physicalCalls": 0,
+      "totalMs": 0
+    },
+    {
+      "artifact": "live-smoke.json",
+      "id": "descriptor_benign",
+      "decision": "allow",
+      "physicalCalls": 1,
+      "totalMs": 400
+    },
+    {
+      "artifact": "live-smoke.json",
+      "id": "prompt_benign_full_reasoning",
+      "decision": "allow",
+      "physicalCalls": 2,
+      "totalMs": 1907
+    },
+    {
+      "artifact": "live-smoke.json",
+      "id": "prompt_typesafe_cascade_block",
+      "decision": "block",
+      "physicalCalls": 1,
+      "totalMs": 203
+    },
+    {
+      "artifact": "live-smoke.json",
+      "id": "skill_benign_full_reasoning",
+      "decision": "review",
+      "physicalCalls": 3,
+      "totalMs": 791
+    },
+    {
+      "artifact": "live-completion.json",
+      "id": "skill_benign_full_reasoning",
+      "decision": "allow",
+      "physicalCalls": 3,
+      "totalMs": 4611
+    },
+    {
+      "artifact": "live-completion.json",
+      "id": "skill_model_reference",
+      "decision": "block",
+      "physicalCalls": 0,
+      "totalMs": 14
+    },
+    {
+      "artifact": "live-reference-rest.json",
+      "id": "skill_model_reference",
+      "decision": "review",
+      "physicalCalls": 4,
+      "totalMs": 6322
+    },
+    {
+      "artifact": "live-reference-rest.json",
+      "id": "health_no_inference",
+      "decision": null,
+      "physicalCalls": 0,
+      "totalMs": null
+    },
+    {
+      "artifact": "live-reference-rest.json",
+      "id": "rest_prompt_benign",
+      "decision": "allow",
+      "physicalCalls": 2,
+      "totalMs": 2049
+    },
+    {
+      "artifact": "live-reference-rest.json",
+      "id": "rest_rejects_policy_override",
+      "decision": null,
+      "physicalCalls": 0,
+      "totalMs": null
+    },
+    {
+      "artifact": "live-reference-rest.json",
+      "id": "mcp_rejects_policy_override",
+      "decision": null,
+      "physicalCalls": 0,
+      "totalMs": null
+    },
+    {
+      "artifact": "native-codex-completion.jsonl",
+      "id": "native_codex_default_v2",
+      "decision": "block",
+      "physicalCalls": 1,
+      "totalMs": 698
+    }
+  ]
+}

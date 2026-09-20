@@ -2,6 +2,20 @@
 
 This ledger tracks the [implementation plan](../superpowers/plans/2026-09-19-typesafe-model-routing.md) against the [specification](../specs/2026-09-19-typesafe-model-routing-spec.md). Code completion, offline verification, live model qualification, and activation are separate statuses.
 
+## Current activation status — supersedes earlier off-state checkpoints
+
+TypeSafe is active in the local Codex MCP installation using `config/ai.active.json`: descriptor, capability and model-reference enforcement; prompt/skill block-only cascades; MCP v2 by default. All four generative roles currently select the working `gemini-3-flash-preview` profile; Claude and OpenAI profiles are available for independent role selection. Taster remains separately opt-in.
+
+The installed `prompt-rejector` entry uses the built launcher in the implementation worktree and reads the original checkout's untracked `.env`. No credential values are stored in the MCP command or tracked files. New Codex sessions load the server. A real native Codex call already returned a v2 TypeSafe block without a `reportVersion` argument.
+
+Activation commits: `0cc1714` (explicit policy and active configuration), `7a7d6ba` (selected-route identity validation), `aa80344` (Gemini schema compatibility and model choices). The launcher and evidence documentation are delivered in the following activation commit.
+
+Live proof is recorded in the [activation run record](../../evaluations/ai/runs/2026-09-19-active-mcp/README.md). It covers added descriptor blocking, cached reuse, benign descriptor/prompt/skill behavior, prompt cascade blocking, model-reference selection and actual HF lookup, REST/MCP policy-override rejection, health without inference and native-client operation. The first clean-skill run exposed Gemini's rejection of the combined bounded schema; the corrected adapter and repeated full skill scan passed. Full failed and successful artifacts are retained.
+
+`qualificationPolicy: "optional"` makes this explicit activation truthful: held-out qualification was not performed, and the reports say so. Every supplied evidence file remains strictly validated. The historical pass table below records what was known at each earlier checkpoint; its off/pending entries do not describe the current active installation.
+
+Final local verification: build and lint pass; **56/56 suites pass on each of Node 18.20.8, 22.23.2, 24.13.0 and 26.9.0**, with zero unexpected network violations. The configuration checker reports no missing credentials for active roles, all five Jev modes enabled and the same hash as the final live reports. A scan of all 252 tracked/new files found no saved or inherited provider key values. Independent SPEC review approved the activation, identity correction, Gemini fix, launcher and live harness after seven isolated focused suites. Independent quality review also approved the activation commits and launcher/harness after an isolated build and seven focused suites with zero unexpected network violations. Its two minor documentation wording corrections are applied. Remote delivery is recorded below when complete.
+
 ## Starting state
 
 - Baseline: `2f3a83c266009afa84cc235c43abd7db3d7e6fe3`, package `prompt-rejector@1.1.0`.

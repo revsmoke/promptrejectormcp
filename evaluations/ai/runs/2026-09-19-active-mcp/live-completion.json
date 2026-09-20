@@ -1,0 +1,619 @@
+{
+  "synthetic": true,
+  "qualification": false,
+  "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+  "success": false,
+  "cases": [
+    "skill_benign_full_reasoning",
+    "skill_model_reference",
+    "rest_prompt_benign"
+  ],
+  "limits": {
+    "maxRequests": 10,
+    "maxUsd": 0.2
+  },
+  "attempts": 3,
+  "reservedUsd": 0.016381642000000002,
+  "unknownSpend": false,
+  "reports": [
+    {
+      "id": "skill_benign_full_reasoning",
+      "report": {
+        "schemaVersion": 2,
+        "decision": "allow",
+        "safe": true,
+        "overallSeverity": "low",
+        "categories": [],
+        "findings": [],
+        "atlasTechniques": [],
+        "timestamp": "2026-09-20T02:42:19.046Z",
+        "coverage": [
+          {
+            "check": "local",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "skill",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "semantic",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "rubricVersion": "skill-context.1"
+          },
+          {
+            "check": "intent_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "prompt-defensive.2"
+          },
+          {
+            "check": "capability_judgment",
+            "required": false,
+            "status": "complete",
+            "reason": "full_reasoning_retained",
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "full_input",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "rubricVersion": "capability-presence-provenance.1"
+          },
+          {
+            "check": "capability",
+            "required": true,
+            "status": "complete",
+            "reason": "declared_scope",
+            "inspectedCharacters": 240,
+            "inspectedFields": 1,
+            "scope": "declared",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "hugging_face",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 240,
+            "inspectedFields": 0,
+            "scope": "external",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "qualification",
+            "required": false,
+            "status": "not_requested",
+            "reason": "qualification_optional_not_supplied",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          }
+        ],
+        "semantic": {
+          "status": "ok",
+          "value": {
+            "verdict": "benign",
+            "severity": "low",
+            "categories": [],
+            "explanation": "The input describes a simple addition task and explicitly disclaims any external tools, connections, or data access.",
+            "evidenceIds": [
+              "input"
+            ],
+            "isInjection": false,
+            "selfReportedConfidence": 1
+          },
+          "meta": {
+            "callId": "7ba8550d-7482-4635-a2a3-3ea3a8fdf2ae",
+            "provider": "gemini",
+            "requestedModel": "gemini-3-flash-preview",
+            "resolvedModel": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "rubricVersion": "skill-context.1",
+            "schemaVersion": "skill-context.1",
+            "elapsedMs": 3669,
+            "attempts": 1,
+            "usage": {
+              "inputTokens": 995,
+              "outputTokens": 152,
+              "cachedReadTokens": null,
+              "cacheWriteTokens": null,
+              "reasoningTokens": 469,
+              "reasoningIsOutputSubset": false,
+              "cachedReadIsInputSubset": true,
+              "cacheWriteIsInputSubset": true
+            },
+            "failureCode": null
+          }
+        },
+        "judgments": {
+          "intent": {
+            "mode": "cascade",
+            "cache": "disabled",
+            "ageMs": 0,
+            "sourceHash": "ec69ea1326c0390e5fa00c2ac1dd73b1f2e54bff0d90f08ad408c4a0d8bec511",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "override": {
+                  "type": "noul",
+                  "noul": 0.11
+                },
+                "disclosure": {
+                  "type": "noul",
+                  "noul": 0.02
+                },
+                "consequential": {
+                  "type": "noul",
+                  "noul": 0.02
+                }
+              },
+              "meta": {
+                "callId": "f4ee40d9-73a8-4724-833b-3f4f3e2eade9",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "prompt-defensive.2",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 530,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 746,
+                  "outputTokens": 57,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "capability": {
+            "mode": "enforce",
+            "cache": "miss",
+            "ageMs": 0,
+            "sourceHash": "5d70d7c5dc2450316a65619ac9c0761635988dacd31e9b751d3967ef00134b1b",
+            "completion": "completed",
+            "coverage": "complete",
+            "result": {
+              "status": "ok",
+              "value": {
+                "private": {
+                  "type": "noul",
+                  "noul": 0.02
+                },
+                "untrusted": {
+                  "type": "noul",
+                  "noul": 0.1
+                },
+                "egress": {
+                  "type": "noul",
+                  "noul": 0.02
+                }
+              },
+              "meta": {
+                "callId": "38ecddae-a1ee-4976-83f7-9074e970582d",
+                "provider": "typesafe",
+                "requestedModel": "jev-1.13.0",
+                "resolvedModel": "jev-1.13.0",
+                "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+                "rubricVersion": "capability-presence-provenance.1",
+                "schemaVersion": "judgment.1",
+                "elapsedMs": 391,
+                "attempts": 1,
+                "usage": {
+                  "inputTokens": 805,
+                  "outputTokens": 55,
+                  "cachedReadTokens": null,
+                  "cacheWriteTokens": null,
+                  "reasoningTokens": null,
+                  "reasoningIsOutputSubset": true,
+                  "cachedReadIsInputSubset": true,
+                  "cacheWriteIsInputSubset": true
+                },
+                "failureCode": null
+              }
+            }
+          },
+          "modelReference": null,
+          "capabilityBuckets": {
+            "privateDataRead": {
+              "state": "absent",
+              "provenance": "declared",
+              "evidence": [
+                "skillContent"
+              ]
+            },
+            "untrustedContentFetch": {
+              "state": "absent",
+              "provenance": "declared",
+              "evidence": [
+                "skillContent"
+              ]
+            },
+            "externalEgress": {
+              "state": "absent",
+              "provenance": "declared",
+              "evidence": [
+                "skillContent"
+              ]
+            }
+          }
+        },
+        "shadow": null,
+        "analysisMode": "cascade",
+        "policyVersion": "security-policy-v2.1",
+        "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+        "routing": [
+          {
+            "role": "semantic",
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "profileHash": "ba6f8ca3a5dc3510d378125b1644b2a71ff16fb81afd3ca25791487372306986",
+            "status": "attempted",
+            "reason": "primary"
+          },
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          },
+          {
+            "role": "judgment",
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "profileHash": "78d479960ad7fb70151c4a7d99fe7380fa9df09cb2db0a09589a9d79b1e0dab6",
+            "status": "attempted",
+            "reason": "enforced_judgment"
+          }
+        ],
+        "timings": {
+          "totalMs": 4611
+        },
+        "usage": {
+          "calls": 3,
+          "usage": {
+            "inputTokens": 2546,
+            "outputTokens": 264,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": false,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "estimatedUsd": null,
+          "pricingVersions": [
+            "2026-09-19-conservative-standard-v2"
+          ]
+        },
+        "static": {
+          "hasXSS": false,
+          "hasSQLi": false,
+          "hasShellInjection": false,
+          "hasObfuscation": false,
+          "hasPolicyPuppetry": false,
+          "hasMarkdownExfil": false,
+          "hasPromptInjection": false,
+          "hasManyShot": false,
+          "severity": "low",
+          "categories": [],
+          "findings": [],
+          "atlasTechniques": []
+        },
+        "task": "skill",
+        "skillSpecific": {
+          "hasHiddenInstructions": false,
+          "hasDangerousToolUsage": false,
+          "hasSensitiveFileAccess": false,
+          "hasObfuscation": false,
+          "hasSocialEngineering": false,
+          "hasNetworkExfiltration": false,
+          "findings": [],
+          "severity": "low",
+          "categories": []
+        },
+        "trifectaResult": {
+          "privateDataRead": {
+            "present": false,
+            "evidence": []
+          },
+          "untrustedContentFetch": {
+            "present": false,
+            "evidence": []
+          },
+          "externalEgress": {
+            "present": false,
+            "evidence": []
+          },
+          "trifectaPresent": false,
+          "severity": "safe",
+          "recommendation": "Lethal trifecta not present."
+        },
+        "hasLethalTrifecta": false,
+        "huggingFaceSecurityFlags": [],
+        "huggingFaceReports": [],
+        "modelReferences": {
+          "baselineIds": [],
+          "candidateCount": 0,
+          "candidateOverflow": false,
+          "candidates": [],
+          "parserCorrections": [],
+          "shadowAdditions": [],
+          "lookupIds": [],
+          "unresolvedIds": []
+        }
+      }
+    },
+    {
+      "id": "skill_model_reference",
+      "report": {
+        "schemaVersion": 2,
+        "decision": "block",
+        "safe": false,
+        "overallSeverity": "high",
+        "categories": [
+          "shell_injection"
+        ],
+        "findings": [],
+        "atlasTechniques": [],
+        "timestamp": "2026-09-20T02:42:19.086Z",
+        "coverage": [
+          {
+            "check": "local",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 180,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "skill",
+            "required": true,
+            "status": "complete",
+            "reason": null,
+            "inspectedCharacters": 180,
+            "inspectedFields": 1,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "semantic",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "intent_judgment",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "capability_judgment",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "reference_judgment",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "capability",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "hugging_face",
+            "required": true,
+            "status": "not_requested",
+            "reason": "conclusive_block",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "full_input",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          },
+          {
+            "check": "qualification",
+            "required": false,
+            "status": "not_requested",
+            "reason": "qualification_optional_not_supplied",
+            "inspectedCharacters": 0,
+            "inspectedFields": 0,
+            "scope": "local",
+            "provider": null,
+            "model": null,
+            "rubricVersion": null
+          }
+        ],
+        "semantic": null,
+        "judgments": {
+          "intent": null,
+          "capability": null,
+          "modelReference": null,
+          "capabilityBuckets": null
+        },
+        "shadow": null,
+        "analysisMode": "cascade",
+        "policyVersion": "security-policy-v2.1",
+        "configHash": "188cb62f30cfaad7bda38aeb3fe3a5bbf82ed426f4bba73eaf73bc28b3612871",
+        "routing": [],
+        "timings": {
+          "totalMs": 14
+        },
+        "usage": {
+          "calls": 0,
+          "usage": {
+            "inputTokens": null,
+            "outputTokens": null,
+            "cachedReadTokens": null,
+            "cacheWriteTokens": null,
+            "reasoningTokens": null,
+            "reasoningIsOutputSubset": true,
+            "cachedReadIsInputSubset": true,
+            "cacheWriteIsInputSubset": true
+          },
+          "estimatedUsd": null,
+          "pricingVersions": []
+        },
+        "static": {
+          "hasXSS": false,
+          "hasSQLi": false,
+          "hasShellInjection": false,
+          "hasObfuscation": false,
+          "hasPolicyPuppetry": false,
+          "hasMarkdownExfil": false,
+          "hasPromptInjection": false,
+          "hasManyShot": false,
+          "severity": "low",
+          "categories": [],
+          "findings": [],
+          "atlasTechniques": []
+        },
+        "task": "skill",
+        "skillSpecific": {
+          "hasHiddenInstructions": false,
+          "hasDangerousToolUsage": false,
+          "hasSensitiveFileAccess": false,
+          "hasObfuscation": false,
+          "hasSocialEngineering": false,
+          "hasNetworkExfiltration": false,
+          "findings": [],
+          "severity": "high",
+          "categories": [
+            "shell_injection"
+          ]
+        },
+        "trifectaResult": {
+          "privateDataRead": {
+            "present": false,
+            "evidence": []
+          },
+          "untrustedContentFetch": {
+            "present": false,
+            "evidence": []
+          },
+          "externalEgress": {
+            "present": false,
+            "evidence": []
+          },
+          "trifectaPresent": false,
+          "severity": "safe",
+          "recommendation": "Lethal trifecta not present."
+        },
+        "hasLethalTrifecta": false,
+        "huggingFaceSecurityFlags": [],
+        "huggingFaceReports": [],
+        "modelReferences": {
+          "baselineIds": [
+            "openai/whisper-tiny"
+          ],
+          "candidateCount": 1,
+          "candidateOverflow": false,
+          "candidates": [
+            {
+              "id": "c0",
+              "repository": "openai/whisper-tiny",
+              "start": 54,
+              "end": 73,
+              "text": "openai/whisper-tiny",
+              "kind": "unresolved"
+            }
+          ],
+          "parserCorrections": [],
+          "shadowAdditions": [],
+          "lookupIds": [
+            "openai/whisper-tiny"
+          ],
+          "unresolvedIds": []
+        }
+      }
+    }
+  ]
+}

@@ -13,18 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Independent semantic, pattern-drafting, Taster and Monitor model profiles with native Gemini, Claude and OpenAI adapters, validated capabilities and availability-only fallback.
 - TypeSafe Jev judgments for descriptor poisoning, prompt/skill intent, capability presence and exact-source model references; bounded caches and shared request/cost accounting.
-- Opt-in version 2 REST and MCP reports with explicit allow/block/review/unavailable decisions, required coverage, provider attribution and usage. Existing 11 MCP tool names and version 1 defaults remain.
-- Qualified enforcement and prompt/skill cascade policies, isolated candidate evaluation, immutable development datasets, reviewed held-out evidence requirements and code/model/pattern-bound activation manifests.
+- Opt-in version 2 REST and MCP reports with explicit allow/block/review/unavailable decisions, required coverage, provider attribution and usage. Existing 11 MCP tool names remain. Legacy configurations default to v1; the active MCP profile defaults to v2.
+- Explicit active TypeSafe configuration and a directory-independent MCP launcher, with optional or required formal qualification.
+- Enforcement and prompt/skill cascade policies, isolated candidate evaluation, immutable development datasets, reviewed held-out evidence requirements and code/model/pattern-bound activation manifests.
 - Guarded offline suites, runtime CI matrix, non-inferencing configuration/health diagnostics, bounded live probes and model-switch/rollback documentation.
 
 ### Fixed
 
 - Provider failures, malformed output and incomplete required HF metadata can no longer silently authorize a safe scan.
+- Gemini combined skill response compatibility, while preserving strict local validation of every response.
+- Per-route resolved-model checks prevent a primary from borrowing a fallback profile's identity policy.
 - HF model/dataset/Space parsing, source-evidence validation, partial Taster action evidence, model identity drift and expired/stale qualification handling.
 
 ### Rollout status
 
-TypeSafe defaults **off** and Taster remains opt-in. No production activation or passing held-out qualification manifest is included. Bounded Jev/Gemini smoke evidence is recorded; current Claude/OpenAI account access prevents completing those live probes. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates. Package and registry versions remain 1.1.0 until a separate release.
+The dedicated MCP launcher selects an **active TypeSafe** profile with working Jev and Gemini analysis. Legacy startup/configuration behavior remains available; Taster remains opt-in. Formal held-out qualification is reported separately and is not claimed. Bounded live activation evidence includes real security blocks and clean contextual reasoning; Claude/OpenAI remain selectable adapters, with account access still needed for their live verification. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates. Package and registry versions remain 1.1.0 until a separate release.
 
 ## [1.1.0] - 2026-05-14
 
