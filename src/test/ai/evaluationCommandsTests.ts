@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadAIConfig } from '../../ai/config.js';
@@ -43,7 +43,7 @@ try {
     const summary = await runEvaluation(['--dataset',dataset,'--tasks','prompt','--limit','2','--output',output], { env: { GEMINI_API_KEY:'never-print-this' } });
     assert.equal(summary.live,false); assert.equal(summary.completed,true); assert.equal(summary.completedCases,2); assert.equal(calls,0);
     assert.ok(!JSON.stringify(summary).includes('never-print-this'));
-    assert.equal(Object.values(summary.repeatedChanges)[0].changed,null,'single observations are not a stability result');
+    assert.equal(Object.values(summary.repeatedChanges)[0].decisionChanges,null,'single observations are not a stability result');
     await assert.rejects(runEvaluation(['--dataset',dataset,'--output',output]), /empty/);
     const live = ['--live','--dataset',dataset,'--tasks','prompt','--profiles','legacy-gemini,missing','--max-requests','1','--max-usd','1','--pricing','config/ai-pricing.example.json','--output',join(directory,'invalid')];
     await assert.rejects(runEvaluation(live,{ env:{ GEMINI_API_KEY:'fake' } }), /Unknown selected profile/);
@@ -51,6 +51,20 @@ try {
     const missingRates=join(directory,'rates.json'); writeFileSync(missingRates,JSON.stringify({schemaVersion:1,version:'empty',asOf:'2026-09-19',rates:{}}));
     await assert.rejects(runEvaluation(live.map((v,i,a)=>a[i-1]==='--profiles'?'legacy-gemini':a[i-1]==='--pricing'?missingRates:v),{env:{GEMINI_API_KEY:'fake'}}));
     assert.equal(calls,0);
+    const writableArgs=['--live','--dataset',dataset,'--tasks','descriptor','--profiles','typesafe','--scenarios','shadow','--limit','1','--max-requests','1','--max-usd','1','--pricing','config/ai-pricing.example.json'];
+    const locked=join(directory,'locked');mkdirSync(locked);chmodSync(locked,0o500);
+    try { if (process.getuid?.() !== 0) await assert.rejects(runEvaluation([...writableArgs,'--output',locked],{env:{TYPESAFE_API_KEY:'fake'}})); }
+    finally { chmodSync(locked,0o700); }
+    assert.equal(calls,0,'unwritable output cannot spend');
+    const concurrent=join(directory,'concurrent');
+    let entered!:()=>void,release!:()=>void;
+    const atFetch=new Promise<void>(resolve=>{entered=resolve;}), released=new Promise<void>(resolve=>{release=resolve;});
+    globalThis.fetch=async()=>{calls++;assert.ok(existsSync(join(concurrent,'records.jsonl')));assert.ok(existsSync(join(concurrent,'summary.json')));entered();await released;return new Response('{}');};
+    const firstRun=runEvaluation([...writableArgs,'--output',concurrent],{env:{TYPESAFE_API_KEY:'fake'}});
+    await atFetch;
+    await assert.rejects(runEvaluation([...writableArgs,'--output',concurrent],{env:{TYPESAFE_API_KEY:'fake'}}),/empty/);
+    release();await firstRun;
+    assert.equal(calls,1,'one run owns the artifact files before first dispatch');
   } finally { globalThis.fetch = originalFetch; }
 } finally { rmSync(directory,{recursive:true,force:true}); }
 console.log('PASS evaluation offline default, preflight, privacy, shared request and monetary caps');

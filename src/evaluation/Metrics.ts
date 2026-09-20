@@ -1,5 +1,16 @@
+import { createHash } from "node:crypto";
 export type EvaluationDecision = "allow" | "block" | "review" | "unavailable";
-export interface EvaluationObservation { id: string; family: string; risk: boolean | null; severity: string | null; decision: EvaluationDecision; coverageComplete: boolean; elapsedMs: number; estimatedUsd: number | null; attempts: number }
+export interface EvaluationObservation { id: string; family: string; risk: boolean | null; severity: string | null; decision: EvaluationDecision; answerFingerprint?: string; coverageComplete: boolean; elapsedMs: number; estimatedUsd: number | null; attempts: number }
+/** Compare substantive normalized results, independently of the policy's final
+ * decision. Native IDs and operational metadata must not count as instability. */
+export function modelAnswerFingerprint(report: object): string {
+    const excluded = new Set(["meta", "routing", "timings", "usage", "runId", "timestamp", "sourceHash", "ageMs", "cache", "id", "tool_use_id", "idOrNull"]);
+    const normalize = (value: unknown): unknown => Array.isArray(value) ? value.map(normalize) : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).filter(([key]) => !excluded.has(key)).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, normalize(child)])) : value;
+    const fields = ["semantic", "judgments", "shadow", "buckets", "additions", "modelReferences", "behaviorReport", "tasterTranscript"];
+    const selected = Object.fromEntries(Object.entries(report).filter(([key]) => fields.includes(key)));
+    return createHash("sha256").update(JSON.stringify(normalize(selected))).digest("hex");
+}
 export function percentile(values: number[], fraction: number): number | null {
     if (!values.length) return null;
     const sorted = [...values].sort((a, b) => a - b);
@@ -33,12 +44,16 @@ export function summarizeObservations(items: readonly EvaluationObservation[]) {
 }
 export function repeatedAnswerChanges(runs: readonly (readonly EvaluationObservation[])[]) {
     const answers = new Map<string, Set<string>>();
+    const modelAnswers = new Map<string, Set<string>>(), answerCounts = new Map<string, number>();
     const observations = new Map<string, number>();
     for (const run of runs) for (const item of run) {
         const set = answers.get(item.id) ?? new Set<string>(); set.add(item.decision); answers.set(item.id, set);
         observations.set(item.id, (observations.get(item.id) ?? 0) + 1);
+        if (item.answerFingerprint) { const set = modelAnswers.get(item.id) ?? new Set<string>(); set.add(item.answerFingerprint); modelAnswers.set(item.id, set); answerCounts.set(item.id, (answerCounts.get(item.id) ?? 0) + 1); }
     }
     const repeatedCases = [...observations.values()].filter((count) => count > 1).length;
-    return { cases: answers.size, repeatedCases, changed: repeatedCases ? [...answers.values()].filter((values) => values.size > 1).length : null,
+    const repeatedAnswerCases = [...answerCounts.values()].filter((count) => count > 1).length;
+    return { cases: answers.size, repeatedCases, decisionChanges: repeatedCases ? [...answers.values()].filter((values) => values.size > 1).length : null,
+        repeatedAnswerCases, answerChanges: repeatedAnswerCases ? [...modelAnswers.values()].filter((values) => values.size > 1).length : null,
         limitation: "Stability observations are not a guarantee of deterministic model answers. Each repeat uses a fresh judgment cache." };
 }

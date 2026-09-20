@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAIConfig, parseAIConfig, type ConfigSnapshot } from "../ai/config.js";
@@ -76,6 +76,17 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
         jobs.push({ profile, scenario, snapshot });
     }
     mkdirSync(flags.output, { recursive: true });
+    const owned: Array<{ path: string; fd: number }> = [];
+    try {
+        for (const name of ["records.jsonl", "summary.json"]) {
+            const path = resolve(flags.output, name);
+            owned.push({ path, fd: openSync(path, "wx", 0o600) });
+        }
+    } catch (error) {
+        for (const file of owned) { closeSync(file.fd); unlinkSync(file.path); }
+        throw error;
+    }
+    try {
     let completed = true;
     const executionErrors: Array<{ id: string; profile: string; scenario: string; reason: string }> = [];
     outer: for (const { profile, scenario, snapshot } of jobs) for (let repeat = 0; repeat < flags.repeats; repeat++) {
@@ -98,9 +109,10 @@ export async function runEvaluation(args: string[], options: { env?: NodeJS.Proc
         budget: quota ? { attempts: quota.attempts, conservativeReservedUsd: quota.reservedUsd, unknownSpend: quota.unknownSpend } : null,
         groups, repeatedChanges: changes, exactReferenceExtraction: { cases: records.filter((row) => row.exactReferences !== null).length, correct: records.filter((row) => row.exactReferences === true).length },
         executionErrors, limitations: [...corpus.manifest.limitations, ...flags.live ? [] : ["Offline full scans explicitly lack live semantic and HF metadata coverage."], "A successful run is not an activation manifest. Review and unavailable remain abstentions."] };
-    writeFileSync(resolve(flags.output, "records.jsonl"), records.map((item) => JSON.stringify(item)).join("\n") + "\n", { flag: "wx" });
-    writeFileSync(resolve(flags.output, "summary.json"), JSON.stringify(summary, null, 2) + "\n", { flag: "wx" });
+    writeFileSync(owned[0].fd, records.map((item) => JSON.stringify(item)).join("\n") + "\n");
+    writeFileSync(owned[1].fd, JSON.stringify(summary, null, 2) + "\n");
     return summary;
+    } finally { for (const file of owned) closeSync(file.fd); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     try {

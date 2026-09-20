@@ -14,7 +14,7 @@ import { HuggingFaceService } from "../services/HuggingFaceService.js";
 import { TasteTesterService, type TasteTesterInput } from "../services/TasteTesterService.js";
 import { AnalysisBudget } from "../ai/budget.js";
 import { validateCaseInput, type EvaluationCase } from "./Corpus.js";
-import type { EvaluationDecision, EvaluationObservation } from "./Metrics.js";
+import { modelAnswerFingerprint, type EvaluationDecision, type EvaluationObservation } from "./Metrics.js";
 import type { RunQuota } from "./RunQuota.js";
 class OfflineHF extends HuggingFaceService {
     override async checkModel(modelId: string) { return { modelId, fetchedAt: new Date().toISOString(), severity: "low" as const, flags: [{ class: "lookup_failed" as const, note: "Offline evaluation: metadata lookup not performed" }] }; }
@@ -59,7 +59,7 @@ export async function evaluateCase(services: ReturnType<typeof evaluationService
         decision = report.behaviorReport.monitorVerdict === "malicious" ? "block" : report.behaviorReport.monitorVerdict === "clean" ? "allow" : report.behaviorReport.monitorVerdict === "undetermined" ? "unavailable" : "review";
     } else coverageComplete = !report.extraction.candidateOverflow;
     const observation: EvaluationObservation = { id: item.id, family: item.family, risk: item.label.risk, severity: item.label.severity,
-        decision, coverageComplete,
+        decision, coverageComplete, answerFingerprint: modelAnswerFingerprint(report),
         elapsedMs: Date.now() - started, estimatedUsd: report.usage?.estimatedUsd ?? null, attempts: report.usage?.calls ?? 0 };
     const exactReferences = "extraction" in report && Array.isArray(item.label.expected)
         ? JSON.stringify([...report.extraction.baselineIds].sort()) === JSON.stringify([...item.label.expected].sort()) : null;
