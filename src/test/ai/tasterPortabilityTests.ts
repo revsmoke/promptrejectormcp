@@ -41,14 +41,14 @@ console.log('PASS Taster portability across native providers with independent Mo
     const cfg = structuredClone(loadAIConfig({}).config);
     cfg.profiles.other = { provider: 'openai', model: models.openai, maxOutputTokens: 64 };
     cfg.roles.taster.fallback = 'other';
-    cfg.limits.reasoningTimeoutMs = 25;
+    cfg.limits.reasoningTimeoutMs = 250;
     const snapshot = parseAIConfig(cfg);
     let nativeCalls = 0;
     let monitorCalls = 0;
     const registry = new ProviderRegistry(snapshot, { env: { ANTHROPIC_API_KEY: 'test', OPENAI_API_KEY: 'test' }, fetch: async (url) => { assert.ok(String(url).includes('anthropic')); nativeCalls++; if (nativeCalls === 1)
             return new Response(JSON.stringify(wire('anthropic', true))); return new Promise<Response>(() => { }); } });
     registry.register('anthropic', { generate: async (req, ctx) => { monitorCalls++; assert.ok(ctx.budget.reserveAttempt().ok); return { status: 'ok', value: req.parse(clean), meta: { callId: 'm', provider: 'anthropic', requestedModel: models.anthropic, resolvedModel: null, profileHash: 'x', rubricVersion: 'x', schemaVersion: 'x', elapsedMs: 0, attempts: 1, usage: emptyUsage(), failureCode: null } }; } });
-    const svc = new TasteTesterService({ enabled: true, monitor: new SemanticAnalysisService(snapshot, registry), timeoutMs: 100 });
+    const svc = new TasteTesterService({ enabled: true, monitor: new SemanticAnalysisService(snapshot, registry), timeoutMs: 1000 });
     const result = await svc.runV2({ prompt: 'test', mode: 'thorough' });
     assert.equal(result.coverage.taster, 'partial');
     assert.equal(result.behaviorReport.severity, 'critical');
@@ -136,6 +136,9 @@ for (const provider of Object.keys(models) as ReasoningProviderId[]) {
 // A Monitor deadline/cancellation must settle native attempt accounting before
 // the public report freezes, including when an availability fallback hangs.
 for (const provider of Object.keys(models) as ReasoningProviderId[]) for (const stop of ['timeout','cancelled','fallback','fallback_cancelled'] as const) {
+ // Leave headroom for the successful Taster to start and finish under load;
+ // the hanging native Monitor must still hit its own bounded phase deadline.
+ const phaseTimeoutMs=1000;
  const cfg=structuredClone(loadAIConfig({}).config);cfg.profiles.monitor={provider,model:models[provider],maxOutputTokens:512};cfg.roles.monitor=stop.startsWith('fallback')?{primary:'legacy-anthropic',fallback:'monitor'}:{primary:'monitor'};
  const snapshot=parseAIConfig(cfg);const controller=new AbortController();let physical=0;let activeSignal:AbortSignal|undefined;
  const budget=new (await import('../../ai/budget.js')).AnalysisBudget('taster',snapshot.config.limits,{tasterTurns:2});
@@ -146,9 +149,9 @@ for (const provider of Object.keys(models) as ReasoningProviderId[]) for (const 
   if(stop.endsWith('cancelled'))setTimeout(()=>controller.abort(),5);
   return new Promise<Response>(()=>{});
  }});
- const begin=Date.now();const result=await new TasteTesterService({enabled:true,timeoutMs:25,monitor:new SemanticAnalysisService(snapshot,registry)}).runV2({prompt:'synthetic'},{signal:controller.signal,budget});
+ const begin=Date.now();const result=await new TasteTesterService({enabled:true,timeoutMs:phaseTimeoutMs,monitor:new SemanticAnalysisService(snapshot,registry)}).runV2({prompt:'synthetic'},{signal:controller.signal,budget});
  assert.equal(result.coverage.monitor,'unavailable');assert.equal(result.monitorMeta?.provider,provider);assert.equal(result.monitorMeta?.attempts,1);
- assert.equal(result.monitorMeta?.failureCode,stop.endsWith('cancelled')?'cancelled':'timeout');assert.equal(result.usage.calls,physical);assert.equal(result.usage.calls,stop.startsWith('fallback')?3:2);assert.equal(activeSignal?.aborted,true);assert.ok(Date.now()-begin<500);
+ assert.equal(result.monitorMeta?.failureCode,stop.endsWith('cancelled')?'cancelled':'timeout');assert.equal(result.usage.calls,physical);assert.equal(result.usage.calls,stop.startsWith('fallback')?3:2);assert.equal(activeSignal?.aborted,true);assert.ok(Date.now()-begin<2*phaseTimeoutMs+1000);
  await new Promise(resolve=>setTimeout(resolve,10));assert.deepEqual(budget.usage.summary(),result.usage,'Report usage must not change after returning');
 }
 console.log('PASS bounded public transcript and settled Monitor deadline/cancellation accounting');

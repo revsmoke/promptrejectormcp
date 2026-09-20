@@ -9,6 +9,72 @@ function context(ms = 1000, signal?: AbortSignal): CallContext {
     return { budget, deadlineMs: budget.deadlineMs, signal, role: "semantic", runId: "fixture", configHash: "fixture" };
 }
 const request = { url: "https://provider.invalid/inference", headers: { authorization: "secret-fixture-key" }, body: "{}", timeoutMs: 1000 };
+// Timers can wake before the absolute Date.now boundary. Control both clocks so
+// this regression does not depend on a particular Node version or machine load.
+async function earlyDeadlineTimer(operation: "wrapper" | "transport", outcome: "timeout" | "cancelled" | "complete"): Promise<void> {
+    const originalNow = Date.now;
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    let now = 1000;
+    let nextId = 0;
+    const timers = new Map<number, () => void>();
+    Date.now = () => now;
+    globalThis.setTimeout = ((callback: () => void) => {
+        const id = ++nextId;
+        timers.set(id, callback);
+        return id;
+    }) as unknown as typeof setTimeout;
+    globalThis.clearTimeout = ((id: number) => { timers.delete(id); }) as unknown as typeof clearTimeout;
+    const fireTimer = () => {
+        const [id, callback] = timers.entries().next().value!;
+        timers.delete(id);
+        callback();
+    };
+    const external = new AbortController();
+    let signal: AbortSignal | undefined;
+    let finish!: () => void;
+    let pending: Promise<unknown> | undefined;
+    try {
+        pending = operation === "wrapper"
+            ? withDeadline(async active => { signal = active; return new Promise<string>(resolve => { finish = () => resolve("finished"); }); }, 1100, external.signal)
+            : new NativeTransport({ fetch: async (_url, init) => { signal = init?.signal ?? undefined; return new Promise<Response>(resolve => { finish = () => resolve(new Response("{}")); }); } }).postJson(request, context(100, external.signal));
+        // Observe rejection immediately, including when this regression fails.
+        const settled = pending.then(value => ({ value }), error => ({ error }));
+        await Promise.resolve();
+        assert.ok(signal, "the operation must start before exercising its deadline");
+        now = 1099;
+        fireTimer();
+        assert.equal(signal.aborted, false, `${operation} must not abort before its absolute deadline`);
+        assert.equal(timers.size, 1, "an early timer must rearm for the remaining interval");
+        if (outcome === "timeout") { now = 1100; fireTimer(); }
+        else if (outcome === "cancelled") external.abort();
+        else finish();
+        const result = await settled;
+        if (operation === "wrapper") {
+            if (outcome === "complete") assert.deepEqual(result, { value: "finished" });
+            else assert.equal("error" in result && result.error.code, outcome);
+        } else {
+            assert.ok("value" in result);
+            const value = result.value as Awaited<ReturnType<NativeTransport["postJson"]>>;
+            assert.equal(value.attempts, 1, "timer boundaries cannot add physical attempts");
+            assert.equal(value.status, outcome === "complete" ? "ok" : "unavailable");
+            if (value.status === "unavailable") assert.equal(value.code, outcome);
+        }
+        assert.equal(timers.size, 0, "completion, timeout and cancellation must clear all deadline timers");
+        assert.equal(signal.aborted, outcome !== "complete");
+        external.abort();
+        assert.equal(signal.aborted, outcome !== "complete", "completed work must remove the external abort listener");
+    } finally {
+        external.abort();
+        await pending?.catch(() => {});
+        Date.now = originalNow;
+        globalThis.setTimeout = originalSetTimeout;
+        globalThis.clearTimeout = originalClearTimeout;
+    }
+}
+for (const operation of ["wrapper", "transport"] as const) {
+    for (const outcome of ["timeout", "cancelled", "complete"] as const) await earlyDeadlineTimer(operation, outcome);
+}
 let expiredCallbackCalls = 0;
 await assert.rejects(withDeadline(async () => { expiredCallbackCalls++; throw new Error("must not run"); }, Date.now() - 1));
 assert.equal(expiredCallbackCalls, 0, "expired work must not start");

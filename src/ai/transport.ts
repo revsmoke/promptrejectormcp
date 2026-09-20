@@ -17,6 +17,18 @@ class TransportFailure extends Error {
     constructor(readonly code: FailureCode) { super(code); }
 }
 
+/** Timer scheduling and Date.now need not cross a millisecond boundary together.
+ * Recheck the absolute deadline so an early callback cannot cancel valid work. */
+export function deadlineTimer(deadlineMs: number, abort: () => void): () => void {
+    const check = () => {
+        const remainingMs = deadlineMs - Date.now();
+        if (remainingMs <= 0) abort();
+        else timer = setTimeout(check, remainingMs);
+    };
+    let timer = setTimeout(check, Math.max(0, deadlineMs - Date.now()));
+    return () => clearTimeout(timer);
+}
+
 /** Abortable wait used for the whole operation, including queue and response
  * body. Unlike Promise.race-only timeouts, callers also abort native fetch. */
 export function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -32,7 +44,7 @@ export async function withDeadline<T>(work: (signal: AbortSignal) => Promise<T>,
     const abort = () => controller.abort();
     external?.addEventListener("abort", abort, { once: true });
     if (external?.aborted || Date.now() >= deadlineMs) controller.abort();
-    const timer = setTimeout(abort, Math.max(0, deadlineMs - Date.now()));
+    const clearDeadline = deadlineTimer(deadlineMs, abort);
     try {
         if (controller.signal.aborted) throw new TransportFailure("cancelled");
         const result = await untilAborted(Promise.resolve().then(() => {
@@ -42,7 +54,11 @@ export async function withDeadline<T>(work: (signal: AbortSignal) => Promise<T>,
         if (controller.signal.aborted || Date.now() >= deadlineMs) { controller.abort(); throw new TransportFailure("timeout"); }
         return result;
     }
-    finally { clearTimeout(timer); external?.removeEventListener("abort", abort); }
+    catch (error) {
+        if (controller.signal.aborted) throw new TransportFailure(external?.aborted ? "cancelled" : "timeout");
+        throw error;
+    }
+    finally { clearDeadline(); external?.removeEventListener("abort", abort); }
 }
 
 interface Waiter { optional: boolean; accept(): void; reject(code: FailureCode): void }
@@ -93,7 +109,7 @@ export class NativeTransport {
         const abort = () => controller.abort();
         call.signal?.addEventListener("abort", abort, { once: true });
         if (call.signal?.aborted || Date.now() >= deadline) controller.abort();
-        const timer = setTimeout(abort, Math.max(0, deadline - Date.now()));
+        const clearDeadline = deadlineTimer(deadline, abort);
         let attempts = 0;
         const reservationIds: string[] = [];
         const unavailable = (code: FailureCode): TransportResult => ({ status: "unavailable", code, attempts, reservationIds, elapsedMs: Date.now() - start });
@@ -144,7 +160,7 @@ export class NativeTransport {
             if (controller.signal.aborted) return unavailable(call.signal?.aborted ? "cancelled" : "timeout");
             return unavailable(error instanceof TransportFailure ? error.code : "transport");
         } finally {
-            clearTimeout(timer);
+            clearDeadline();
             call.signal?.removeEventListener("abort", abort);
             release?.();
         }

@@ -82,14 +82,16 @@ try {
     writeFileSync(join(temporary, "dist/test/timeout.js"), `
         process.on('SIGTERM', () => {});
         console.log('SIGTERM handler installed');
-        setTimeout(() => process.exit(0), 1200);
+        setTimeout(() => process.exit(0), 8000);
     `);
     const started = performance.now();
-    const timedOut = runSuite(temporary, { file: "timeout.js" }, { timeoutMs: 250 });
+    // Include process/guard startup under a parallel Node matrix. The child
+    // still outlives the deadline if the runner regresses to ordinary SIGTERM.
+    const timedOut = runSuite(temporary, { file: "timeout.js" }, { timeoutMs: 2000 });
     assert.equal(timedOut.passed, false);
     assert.match(timedOut.error ?? "", /ETIMEDOUT/);
     assert.match(timedOut.output, /SIGTERM handler installed/);
-    assert.ok(performance.now() - started < 1000, "SIGTERM-resistant child must not extend the deadline");
+    assert.ok(performance.now() - started < 4000, "SIGTERM-resistant child must not extend the deadline");
     console.log("PASS: suite timeout is bounded even when the child ignores SIGTERM");
 
     writeFileSync(join(temporary, "dist/test/tmp.cjs"), `

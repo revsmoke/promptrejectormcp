@@ -1,5 +1,6 @@
 import type { CallResult, FailureCode, JudgmentAnswers, JudgmentRequest } from "../ai/contracts.js";
 import { hashConfiguration } from "../ai/modelProfiles.js";
+import { deadlineTimer } from "../ai/transport.js";
 
 export type CacheDisposition = "miss" | "hit" | "shared";
 export interface CachedJudgment { result: CallResult<JudgmentAnswers>; cache: CacheDisposition; ageMs: number }
@@ -51,7 +52,7 @@ export class JudgmentCache {
             entry = { controller, waiters: 0, promise: Promise.resolve(null as never), progress };
             const ownEntry = entry;
             let timedOut = false;
-            const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.providerTimeoutMs);
+            const clearDeadline = deadlineTimer(deadlineMs, () => { timedOut = true; controller.abort(); });
             entry.promise = new Promise<CallResult<JudgmentAnswers>>((resolve, reject) => {
                 const abort = () => reject(new JudgmentCacheError(timedOut ? "timeout" : "cancelled"));
                 controller.signal.addEventListener("abort", abort, { once: true });
@@ -69,7 +70,7 @@ export class JudgmentCache {
                 }
                 return result;
             }).finally(() => {
-                clearTimeout(timer);
+                clearDeadline();
                 if (this.pending.get(key) === ownEntry) this.pending.delete(key);
             });
             this.pending.set(key, entry);
@@ -84,7 +85,7 @@ export class JudgmentCache {
                 if (!error && waiter.signal?.aborted) error = new JudgmentCacheError("cancelled");
                 if (!error && Date.now() >= waiter.deadlineMs) error = new JudgmentCacheError("timeout");
                 settled = true;
-                clearTimeout(timer);
+                clearDeadline();
                 waiter.signal?.removeEventListener("abort", abort);
                 current.waiters--;
                 if (!current.waiters && this.pending.get(key) === current) {
@@ -95,7 +96,7 @@ export class JudgmentCache {
                 else resolve({ result: structuredClone(result!), cache: disposition, ageMs: 0 });
             };
             const abort = () => finish(new JudgmentCacheError("cancelled"));
-            const timer = setTimeout(() => finish(new JudgmentCacheError("timeout")), Math.max(0, waiter.deadlineMs - Date.now()));
+            const clearDeadline = deadlineTimer(waiter.deadlineMs, () => finish(new JudgmentCacheError("timeout")));
             waiter.signal?.addEventListener("abort", abort, { once: true });
             current.promise.then((result) => finish(undefined, result), (error: unknown) => finish(error instanceof JudgmentCacheError ? error : new JudgmentCacheError("transport")));
         });
