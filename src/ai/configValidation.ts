@@ -2,6 +2,7 @@ import { priceCardSchema, type PriceCard } from "./pricing.js";
 import { z } from "zod";
 import { hashConfiguration, validateModelProfile, loadCapabilityCatalog, capabilityCatalogSchema, modelCapabilities, type CapabilityCatalog } from "./modelProfiles.js";
 import type { GenerativeRole, ReasoningProviderId } from "./contracts.js";
+import type { PatternService } from "../services/PatternService.js";
 import type { QualificationState } from "./qualification.js";
 const identity = z.string().min(1).max(150).regex(/^[a-zA-Z0-9._-]+$/);
 export const modelResolutionSchema = z.discriminatedUnion("kind", [
@@ -30,7 +31,7 @@ export const aiConfigSchema = z.strictObject({
     capabilitiesFile: z.string().min(1).optional(), pricingFile: z.string().min(1).optional(), evaluationFile: z.string().min(1).optional(),
 });
 export type AIConfig = z.infer<typeof aiConfigSchema>;
-export interface ConfigSnapshot { readonly config: AIConfig; readonly capabilities: CapabilityCatalog; readonly pricing?: PriceCard; readonly hash: string; readonly legacy: boolean; readonly evaluationOnly: boolean; readonly qualification?: QualificationState; readonly qualificationDirectory?: string }
+export interface ConfigSnapshot { readonly config: AIConfig; readonly capabilities: CapabilityCatalog; readonly pricing?: PriceCard; readonly hash: string; readonly legacy: boolean; readonly evaluationOnly: boolean; readonly qualification?: QualificationState; readonly qualificationDirectory?: string; readonly evaluationPatternsSha256?: string }
 export const keyNames: Readonly<Record<ReasoningProviderId | "typesafe", string>> = {
     gemini: "GEMINI_API_KEY", anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", typesafe: "TYPESAFE_API_KEY",
 };
@@ -41,7 +42,7 @@ export function deepFreeze<T>(value: T): T {
     }
     return value;
 }
-export interface ConfigParseOptions { tasterEnabled?: boolean; capabilities?: CapabilityCatalog; pricing?: PriceCard; configDirectory?: string }
+export interface ConfigParseOptions { tasterEnabled?: boolean; capabilities?: CapabilityCatalog; pricing?: PriceCard; configDirectory?: string; patternService?: PatternService }
 /** Internal structural validation shared only by serving config and the isolated evaluator. */
 export function validateConfiguration(input: unknown, legacy = false, options: ConfigParseOptions = {}): ConfigSnapshot {
     const config = aiConfigSchema.parse(input);

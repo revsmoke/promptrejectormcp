@@ -9,7 +9,7 @@ export { aiConfigSchema, limitsSchema, keyNames } from "./configValidation.js";
 export type { AIConfig, AnalysisLimits, ConfigSnapshot, ConfigParseOptions } from "./configValidation.js";
 export function parseAIConfig(input: unknown, legacy = false, options: ConfigParseOptions = {}): ConfigSnapshot {
     const snapshot = validateConfiguration(input, legacy, options);
-    const qualification = qualifyConfiguration(snapshot, options.configDirectory);
+    const qualification = qualifyConfiguration(snapshot, options.configDirectory, options.patternService);
     return deepFreeze({ ...snapshot, qualification, qualificationDirectory: options.configDirectory ? resolve(options.configDirectory) : undefined, hash: hashConfiguration({ config: snapshot.config, capabilities: snapshot.capabilities, pricing: snapshot.pricing ?? null, qualification }) });
 }
 export function loadAIConfig(env: NodeJS.ProcessEnv = process.env): ConfigSnapshot {

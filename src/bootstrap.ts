@@ -22,7 +22,7 @@ import { DescriptorAnalysisService } from "./services/DescriptorAnalysisService.
 import { CapabilityAnalysisService } from "./services/CapabilityAnalysisService.js";
 import { ModelReferenceService } from "./services/ModelReferenceService.js";
 import { tokenPrices } from "./ai/pricing.js";
-import { assertServingSnapshot } from "./ai/qualification.js";
+import { assertServingSnapshot, assertQualifiedPatterns } from "./ai/qualification.js";
 
 export interface ServiceDependencies {
     env?: NodeJS.ProcessEnv;
@@ -37,12 +37,13 @@ export interface ServiceDependencies {
 /** One process graph, constructed only after dotenv. Importing this module
  * performs neither service construction nor provider/account discovery. */
 export function createServices(snapshot: ConfigSnapshot = loadAIConfig(), deps: ServiceDependencies = {}) {
-    assertServingSnapshot(snapshot);
     const env = deps.env ?? process.env;
+    const patternService = deps.patternService ?? new PatternService();
+    assertServingSnapshot(snapshot, patternService);
+    assertQualifiedPatterns(snapshot, patternService);
     const configuredProviders = Object.fromEntries(Object.entries(keyNames).map(([provider, key]) => [provider, !!env[key]]));
     const registry = deps.registry ?? new ProviderRegistry(snapshot, { env, fetch: deps.fetch });
     const semantic = deps.semantic ?? new SemanticAnalysisService(snapshot, registry);
-    const patternService = deps.patternService ?? new PatternService();
     const huggingFaceService = deps.huggingFaceService ?? new HuggingFaceService({ token: env.HF_TOKEN });
     const judgmentService = deps.judgmentService ?? new JudgmentService(snapshot, { apiKey: env.TYPESAFE_API_KEY, fetch: deps.fetch, prices: tokenPrices(snapshot.pricing, "typesafe", snapshot.config.typesafe.model) });
     const capabilityAnalysis = new CapabilityAnalysisService(judgmentService, undefined, undefined, semantic);

@@ -12,6 +12,16 @@ import {
     type IntegrityCheckResult,
 } from "../schemas/PatternSchemas.js";
 import { FALLBACK_PATTERNS } from "./fallbackPatterns.js";
+import { hashConfiguration } from "../ai/modelProfiles.js";
+
+export interface PatternQualificationState {
+    readonly schemaVersion: 1;
+    readonly corpusSha256: string;
+    readonly filesSha256: string;
+    readonly fallbackActive: boolean;
+    readonly integrity: "valid" | "invalid" | "unavailable";
+    readonly hmac: "verified" | "invalid" | "not_configured" | "unavailable";
+}
 
 export interface ActivePattern {
     entry: PatternEntry;
@@ -317,6 +327,26 @@ export class PatternService {
         }
 
         return result;
+    }
+
+    /** Capture actual loaded behavior and current persisted evidence. This does
+     * not reload patterns, regenerate signatures, or expose the HMAC secret.
+     * Runtime qualification checks detect approved CRUD changes, direct cache
+     * mutations, on-disk edits, and transitions to a fallback corpus. */
+    getQualificationState(): PatternQualificationState {
+        let filesSha256: string;
+        try {
+            const files = readdirSync(this.patternsDir).filter((name) => name.endsWith(".json")).sort();
+            filesSha256 = hashConfiguration(files.map((name) => ({ name, sha256: createHash("sha256").update(readFileSync(join(this.patternsDir, name))).digest("hex") })));
+        } catch { filesSha256 = hashConfiguration({ files: "unavailable" }); }
+        let integrity: PatternQualificationState["integrity"] = "unavailable";
+        let hmac: PatternQualificationState["hmac"] = "unavailable";
+        try {
+            const result = this.verify();
+            integrity = result.valid ? "valid" : "invalid";
+            hmac = result.hmacValid === null ? "not_configured" : result.hmacValid ? "verified" : "invalid";
+        } catch { /* A failed recheck must differ from qualified valid evidence. */ }
+        return Object.freeze({ schemaVersion: 1, corpusSha256: hashConfiguration(this.cache), filesSha256, fallbackActive: this.fallbackActive, integrity, hmac });
     }
 
     isFallbackActive(): boolean {

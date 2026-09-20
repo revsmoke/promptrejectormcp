@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ConfigSnapshot } from "./configValidation.js";
 import { modelResolutionSchema } from "./configValidation.js";
 import { hashConfiguration, modelCapabilities, profileHash } from "./modelProfiles.js";
+import { PatternService } from "../services/PatternService.js";
 import { tokenPrices } from "./pricing.js";
 
 export const QUALIFICATION_THRESHOLDS = Object.freeze({ high: .9, low: .1, choiceEvidence: .6 });
@@ -17,12 +18,13 @@ const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const count = z.number().int().nonnegative();
 const timestamp = z.string().datetime();
 const task = z.enum(QUALIFICATION_TASKS);
+const reviewerId = z.string().trim().min(1);
 const routesSchema = z.array(z.strictObject({ name: z.string().min(1), selection: z.enum(["primary", "fallback"]), provider: z.enum(["anthropic", "openai", "gemini"]), model: z.string().min(1), profileHash: digest, capabilityHash: digest }));
 const bindingSchema = z.strictObject({
     task, mode: z.enum(["enforce", "cascade"]), policyVersion: z.string().min(1), sourcePolicyVersion: z.string().min(1),
     thresholds: z.strictObject({ high: z.number(), low: z.number(), choiceEvidence: z.number() }),
     typesafeModel: z.string().min(1), routes: routesSchema, modelResolutions: z.record(z.string(), modelResolutionSchema),
-    profileOptionsSha256: digest, rubricSha256: digest, schemaSha256: digest, decisionCodeSha256: digest, limitsSha256: digest,
+    profileOptionsSha256: digest, rubricSha256: digest, schemaSha256: digest, decisionCodeSha256: digest, limitsSha256: digest, patternsSha256: digest,
     childModes: z.strictObject({ capability: z.enum(["off", "shadow", "enforce"]), modelReference: z.enum(["off", "shadow", "enforce"]) }).nullable(),
     pricingVersion: z.string().min(1), pricingSha256: digest,
 });
@@ -31,8 +33,8 @@ export const qualificationManifestSchema = z.strictObject({
     schemaVersion: z.literal(1), task, mode: z.enum(["enforce", "cascade"]), status: z.enum(["passed", "failed", "pending"]),
     binding: bindingSchema, bindingSha256: digest,
     dataset: z.strictObject({ id: z.string().min(1), partition: z.literal("heldout"), casesSha256: digest, labelsSha256: digest, familiesSha256: digest, reviewSha256: digest, familyDisjoint: z.boolean(), untouchedAfterTuning: z.boolean(), classifierIndependent: z.boolean() }),
-    review: z.strictObject({ reviewedAt: timestamp, adjudication: z.enum(["resolved", "pending"]), unresolvedLabels: count, reviewers: z.array(z.strictObject({ id: z.string().min(1), independent: z.boolean(), approved: z.boolean(), datasetSha256: digest })).min(2).max(20) }),
-    resultApproval: z.strictObject({ reviewedAt: timestamp, reviewer: z.string().min(1), approved: z.boolean(), resultsSha256: digest }).optional(),
+    review: z.strictObject({ reviewedAt: timestamp, adjudication: z.enum(["resolved", "pending"]), unresolvedLabels: count, reviewers: z.array(z.strictObject({ id: reviewerId, independent: z.boolean(), approved: z.boolean(), datasetSha256: digest })).min(2).max(20) }),
+    resultApproval: z.strictObject({ reviewedAt: timestamp, reviewer: reviewerId, approved: z.boolean(), resultsSha256: digest }).optional(),
     modelResolutions: z.record(z.string(), modelResolutionSchema), evaluatedAt: timestamp, expiresAt: timestamp, pricingVersion: z.string().min(1),
     gates: z.strictObject({ contracts: z.boolean(), compatibility: z.boolean(), shadow: z.boolean(), operational: z.boolean(), liveProfileHashes: z.array(digest), typesafeLiveModel: z.string().min(1) }),
     metrics: z.strictObject({ strata: z.array(z.strictObject({ task,
@@ -44,7 +46,7 @@ export const qualificationManifestSchema = z.strictObject({
 });
 export type QualificationManifest = z.infer<typeof qualificationManifestSchema>;
 export const qualificationBundleSchema = z.strictObject({ schemaVersion: z.literal(1), manifests: z.array(qualificationManifestSchema).min(1).max(10) });
-export interface QualificationState { readonly tasks: Partial<Record<QualificationTask, { readonly bindingSha256: string; readonly manifestSha256: string; readonly expiresAt: string; readonly operational: "pending" | "passed" }>> }
+export interface QualificationState { readonly tasks: Partial<Record<QualificationTask, { readonly bindingSha256: string; readonly manifestSha256: string; readonly expiresAt: string; readonly operational: "pending" | "passed"; readonly patternsSha256: string }>> }
 
 function codeFiles(relative: string): Array<{ path: string; content: string }> {
     const extension = import.meta.url.endsWith(".ts") ? ".ts" : ".js";
@@ -73,7 +75,7 @@ export function effectiveSkillChildMode(snapshot: ConfigSnapshot, child: "capabi
 }
 /** The binding includes actual deployed source, not only manually maintained
  * version strings. Evaluate and deploy the same build artifact. */
-export function taskPolicyBinding(snapshot: ConfigSnapshot, selected: QualificationTask, selectedMode: EnforcedMode) {
+export function taskPolicyBinding(snapshot: ConfigSnapshot, selected: QualificationTask, selectedMode: EnforcedMode, patternService?: PatternService) {
     const setting = snapshot.config.roles.semantic;
     const routes = (["primary", "fallback"] as const).flatMap((selection) => {
         const name = setting[selection];
@@ -85,6 +87,7 @@ export function taskPolicyBinding(snapshot: ConfigSnapshot, selected: Qualificat
     const extension = import.meta.url.endsWith(".ts") ? ".ts" : ".js";
     return { task: selected, mode: selectedMode, policyVersion: POLICY_VERSIONS[selected], sourcePolicyVersion: SOURCE_POLICY_VERSION,
         thresholds: { ...QUALIFICATION_THRESHOLDS }, typesafeModel: snapshot.config.typesafe.model, routes, modelResolutions: resolutions,
+        patternsSha256: hashConfiguration((patternService ?? new PatternService()).getQualificationState()),
         profileOptionsSha256: hashConfiguration(routes.map(({ name }) => snapshot.config.profiles[name])),
         rubricSha256: sourceDigest(["ai/rubrics", `services/SemanticAnalysisService${extension}`, `services/ModelReferenceService${extension}`]),
         schemaSha256: sourceDigest([`ai/schemas${extension}`, `ai/taskSchemas${extension}`, "schemas"]),
@@ -123,7 +126,7 @@ function validateEvidence(manifest: QualificationManifest, snapshot: ConfigSnaps
     }
     if (["capability", "modelReference", "skill"].includes(manifest.task) && (!manifest.criteria.independentBucketReferenceLabels || !manifest.criteria.unknownCoverageValidated || !manifest.criteria.deterministicCandidatesPreserved)) throw new Error("Qualification manifest lacks capability/reference evidence");
 }
-export function qualifyConfiguration(snapshot: ConfigSnapshot, configDirectory = process.cwd()): QualificationState {
+export function qualifyConfiguration(snapshot: ConfigSnapshot, configDirectory = process.cwd(), patternService?: PatternService): QualificationState {
     const enabled = QUALIFICATION_TASKS.filter((name) => ["enforce", "cascade"].includes(snapshot.config.typesafe[name]));
     if (!enabled.length) return Object.freeze({ tasks: Object.freeze({}) });
     if (!snapshot.config.evaluationFile) throw new Error("Enforced TypeSafe routes require a matching qualification manifest");
@@ -141,22 +144,23 @@ export function qualifyConfiguration(snapshot: ConfigSnapshot, configDirectory =
     const keys = bundle.manifests.map((entry) => `${entry.task}:${entry.mode}`);
     if (new Set(keys).size !== keys.length) throw new Error("Duplicate qualification manifests");
     const tasks: QualificationState["tasks"] = {};
+    const activePatterns = patternService ?? new PatternService();
     for (const name of enabled) {
         const selectedMode = snapshot.config.typesafe[name] as EnforcedMode;
         const manifest = bundle.manifests.find((entry) => entry.task === name && entry.mode === selectedMode);
         if (!manifest) throw new Error(`Missing qualification manifest for ${name}`);
-        const expected = taskPolicyBinding(snapshot, name, selectedMode);
+        const expected = taskPolicyBinding(snapshot, name, selectedMode, activePatterns);
         if (manifest.bindingSha256 !== hashConfiguration(manifest.binding) || manifest.bindingSha256 !== hashConfiguration(expected)) throw new Error(`Stale qualification manifest binding for ${name}`);
         validateEvidence(manifest, snapshot, now);
-        tasks[name] = Object.freeze({ bindingSha256: manifest.bindingSha256, manifestSha256: hashConfiguration(manifest), expiresAt: manifest.expiresAt, operational: manifest.gates.operational ? "passed" : "pending" });
+        tasks[name] = Object.freeze({ bindingSha256: manifest.bindingSha256, manifestSha256: hashConfiguration(manifest), expiresAt: manifest.expiresAt, operational: manifest.gates.operational ? "passed" : "pending", patternsSha256: manifest.binding.patternsSha256 });
     }
     return Object.freeze({ tasks: Object.freeze(tasks) });
 }
 /** Bootstrap must call this before constructing serving services/listeners. */
-export function assertServingSnapshot(snapshot: ConfigSnapshot): void {
+export function assertServingSnapshot(snapshot: ConfigSnapshot, patternService?: PatternService): void {
     if (snapshot.evaluationOnly) throw new Error("Evaluation-only configuration cannot start serving services");
     // Revalidate expiry and trusted file evidence, including plain object copies.
-    const current = qualifyConfiguration(snapshot, snapshot.qualificationDirectory);
+    const current = qualifyConfiguration(snapshot, snapshot.qualificationDirectory, patternService);
     if (hashConfiguration(current) !== hashConfiguration(snapshot.qualification ?? { tasks: {} })) throw new Error("Serving configuration qualification state changed");
 }
 
@@ -175,4 +179,19 @@ export function validateResolvedModel(snapshot: ConfigSnapshot, selected: Qualif
         if (!resolution || profile.provider !== provider || profile.model !== requestedModel || resolution.resolvedModel !== resolvedModel) return false;
         return resolution.kind === "pinned" || Date.parse(resolution.expiresAt) > Date.now();
     });
+}
+
+/** Check the exact in-process corpus before AND after asynchronous enforced
+ * analysis. On false, callers preserve local blocks but cannot claim a
+ * qualified allow; they must report unavailable/review coverage. */
+export function validateQualifiedPatterns(snapshot: ConfigSnapshot, selected: QualificationTask, patternService: PatternService): boolean {
+    if (!["enforce", "cascade"].includes(snapshot.config.typesafe[selected])) return true;
+    const qualification = snapshot.qualification?.tasks[selected];
+    const expected = snapshot.evaluationOnly ? snapshot.evaluationPatternsSha256 : qualification?.patternsSha256;
+    if (!expected || (!snapshot.evaluationOnly && (!qualification || Date.parse(qualification.expiresAt) <= Date.now()))) return false;
+    try { return expected === hashConfiguration(patternService.getQualificationState()); }
+    catch { return false; }
+}
+export function assertQualifiedPatterns(snapshot: ConfigSnapshot, patternService: PatternService): void {
+    if (QUALIFICATION_TASKS.some((selected) => !validateQualifiedPatterns(snapshot, selected, patternService))) throw new Error("Active pattern corpus no longer matches qualification evidence");
 }
