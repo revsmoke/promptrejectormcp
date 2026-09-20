@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { CallContext, CallMeta, CallResult, FailureCode, StructuredReasoner, StructuredRequest } from "../contracts.js";
-import { modelCapabilities, profileHash, validateModelProfile } from "../modelProfiles.js";
+import { modelCapabilities, profileHash, validateModelProfile, type CapabilityCatalog } from "../modelProfiles.js";
 import { NativeTransport } from "../transport.js";
 import { emptyUsage, estimateCost, reserveCost, tokenCount, type TokenPrices } from "../usage.js";
 
@@ -9,11 +9,13 @@ export class GeminiAdapter implements StructuredReasoner {
     private readonly transport: NativeTransport;
     private readonly timeoutMs: number;
     private readonly prices?: TokenPrices;
-    constructor(options: { apiKey?: string; transport?: NativeTransport; timeoutMs?: number; prices?: TokenPrices } = {}) {
+    private readonly capabilities?: CapabilityCatalog;
+    constructor(options: { apiKey?: string; transport?: NativeTransport; timeoutMs?: number; prices?: TokenPrices; capabilities?: CapabilityCatalog } = {}) {
         this.apiKey = options.apiKey ?? "";
         this.transport = options.transport ?? new NativeTransport();
         this.timeoutMs = options.timeoutMs ?? 15000;
         this.prices = options.prices;
+        this.capabilities = options.capabilities;
     }
     async generate<T>(request: StructuredRequest<T>, call: CallContext): Promise<CallResult<T>> {
         const started = Date.now();
@@ -25,8 +27,8 @@ export class GeminiAdapter implements StructuredReasoner {
         if (!this.apiKey) return fail("not_configured");
         let schema: Record<string, unknown>;
         try {
-            validateModelProfile(request.profile);
-            if (request.profile.provider !== "gemini" || !modelCapabilities(request.profile)?.structured || request.maxOutputTokens > request.profile.maxOutputTokens) return fail("unsupported");
+            validateModelProfile(request.profile, this.capabilities);
+            if (request.profile.provider !== "gemini" || !modelCapabilities(request.profile, this.capabilities)?.structured || request.maxOutputTokens > request.profile.maxOutputTokens) return fail("unsupported");
             schema = geminiJsonSchema(request.jsonSchema);
         } catch { return fail("unsupported"); }
         const body = JSON.stringify({
@@ -34,7 +36,7 @@ export class GeminiAdapter implements StructuredReasoner {
             contents: [{ role: "user", parts: [{ text: request.state }] }],
             generationConfig: { ...request.profile.options, responseMimeType: "application/json", responseJsonSchema: schema, candidateCount: 1, maxOutputTokens: request.maxOutputTokens },
         });
-        if (Buffer.byteLength(body) > modelCapabilities(request.profile)!.maxInputBytes) return fail("context_limit");
+        if (Buffer.byteLength(body) > modelCapabilities(request.profile, this.capabilities)!.maxInputBytes) return fail("context_limit");
         const http = await this.transport.postJson({
             url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(request.profile.model)}:generateContent`,
             headers: { "x-goog-api-key": this.apiKey }, body, timeoutMs: this.timeoutMs,

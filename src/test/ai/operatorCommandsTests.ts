@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { loadAIConfig, parseAIConfig } from "../../ai/config.js";
+import { runProbe } from "../../scripts/probeAi.js";
+import { loadPriceCard } from "../../ai/pricing.js";
+const snapshot = loadAIConfig({});
+const config = spawnSync(process.execPath, ["dist/scripts/checkAiConfig.js"], { encoding: "utf8", env: { PATH: process.env.PATH, HOME: process.env.HOME } });
+assert.equal(config.status, 0, config.stderr);
+assert.equal(JSON.parse(config.stdout).inferencePerformed, false);
+let calls = 0;
+const fetch = async () => { calls++; throw new Error("must not dispatch"); };
+for (const args of [[], ["--live"], ["--live", "--profile", "legacy-gemini", "--max-requests", "1", "--max-usd", "1"], ["--live", "--profile", "legacy-gemini", "--max-requests", "0", "--max-usd", "1", "--pricing", "config/ai-pricing.example.json"]]) {
+    await assert.rejects(runProbe(args, { snapshot, env: { GEMINI_API_KEY: "fake" }, fetch }));
+}
+assert.equal(calls, 0);
+assert.ok(loadPriceCard("config/ai-pricing.example.json").rates["typesafe:jev-1.13.0"]);
+const configured = parseAIConfig({ ...snapshot.config, profiles: { ...snapshot.config.profiles, probe: { provider: "anthropic", model: "claude-sonnet-5", maxOutputTokens: 1024 } } });
+const fixture = JSON.parse(readFileSync("src/test/fixtures/ai/providers/anthropic.json", "utf8")).success;
+const probeArgs = ["--live", "--profile", "probe", "--max-requests", "1", "--max-usd", "1", "--pricing", "config/ai-pricing.example.json"];
+const success = await runProbe(probeArgs, { snapshot: configured, env: { ANTHROPIC_API_KEY: "fake" }, fetch: async () => { calls++; return new Response(JSON.stringify(fixture)); } });
+assert.equal(success.status, "ok");
+assert.equal(success.actualAttempts, 1);
+assert.equal(success.qualification, false);
+assert.equal(success.usage.estimatedUsd, .000431);
+const expensive = await runProbe(probeArgs.map((item, index, args) => args[index - 1] === "--max-usd" ? "0.00000001" : item), { snapshot: configured, env: { ANTHROPIC_API_KEY: "fake" }, fetch });
+assert.equal(expensive.status, "unavailable");
+assert.equal(expensive.actualAttempts, 0);
+assert.equal(calls, 1);
+console.log("PASS offline configuration and explicit probe limits");

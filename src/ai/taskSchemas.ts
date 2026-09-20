@@ -28,3 +28,12 @@ export function nativeJsonSchema(schema: z.ZodType): Record<string, unknown> {
     delete result.$schema;
     return result as Record<string, unknown>;
 }
+
+export const monitorReportSchema = z.strictObject({
+    intents: z.array(z.strictObject({
+        action: z.enum(["fetch_url", "read_file", "exec_shell", "send_email", "transfer_funds", "navigate_browser", "write_memory", "query_database", "unknown"]),
+        target: z.string().max(4000), severity: z.enum(["safe", "medium", "high", "critical"]),
+        atlasTechniques: z.array(z.string().max(100)).max(20), rationale: z.string().max(4000).nullable(),
+    })).max(40),
+    monitorVerdict: z.enum(["clean", "suspicious", "malicious"]), monitorRationale: z.string().min(1).max(4000), severity: z.enum(["safe", "medium", "high", "critical"]),
+});

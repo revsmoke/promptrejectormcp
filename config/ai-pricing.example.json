@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "version": "2026-09-19-conservative-standard-v1",
+  "asOf": "2026-09-19",
+  "notes": [
+    "Estimates, not invoices. Verify account and regional pricing before use. No batch or priority tiers.",
+    "OpenAI Astra uses the documented long-context upper rates across all request sizes; small requests are deliberately overestimated.",
+    "Claude cache writes use five-minute rates; the structured adapter does not request caching or one-hour cache storage.",
+    "Gemini 3 Flash Preview is absent from the current official pricing page and deliberately has no asserted current rate here. Supply an explicit verified entry before a paid budgeted probe."
+  ],
+  "sources": [
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://developers.openai.com/api/docs/pricing",
+    "https://ai.google.dev/gemini-api/docs/pricing",
+    "https://docs.typesafe.ai/"
+  ],
+  "rates": {
+    "anthropic:claude-sonnet-5": {
+      "inputPerMillion": 2,
+      "outputPerMillion": 10,
+      "cachedReadPerMillion": 0.2,
+      "cacheWritePerMillion": 2.5
+    },
+    "anthropic:claude-opus-4-7": {
+      "inputPerMillion": 5,
+      "outputPerMillion": 25,
+      "cachedReadPerMillion": 0.5,
+      "cacheWritePerMillion": 6.25
+    },
+    "openai:gpt-6-astra": {
+      "inputPerMillion": 20,
+      "outputPerMillion": 75,
+      "cachedReadPerMillion": 2,
+      "cacheWritePerMillion": 25
+    },
+    "typesafe:jev-1.13.0": {
+      "inputPerMillion": 0.042,
+      "outputPerMillion": 0
+    }
+  }
+}

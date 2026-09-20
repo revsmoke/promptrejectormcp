@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "capabilitiesFile": "model-capabilities.json",
+  "pricingFile": "ai-pricing.example.json",
+  "profiles": {
+    "claude-semantic": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "maxOutputTokens": 2048
+    },
+    "openai-reasoning": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "maxOutputTokens": 4096,
+      "options": {
+        "reasoning": {
+          "effort": "low"
+        }
+      }
+    },
+    "gemini-compat": {
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "maxOutputTokens": 2048
+    },
+    "claude-taster": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "maxOutputTokens": 4096
+    }
+  },
+  "roles": {
+    "semantic": {
+      "primary": "claude-semantic",
+      "fallback": "openai-reasoning"
+    },
+    "patternDraft": {
+      "primary": "claude-semantic"
+    },
+    "taster": {
+      "primary": "claude-taster"
+    },
+    "monitor": {
+      "primary": "claude-semantic"
+    }
+  },
+  "typesafe": {
+    "model": "jev-1.13.0",
+    "descriptor": "off",
+    "prompt": "off",
+    "skill": "off",
+    "capability": "off",
+    "modelReference": "off"
+  },
+  "limits": {}
+}

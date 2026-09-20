@@ -1,0 +1,100 @@
+{
+  "synthetic": true,
+  "description": "Synthetic native wire fixtures; no live model output or secrets.",
+  "model": "claude-sonnet-5",
+  "success": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "private synthetic thought",
+        "signature": "private"
+      },
+      {
+        "type": "text",
+        "text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cache_creation_input_tokens": 10,
+      "cache_read_input_tokens": 30
+    }
+  },
+  "refusal": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "refusal",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "private synthetic thought",
+        "signature": "private"
+      },
+      {
+        "type": "text",
+        "text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cache_creation_input_tokens": 10,
+      "cache_read_input_tokens": 30
+    }
+  },
+  "truncated": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "max_tokens",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "private synthetic thought",
+        "signature": "private"
+      },
+      {
+        "type": "text",
+        "text": "{\"verdict\": \"benign\", \"severity\": \"low\", \"categories\": [], \"explanation\": \"A harmless synthetic request.\", \"evidenceIds\": [], \"isInjection\": false, \"selfReportedConfidence\": 0.9}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cache_creation_input_tokens": 10,
+      "cache_read_input_tokens": 30
+    }
+  },
+  "empty": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "content": [],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cache_creation_input_tokens": 10,
+      "cache_read_input_tokens": 30
+    }
+  },
+  "invalid": {
+    "model": "claude-sonnet-5",
+    "stop_reason": "end_turn",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "private synthetic thought",
+        "signature": "private"
+      },
+      {
+        "type": "text",
+        "text": "{}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 20,
+      "cache_creation_input_tokens": 10,
+      "cache_read_input_tokens": 30
+    }
+  }
+}

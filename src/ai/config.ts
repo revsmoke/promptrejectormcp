@@ -1,6 +1,8 @@
+import { loadPriceCard, priceCardSchema, type PriceCard } from "./pricing.js";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { z } from "zod";
-import { hashConfiguration, validateModelProfile } from "./modelProfiles.js";
+import { hashConfiguration, validateModelProfile, loadCapabilityCatalog, capabilityCatalogSchema, modelCapabilities, type CapabilityCatalog } from "./modelProfiles.js";
 import type { GenerativeRole, ModelProfile, ReasoningProviderId } from "./contracts.js";
 
 const positive = z.number().int().positive();
@@ -21,10 +23,10 @@ export const aiConfigSchema = z.strictObject({
     roles: z.strictObject({ semantic: roleSchema, patternDraft: roleSchema, taster: roleSchema, monitor: roleSchema }),
     typesafe: z.strictObject({ model: z.string().min(1), descriptor: mode, prompt: cascadeMode, skill: cascadeMode, capability: mode, modelReference: mode }),
     limits: limitsSchema,
-    pricingFile: z.string().min(1).optional(), evaluationFile: z.string().min(1).optional(),
+    capabilitiesFile: z.string().min(1).optional(), pricingFile: z.string().min(1).optional(), evaluationFile: z.string().min(1).optional(),
 });
 export type AIConfig = z.infer<typeof aiConfigSchema>;
-export interface ConfigSnapshot { readonly config: AIConfig; readonly hash: string; readonly legacy: boolean }
+export interface ConfigSnapshot { readonly config: AIConfig; readonly capabilities: CapabilityCatalog; readonly pricing?: PriceCard; readonly hash: string; readonly legacy: boolean }
 export const keyNames: Readonly<Record<ReasoningProviderId | "typesafe", string>> = {
     gemini: "GEMINI_API_KEY", anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", typesafe: "TYPESAFE_API_KEY",
 };
@@ -35,27 +37,38 @@ function deepFreeze<T>(value: T): T {
     }
     return value;
 }
-export function parseAIConfig(input: unknown, legacy = false, options: { tasterEnabled?: boolean } = {}): ConfigSnapshot {
+export function parseAIConfig(input: unknown, legacy = false, options: { tasterEnabled?: boolean; capabilities?: CapabilityCatalog; pricing?: PriceCard } = {}): ConfigSnapshot {
     const config = aiConfigSchema.parse(input);
+    const pricing = options.pricing ? priceCardSchema.parse(options.pricing) : undefined;
+    const capabilities = options.capabilities ? capabilityCatalogSchema.parse(options.capabilities) : loadCapabilityCatalog();
+    if (new Set(capabilities.models.map((model) => `${model.provider}:${model.model}`)).size !== capabilities.models.length) throw new Error("Duplicate model capabilities");
     for (const role of Object.keys(config.roles) as GenerativeRole[]) {
         const setting = config.roles[role];
         if (setting.primary === setting.fallback) throw new Error(`Role ${role} cannot fall back to itself`);
         for (const name of [setting.primary, setting.fallback].filter((name): name is string => !!name)) {
             const profile = config.profiles[name];
             if (!profile) throw new Error(`Role ${role} references an unknown profile`);
-            if (!(["taster", "monitor"].includes(role) && options.tasterEnabled === false)) validateModelProfile(profile);
+            if (!(["taster", "monitor"].includes(role) && options.tasterEnabled === false)) {
+                validateModelProfile(profile, capabilities);
+                const cap = modelCapabilities(profile, capabilities)!;
+                if (role === "taster" ? !cap.tools || !cap.statelessTools : !cap.structured) throw new Error(`Role ${role} requires supported capabilities`);
+            }
         }
     }
     // Enforced routes cannot accidentally start before the qualification gate
     // exists. Later rollout passes replace this with matching manifest validation.
     if (Object.entries(config.typesafe).some(([key, value]) => key !== "model" && ["enforce", "cascade"].includes(value))) throw new Error("Enforced TypeSafe routes require a matching qualification manifest");
-    return deepFreeze({ config, hash: hashConfiguration(config), legacy });
+    return deepFreeze({ config, capabilities, pricing, hash: hashConfiguration({ config, capabilities, pricing: pricing ?? null }), legacy });
 }
 export function loadAIConfig(env: NodeJS.ProcessEnv = process.env): ConfigSnapshot {
     if (env.AI_CONFIG_PATH) {
         // Config contents can contain untrusted strings. Do not echo them in a
         // startup error or include file bodies in logs.
-        try { return parseAIConfig(JSON.parse(readFileSync(env.AI_CONFIG_PATH, "utf8")), false, { tasterEnabled: env.TASTE_TESTER_ENABLED === "true" }); }
+        try {
+            const input = JSON.parse(readFileSync(env.AI_CONFIG_PATH, "utf8"));
+            const catalog = input.capabilitiesFile ? loadCapabilityCatalog(resolve(dirname(env.AI_CONFIG_PATH), input.capabilitiesFile)) : loadCapabilityCatalog();
+            return parseAIConfig(input, false, { tasterEnabled: env.TASTE_TESTER_ENABLED === "true", capabilities: catalog, pricing: input.pricingFile ? loadPriceCard(resolve(dirname(env.AI_CONFIG_PATH), input.pricingFile)) : undefined });
+        }
         catch { throw new Error("Invalid AI configuration; run ai-config-check for field diagnostics"); }
     }
     const tasterModel = env.TASTE_TESTER_MODEL || "claude-opus-4-7";

@@ -36,6 +36,12 @@ export const OFFLINE_SUITES: readonly OfflineSuite[] = [
     { file: "ai/budgetTests.js" },
     { file: "ai/typesafeAdapterTests.js" },
     { file: "ai/judgmentCacheTests.js" },
+    { file: "ai/anthropicAdapterTests.js" },
+    { file: "ai/openaiAdapterTests.js" },
+    { file: "ai/modelConfigTests.js" },
+    { file: "ai/roleRoutingTests.js" },
+    { file: "ai/usageTests.js" },
+    { file: "ai/operatorCommandsTests.js" },
     { file: "ai/descriptorRubricTests.js" },
     { file: "ai/rubricIsolationTests.js" },
     { file: "ai/trustedCapabilityTests.js" },
@@ -115,6 +121,7 @@ export function runOfflineTests(projectRoot: string): boolean {
             copyFixtures(join(projectRoot, "src"), join(cwd, "src"));
             // Some existing tests inspect source next to their compiled imports.
             copyFixtures(join(projectRoot, "src"), join(cwd, "dist"));
+            cpSync(join(projectRoot, "config"), join(cwd, "config"), { recursive: true, filter: excludeEnvironmentFiles });
             cpSync(join(projectRoot, "patterns"), join(cwd, "patterns"), { recursive: true, filter: excludeEnvironmentFiles });
             // REST/MCP read the actual package version. This manifest contains
             // no credentials; preserve it instead of inventing a test version.
