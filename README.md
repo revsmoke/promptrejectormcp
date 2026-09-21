@@ -345,6 +345,7 @@ The guarded offline runner builds first, blocks unexpected network calls and nee
 - [Language integration examples](docs/integration-examples.md)
 - [Features, detection categories, feeds and architecture](docs/feature-reference.md)
 - [Skill security guide](SKILLS_SECURITY.md)
+- [How we use Jev from TypeSafe AI: implementation, benefits and test results](docs/how-we-use-jev-from-typesafe-ai.md)
 - [TypeSafe evaluation and rollout](docs/operations/typesafe-rollout.md)
 - [Live HTTPS and MCP verification](evaluations/ai/runs/2026-09-20-single-api/README.md)
 - [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [ISC license](LICENSE)
