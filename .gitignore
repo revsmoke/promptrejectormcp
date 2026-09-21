@@ -41,7 +41,6 @@ npm_recovery_codes.txt
 .mcpregistry_github_token
 .mcpregistry_registry_token
 awesome-mcp-servers/
-CLAUDE.md
 .claude
 
 # Local HTTPS certificate and private key generated during setup
