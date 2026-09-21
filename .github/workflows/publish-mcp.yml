@@ -1,21 +1,11 @@
-# Publish MCP server — releases the package to npm and the public MCP Registry.
+# Publish the npm package on version tags; GitHub Releases use Release Drafter.
+# MCP Registry publication is deliberately outside the release path: no registry
+# schema download, publisher binary, validation, credentials or network calls.
 #
-# Fires on any pushed tag matching `v*` (e.g. `v1.1.0`). The job:
-#   1. Builds the TypeScript bundle.
-#   2. Validates server.json against the MCP server.schema.json.
-#   3. Audits the `npm pack` contents for accidentally-included secrets.
-#   4. Syncs server.json `.version` to match the tag.
-#   5. Publishes to npm as `io.github.revsmoke/promptrejectormcp` (see package.json).
-#   6. Authenticates to the MCP Registry via GitHub OIDC (no static token).
-#   7. Publishes the server entry to https://registry.modelcontextprotocol.io.
-#
-# Required secrets:
-#   - NPM_TOKEN     Mandatory. npm automation token with publish rights for
-#                   the `io.github.revsmoke` scope. Without it step
-#                   "Publish to npm" fails.
-#   - GITHUB_TOKEN  Auto-provided. Used implicitly for OIDC auth to the MCP
-#                   Registry (`id-token: write` permission below).
-name: Publish MCP server (npm + MCP Registry)
+# Set the repository variable PUBLISH_NPM=false for GitHub-only releases.
+# Otherwise NPM_TOKEN must have publish rights for the prompt-rejector package.
+# The existing v* trigger, tag-derived metadata and npm version are preserved.
+name: Publish npm package
 
 on:
   push:
@@ -24,10 +14,10 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for GitHub OIDC auth to MCP Registry
 
 jobs:
   build-and-publish:
+    if: ${{ vars.PUBLISH_NPM != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,8 +35,13 @@ jobs:
       - name: Build
         run: npm run build --if-present
 
-      - name: Validate server.json against MCP schema
-        run: npx -y ajv-cli validate -s https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json -d server.json
+      - name: Sync server.json version from tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          jq --arg v "$VERSION" '
+            .version = $v
+            | .packages |= map(if has("version") then .version = $v else . end)
+          ' server.json > server.tmp && mv server.tmp server.json
 
       - name: Audit npm pack contents (fail on leaked files)
         run: |
@@ -54,24 +49,10 @@ jobs:
           echo "Pack contents preview:" && sed -n '1,120p' pack.txt
           ! grep -q "npm_recovery_codes.txt" pack.txt || (echo "Refusing to publish: npm_recovery_codes.txt present" && exit 1)
           ! grep -q ".tmp_server.schema.json" pack.txt || (echo "Refusing to publish: .tmp_server.schema.json present" && exit 1)
-
-      - name: Sync server.json version from tag
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          ! grep -q "mcp-publisher" pack.txt || (echo "Refusing to publish: mcp-publisher present" && exit 1)
 
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish --access public
-
-      - name: Download mcp-publisher
-        run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
-
-      - name: Authenticate to MCP Registry (OIDC)
-        run: ./mcp-publisher login github-oidc
-
-      - name: Publish server to MCP Registry
-        run: ./mcp-publisher publish
