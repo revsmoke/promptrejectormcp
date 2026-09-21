@@ -1,6 +1,6 @@
 # Repository Discovery and Onboarding Implementation Plan
 
-> **For agentic workers:** Use `subagent-driven-development` if subagents are available and tasks are independent; otherwise use `executing-plans`. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** Use `subagent-driven-development` if subagents are available and tasks are independent; otherwise use `executing-plans`. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the repository easier to discover, try, report vulnerabilities to, and contribute to.
 
@@ -30,11 +30,20 @@ Remote resources: `revsmoke/promptrejectormcp` private reporting, description/to
 
 - [x] From the clean worktree, run `npm ci`, `npm run build`, historical replay and `npm run test:offline`. Verify relative links and GitHub form structure; run `git diff --check`.
 - [x] Enable GitHub private vulnerability reporting with `gh api --method PUT repos/revsmoke/promptrejectormcp/private-vulnerability-reporting`; verify GET returns `enabled: true` and the reporting entry point is available. Do not submit a fake vulnerability report.
-- [ ] Review the staged diff, commit using the commit skill, integrate into `main`, and push. Preserve unrelated untracked user files.
-- [ ] Update GitHub description to accurately mention TypeSafe Jev, MCP/HTTPS screening and configurable reasoning. Add relevant discovery topics while preserving existing ones. Use the public Jev article as homepage until a separate project page exists.
-- [ ] Publish three contributor issues after checking for duplicates: (1) independently verify a supported plugin installation, (2) contribute reviewed quoted-vs-operative instruction examples, (3) add a currently missing descriptor source-evidence regression case. Give each a bounded scope, exact resource links, acceptance criteria and appropriate labels. Do not publish the replay-discoverability issue because this implementation completes it.
-- [ ] Verify published README, issue chooser/forms, private reporting, metadata, and issue URLs. Confirm main contains the commit and record the results below.
+- [x] Review the staged diff, commit using the commit skill, integrate into `main`, and push. Preserve unrelated untracked user files.
+- [x] Update GitHub description to accurately mention TypeSafe Jev, MCP/HTTPS screening and configurable reasoning. Add relevant discovery topics while preserving existing ones. Use the public Jev article as homepage until a separate project page exists.
+- [x] Publish three contributor issues after checking for duplicates: (1) independently verify a supported plugin installation, (2) contribute reviewed quoted-vs-operative instruction examples, (3) add a currently missing descriptor source-evidence regression case. Give each a bounded scope, exact resource links, acceptance criteria and appropriate labels. Do not publish the replay-discoverability issue because this implementation completes it.
+- [x] Verify published README, issue chooser/forms, private reporting, metadata, and issue URLs. Confirm main contains the commit and record the results below.
 
 ## Completion record
 
-Documentation, forms and contributor briefs passed independent scope and quality reviews. A fresh Node 24.13.0 dependency installation, build and historical replay passed; all 58 offline suites passed with zero network violations. YAML and local links/anchors passed validation. Private reporting is enabled and the public Advisories page displays its reporting link. Publication verification follows below.
+Documentation, forms and contributor briefs passed independent scope and quality reviews. A fresh Node 24.13.0 dependency installation, build and historical replay passed; all 58 offline suites passed with zero network violations. YAML and local links/anchors passed validation. Private reporting is enabled and the public Advisories page displays its reporting link.
+
+
+Published on `main` in `884582b`:
+
+- GitHub description names TypeSafe AI Jev; added `typesafe-ai`, `jev`, `codex`, `mcp-security`, and `tool-poisoning`, preserving prior topics. The homepage links the public Jev article.
+- Contributor issues: [Linux Claude Code plugin verification #8](https://github.com/revsmoke/promptrejectormcp/issues/8), [six paired instruction examples #9](https://github.com/revsmoke/promptrejectormcp/issues/9), and [escaped descriptor evidence paths #10](https://github.com/revsmoke/promptrejectormcp/issues/10). Their published bodies and labels match the reviewed briefs.
+- Published README, CONTRIBUTING, SECURITY, issue forms/chooser configuration and PR template match the local files. The public Security policy renders correctly and GitHub recognizes the chooser's private reporting contact. The browser requires sign-in to display the issue forms; their YAML structure and published definitions were checked without submitting a test issue.
+- [Offline CI](https://github.com/revsmoke/promptrejectormcp/actions/runs/35638513093) passed on Node 18.20.8, 22, 24 and 26. [Plugin packaging CI](https://github.com/revsmoke/promptrejectormcp/actions/runs/35638513018) passed.
+- No ads, promotional outreach, directory submissions, release/tag changes, live inference or installed-service changes were performed.
