@@ -66,6 +66,7 @@ jobs:
           echo "Pack contents preview:" && sed -n '1,120p' pack.txt
           ! grep -q "npm_recovery_codes.txt" pack.txt || (echo "Refusing to publish: npm_recovery_codes.txt present" && exit 1)
           ! grep -q ".tmp_server.schema.json" pack.txt || (echo "Refusing to publish: .tmp_server.schema.json present" && exit 1)
+          ! grep -q "mcp-publisher" pack.txt || (echo "Refusing to publish: mcp-publisher present" && exit 1)
 
       - name: Publish to npm
         env:
