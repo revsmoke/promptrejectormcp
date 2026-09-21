@@ -69,8 +69,8 @@ Output in `artifacts/plugins/`:
 
 | File | Contents |
 | --- | --- |
-| `prompt-rejector-1.1.0-local.zip` | Portable manifest, Codex compatibility manifest, Claude Code manifest, shared skill, launchers, built app, active model configuration, verified patterns, production dependencies and licenses |
-| `prompt-rejector-1.1.0.mcpb` | Same runtime in Claude Desktop's extension format, with secret configuration fields |
+| `prompt-rejector-1.2.0-local.zip` | Portable manifest, Codex compatibility manifest, Claude Code manifest, shared skill, launchers, built app, active model configuration, verified patterns, production dependencies and licenses |
+| `prompt-rejector-1.2.0.mcpb` | Same runtime in Claude Desktop's extension format, with secret configuration fields |
 | `prompt-rejector-skill.zip` | Standalone provider-neutral skill and its setup/use/web references |
 | `SHA256SUMS`, `build.json` | Archive hashes, runtime identity, version and package inventory |
 
