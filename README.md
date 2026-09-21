@@ -76,7 +76,7 @@ The commands below use a macOS/Linux shell. Actual scans send input to the confi
 
 ### 2. Download and build
 
-The current application, plugins and skill are included on **`main`**. Package/registry publication is a separate release step. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
+The current application, plugins and skill are included on **`main`**. GitHub releases and optional npm publishing are described in the [release guide](CONTRIBUTING.md#release--publishing); MCP Registry publication is not required. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
 
 ```sh
 git clone --branch main https://github.com/revsmoke/promptrejectormcp.git
