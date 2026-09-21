@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Align all plugin and Desktop extension manifests with package version 1.2.0 so release bundles build and install consistently.
+- Remove external MCP Registry publishing from the release workflow; preserve tag-based npm publishing and support GitHub-only releases.
 - Provider failures, malformed output and incomplete required HF metadata can no longer silently authorize a safe scan.
 - Gemini combined skill response compatibility, while preserving strict local validation of every response.
 - Per-route resolved-model checks prevent a primary from borrowing a fallback profile's identity policy.

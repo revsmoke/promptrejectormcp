@@ -49,7 +49,7 @@ claude plugin install prompt-rejector@prompt-rejector --scope user
 
 Start a new session and ask the agent to use **Prompt Rejector**. The included [skill](plugins/prompt-rejector/skills/prompt-rejector/SKILL.md) explains cloning, configuration, startup, verification and tool use. Keys remain in your private environment file; plugin settings save only paths. Use one connection if you already have a manual MCP entry.
 
-For **Claude Desktop chat**, build or download the `.mcpb` extension and install the standalone skill ZIP. `npm run plugin:build` creates complete local packages under `artifacts/plugins/`, including the app and production dependencies. [GitHub Actions builds](https://github.com/revsmoke/promptrejectormcp/actions/workflows/plugins.yml) provide downloadable artifacts for `main`.
+For **Claude Desktop chat**, download the `.mcpb` extension and standalone skill ZIP from [GitHub Releases](https://github.com/revsmoke/promptrejectormcp/releases/latest), or build them locally. `npm run plugin:build` creates complete local packages under `artifacts/plugins/`, including the app and production dependencies. [GitHub Actions builds](https://github.com/revsmoke/promptrejectormcp/actions/workflows/plugins.yml) provide downloadable artifacts for `main`.
 
 For **ChatGPT or Claude on the web**, a skill alone does not connect to your computer. Use OpenAI's private MCP tunnel or the included OAuth-protected remote transport on your own HTTPS host. See the [platform installation guide](docs/plugins.md), [web connection guide](docs/operations/remote-mcp.md), and [verified coverage](docs/plugin-verification.md). Public plugin-directory publication and cloud account setup are separate steps.
 

@@ -57,6 +57,8 @@ If an older manual MCP connection already works, choose one connection so the ag
 
 ## Build the complete packages
 
+Ready-made local plugin, Desktop extension and standalone skill downloads are available in [GitHub Releases](https://github.com/revsmoke/promptrejectormcp/releases/latest). Use the steps below to build them from source.
+
 Use Node 24 with the repository's locked dependencies:
 
 ```sh
