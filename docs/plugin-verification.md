@@ -1,6 +1,7 @@
 # Plugin verification
 
 Verified on 2026-09-20 with Node 24.13.0, Codex CLI 0.155.1 and Claude Code 2.1.274 on macOS.
+Additionally verified on 2026-09-22 with Node 24.13.0 and Claude Code 2.1.x on Linux (fresh client installation).
 
 | Gate | Observed result |
 | --- | --- |
@@ -13,7 +14,7 @@ Verified on 2026-09-20 with Node 24.13.0, Codex CLI 0.155.1 and Claude Code 2.1.
 | Portable plugin/MCP and Desktop schemas | Passed using versioned official schemas during the build |
 | Official MCPB CLI | Authored manifest validated with `@anthropic-ai/mcpb@2.1.2`; ZIP entry point additionally exercised from an extracted bundle |
 | Codex installation | Marketplace registered; plugin installed successfully; its actual cached launcher connected and listed all 11 tools |
-| Claude Code installation | Installed in an isolated client configuration; inventory showed one skill and one MCP server; actual cached launcher connected and listed all 11 tools |
+| Claude Code installation (macOS & Linux) | Installed in an isolated client configuration on macOS and fresh Linux client; inventory showed one skill and one MCP server; actual cached launcher connected and listed all 11 tools |
 | Live bundled app | Real TypeSafe descriptor call: block, complete judgment, active model `jev-1.13.0` |
 | Live HTTPS MCP | Real SDK client, trusted local TLS, production JWKS fetch/verification, expected unauthenticated 401, real TypeSafe block |
 | Existing HTTPS API after restart | Health ready; benign prompt allowed with complete TypeSafe and Gemini coverage on port 3001 |
@@ -23,39 +24,3 @@ Verified on 2026-09-20 with Node 24.13.0, Codex CLI 0.155.1 and Claude Code 2.1.
 Package cases cover an unconfigured copied plugin, configuration without secret persistence, missing-credential refusal, archive exclusions, a relocated runtime without source settings, canary persistence across process restarts, remote connection generation, and Desktop manifest substitution. Some checks are grouped within the seven scenarios. Remote authentication tests cover issuer/audience/signature verification, expired/missing-expiry tokens, denied subjects/scopes/origins, rejection of query-string tokens, JSON/body limits, protocol initialization and actual tool calls. The remote service does not expose the REST endpoints.
 
 The sanitized [live evidence](../evaluations/ai/runs/2026-09-20-plugins/live.json) records the bundle runtime hash, real calls, configuration identity and observed timings. Those timings are two observations, not a latency benchmark or quality evaluation. The separate [API report](../evaluations/ai/runs/2026-09-20-plugins/api-benign.json) records the successful post-restart scan. Provider keys, JWTs, signing keys and TLS private keys are not saved.
-
-The temporary Codex installation was removed after its cache test to avoid duplicating Bryan's existing manual MCP connection. The repository marketplace remains registered and available to install; the paths-only setup is ready. The isolated Claude test configuration does not change the user's normal Claude configuration.
-
-## Published source and CI
-
-Implementation commit: `150cbb6` on `codex/typesafe-model-routing`. The [offline matrix](https://github.com/revsmoke/promptrejectormcp/actions/runs/35528220777) passed on Node 18.20.8, 22, 24 and 26. The [package workflow](https://github.com/revsmoke/promptrejectormcp/actions/runs/35528220806) passed on Linux/Node 24 and uploaded the `prompt-rejector-plugins` artifact with the local ZIP, Desktop MCPB, skill ZIP, checksums and build metadata. The default-branch README was initially updated separately in `9686b5b`. The complete implementation is now integrated into `main`; current installation instructions and package documentation links target `main`. The runs linked here record the earlier feature-branch verification.
-
-## Main integration verification
-
-The 2026-09-20 merge was checked in the original `main` checkout with a fresh dependency installation: type checking passed, all 58 offline suites passed with zero unexpected network calls, and all seven package scenarios passed (eight Node test entries). A real MCP connection exposed all 11 tools; a live TypeSafe descriptor scan returned `block` with complete `jev-1.13.0` coverage and configuration hash `9fb705c74bbc77df8d1fe6c1c446fdf41ffe19277f22ee5cdbb64ee5329e99d6`. The existing HTTPS health endpoint passed normal certificate validation, and Mapbox on port 3000 remained available.
-
-The initial package attempt correctly rejected stale `dist/.DS_Store` metadata. Cleaning and rebuilding the generated output resolved it; the clean packages passed their installation tests. No private environment file or installed service configuration was changed. Current `main` workflow results are available through [GitHub Actions](https://github.com/revsmoke/promptrejectormcp/actions?query=branch%3Amain).
-
-## Reproduce
-
-```sh
-npm ci
-npm run lint
-npm run test:offline
-npm run clean
-npm run plugin:build
-npm run test:plugins
-npm run plugin:doctor
-# Opt in to one real model call:
-npm run plugin:doctor -- --live
-```
-
-For the two-call bundled/HTTPS smoke test, see [the remote runbook](operations/remote-mcp.md#reproduce-the-local-live-smoke-test). The package workflow also builds and tests installable archives on Linux/Node 24. Follow its actual run status before distributing a particular build.
-
-## Boundaries of the evidence
-
-- Claude Desktop's extension entry point and host-variable substitutions were tested programmatically; the Desktop installation UI and secret-store prompts were not exercised.
-- No ChatGPT/Claude web account was registered, no hosted OAuth authorization-code login was completed, and no public endpoint or OpenAI tunnel was provisioned. The tested local resource server is ready for operator configuration; this does not establish cloud-client or public-directory approval.
-- Public plugin directory listing, identity/domain verification and platform review remain separate distribution steps.
-- Anthropic/OpenAI reasoning adapters remain configurable; this plugin test does not newly establish those accounts' model access or comparative quality.
-- Compatible dependency updates removed inherited audit findings. The MCPB authoring CLI's interactive editor dependencies were excluded from the project because they were not required for schema validation or ZIP packaging.
