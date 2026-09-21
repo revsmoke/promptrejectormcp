@@ -3,6 +3,7 @@
 ## Resources
 
 - `README.md`: installation, current endpoints, MCP setup and command reference.
+- `CONTRIBUTING.md`: offline development and contributor tasks; `SECURITY.md`: private vulnerability reporting; `.github/ISSUE_TEMPLATE/`: report forms.
 - `docs/operations/local-server.md`: installed service/worktree paths, HTTPS certificates and restart procedure. Check here before changing a running service.
 - `config/README.md`, `docs/operations/ai-models.md`: active configuration, provider roles, model switching and access probes.
 - `docs/how-we-use-jev-from-typesafe-ai.md`: TypeSafe design and measured results; `docs/operations/typesafe-rollout.md`: modes and bounded live tests.

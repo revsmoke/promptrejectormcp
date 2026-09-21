@@ -1,0 +1,37 @@
+name: Installation or documentation problem
+description: Report a setup problem or an unclear instruction.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use synthetic or redacted details only. Do not include keys, .env contents, private prompts or customer data.
+        Report vulnerabilities and security-sensitive detection bypasses through [private vulnerability reporting](https://github.com/revsmoke/promptrejectormcp/security/advisories/new), not this public form.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Release or commit, OS, Node/npm versions, and client/version if relevant. Include the installation route (source, plugin or Desktop extension).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Link the instruction you followed and list minimal steps. Redact local usernames and private paths.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What should happen, or what should the instruction explain?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Describe what happened. If needed, include only the relevant redacted error message, not a full log or environment dump.
+    validations:
+      required: true

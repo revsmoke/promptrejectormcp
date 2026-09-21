@@ -1,0 +1,37 @@
+name: Synthetic test case or false positive
+description: Suggest a non-sensitive test or report benign content being flagged.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is public. Use synthetic or redacted examples; never include keys, .env contents, private prompts or customer data.
+        If the case reveals a security-sensitive detection bypass, use [private vulnerability reporting](https://github.com/revsmoke/promptrejectormcp/security/advisories/new) instead.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and test status
+      description: Release or commit, OS/Node version, scanner/tool, and configuration or provider/model names if tested. Say "not run" for a proposed case; no API call is required.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Synthetic example and reproduction
+      description: Give the minimal input and steps or test-suite location. For a proposal, explain where it would be exercised.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result and reasoning
+      description: Explain the expected decision or finding and why, including relevant source fields.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include only relevant redacted decision/finding fields if tested, or say "not run". Do not attach full private reports or provider responses.
+    validations:
+      required: true

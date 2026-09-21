@@ -1,364 +1,51 @@
 # Contributing to Prompt Rejector
 
-First off, thank you for considering contributing to Prompt Rejector! 🛡️
+Choose a [good first issue](https://github.com/revsmoke/promptrejectormcp/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) or a [help wanted task](https://github.com/revsmoke/promptrejectormcp/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22). Installation feedback, clear documentation and well-labeled synthetic test cases are useful contributions alongside code. Comment on a task before starting so others can coordinate with you.
 
-This project aims to make AI agents safer by providing a robust defense against prompt injection and other attacks. Every contribution helps protect developers and their users.
+## Report a problem
 
-## Table of Contents
+- [Installation or documentation problem](https://github.com/revsmoke/promptrejectormcp/issues/new?template=installation.yml): include the version, environment and minimal steps.
+- [Synthetic test case or false positive](https://github.com/revsmoke/promptrejectormcp/issues/new?template=test-case.yml): explain the expected result and the actual result, if tested.
+- Other suggestions: search [existing issues](https://github.com/revsmoke/promptrejectormcp/issues) first, then explain the problem and intended outcome in a new issue.
+- Vulnerabilities and **security-sensitive detection bypasses**: use the private reporting route in [SECURITY.md](SECURITY.md), including when the problem concerns an attack the scanner is intended to detect.
 
-- [Code of Conduct](#code-of-conduct)
-- [How Can I Contribute?](#how-can-i-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Features](#suggesting-features)
-  - [Submitting Pull Requests](#submitting-pull-requests)
-- [Development Setup](#development-setup)
-- [Project Structure](#project-structure)
-- [Coding Guidelines](#coding-guidelines)
-- [Testing Guidelines](#testing-guidelines)
-- [Security Vulnerability Reporting](#security-vulnerability-reporting)
+Use synthetic or redacted examples. Never publish keys, `.env` contents, private prompts or customer data. Be respectful and constructive when discussing results.
 
----
+## Development setup
 
-## Code of Conduct
+Use **Node.js 24 with npm**, Git, and OpenSSL (for temporary HTTPS test certificates). Clone your fork or the repository:
 
-This project adheres to a simple code of conduct: **be respectful, be constructive, and be helpful**. We're all here to make AI safer.
-
----
-
-## How Can I Contribute?
-
-### Reporting Bugs
-
-Found a bug? We'd love to hear about it!
-
-**Before submitting:**
-1. Search existing issues to avoid duplicates
-2. Try to reproduce with the latest version
-
-**When submitting, include:**
-- Clear, descriptive title
-- Steps to reproduce
-- Expected vs. actual behavior
-- Your environment (Node.js version, OS, etc.)
-- Relevant logs or error messages
-
-**Example bug report:**
-```markdown
-### Bug: False positive on legitimate SQL query discussion
-
-**Environment:** Node.js 20.x, macOS 14.0
-
-**Steps to reproduce:**
-1. Send prompt: "Can you explain how SELECT * FROM users works?"
-2. Check result
-
-**Expected:** safe: true (educational query)
-**Actual:** safe: false, categories: ["sqli"]
-
-**Notes:** The static checker seems to trigger on any SQL keywords.
-```
-
-### Suggesting Features
-
-Have an idea to improve Prompt Rejector? Open a feature request!
-
-**Great feature requests include:**
-- Clear description of the problem it solves
-- Proposed solution (if you have one)
-- Use cases and examples
-- Consideration of potential drawbacks
-
-**Areas we're especially interested in:**
-- New attack vector detection
-- Performance optimizations
-- Additional language/framework integrations
-- Better developer experience
-
-### Submitting Pull Requests
-
-Ready to contribute code? Awesome! Here's the process:
-
-1. **Fork the repository** and create your branch from `main`
-   ```bash
-   git checkout -b feature/your-feature-name
-   # or
-   git checkout -b fix/issue-description
-   ```
-
-2. **Make your changes** following our [coding guidelines](#coding-guidelines)
-
-3. **Test your changes** thoroughly (see [testing guidelines](#testing-guidelines))
-
-4. **Commit with clear messages**
-   ```bash
-   git commit -m "feat: add detection for Unicode homoglyph attacks"
-   # or
-   git commit -m "fix: reduce false positives on educational SQL queries"
-   ```
-
-5. **Push and open a PR**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-6. **Fill out the PR template** with:
-   - What the PR does
-   - Why it's needed
-   - How to test it
-   - Any breaking changes
-
----
-
-## Development Setup
-
-```bash
-# 1. Clone your fork
-git clone https://github.com/YOUR_USERNAME/promptrejectormcp.git
+```sh
+git clone https://github.com/revsmoke/promptrejectormcp.git
 cd promptrejectormcp
-
-# 2. Install dependencies
-npm install
-
-# 3. Set up environment
-cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
-
-# 4. Build
+npm ci
 npm run build
-
-# 5. Run in development mode
-npm run dev
-```
-
-### Prerequisites
-
-- Node.js 18.x or higher
-- npm 9.x or higher
-- Provider credentials only for explicitly selected live roles; offline tests need no keys
-
----
-
-## Project Structure
-
-```
-promptrejectormcp/
-├── src/
-│   ├── index.ts                       # Entry point — picks mode, redirects stdout under MCP
-│   ├── api/
-│   │   └── server.ts                  # REST API (Express)
-│   ├── mcp/
-│   │   └── mcpServer.ts               # MCP server (11 tools)
-│   ├── ai/                           # Typed contracts, native adapters, budgets and qualification
-│   ├── evaluation/                   # Isolated corpus evaluation and spending caps
-│   ├── bootstrap.ts                  # Shared REST/MCP dependency graph
-│   ├── schemas/
-│   │   └── PatternSchemas.ts          # Zod schemas for the pattern library
-│   ├── services/
-│   │   ├── SecurityService.ts         # Main aggregator (check_prompt)
-│   │   ├── SkillScanService.ts        # scan_skill aggregator
-│   │   ├── GeminiService.ts           # Legacy compatibility facade
-│   │   ├── StaticCheckService.ts      # Regex pattern detection
-│   │   ├── PatternService.ts          # File-based pattern library + integrity
-│   │   ├── VulnFeedService.ts         # NVD + GHSA scanning → staged patterns
-│   │   ├── KevFeedService.ts          # CISA KEV catalog ingest (v1.1)
-│   │   ├── OsvFeedService.ts          # OSV/deps.dev feed ingest (v1.1)
-│   │   ├── GhsaGraphQLService.ts      # GitHub Advisory GraphQL client (v1.1)
-│   │   ├── UnifiedCveCache.ts         # Cross-feed CVE de-duplication (v1.1)
-│   │   ├── AtlasService.ts            # MITRE ATLAS taxonomy lookup (v1.1)
-│   │   ├── TrifectaAnalyzer.ts        # Lethal-Trifecta detector (v1.1)
-│   │   ├── HuggingFaceService.ts      # HF Hub security-flag lookup (v1.1)
-│   │   ├── McpToolScanner.ts          # MCP-tool-manifest scanner (v1.1)
-│   │   ├── CanaryService.ts           # Canary-token issue/verify (v1.1)
-│   │   ├── TasteTesterService.ts      # Dual-agent sandbox detonator (v1.1)
-│   │   ├── fallbackPatterns.ts        # Hardcoded emergency patterns
-│   │   └── aiPackageAllowlist.ts      # Trusted-package allowlist for HF/PyPI checks
-│   └── test/                          # Compiled scripts registered in the offline runner
-├── patterns/                          # JSON pattern library + manifest
-├── dist/                              # Compiled output
-└── docs/                              # Additional documentation
-```
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `SecurityService.ts` | Orchestrates configured semantic, TypeSafe and static layers for `check_prompt` |
-| `SkillScanService.ts` | Aggregates configured semantic + static + skill-specific + capability + HF for `scan_skill` |
-| `GeminiService.ts` | Legacy compatibility wrapper around configured semantic analysis |
-| `StaticCheckService.ts` | Fast regex-based pattern matching |
-| `TrifectaAnalyzer.ts` | Detects co-location of private-read / untrusted-fetch / external-egress |
-| `HuggingFaceService.ts` | Looks up model security flags via the HF Hub API |
-| `AtlasService.ts` | Maps findings to MITRE ATLAS technique IDs |
-| `TasteTesterService.ts` | Portable Taster and independent Monitor dynamic detonator for suspicious prompts |
-| `server.ts` | REST API endpoints |
-| `mcpServer.ts` | MCP protocol implementation |
-
----
-
-## Coding Guidelines
-
-### TypeScript Style
-
-- Use TypeScript strict mode
-- Prefer `interface` over `type` for object shapes
-- Use explicit return types on public functions
-- Document complex logic with comments
-
-```typescript
-// Good
-interface SecurityResult {
-  safe: boolean;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-}
-
-async function checkPrompt(input: string): Promise<SecurityResult> {
-  // Implementation
-}
-
-// Avoid
-const checkPrompt = async (input) => {
-  // No types, arrow function for top-level
-}
-```
-
-### Naming Conventions
-
-- **Files:** camelCase for modules (`myService.ts`), PascalCase for classes
-- **Variables:** camelCase (`userInput`, `isInjection`)
-- **Constants:** UPPER_SNAKE_CASE (`MAX_RETRIES`, `DEFAULT_PORT`)
-- **Interfaces:** PascalCase, descriptive (`SecurityCheckResult`, `GeminiResponse`)
-
-### Error Handling
-
-- Always catch and handle errors gracefully
-- Log errors to stderr (not stdout, to preserve MCP compatibility)
-- Provide meaningful error messages
-
-Do not manufacture a benign result when a provider fails. Return a typed unavailable result with sanitized failure metadata, preserve known local findings, and let `DecisionPolicy` derive the report. Version 2 permits `safe: true` only for `decision: "allow"` with required coverage complete. Never log reflected provider bodies, credentials, prompts or private continuation data.
-
-The provider contracts live in `src/ai/contracts.ts`. Native adapters normalize structured reasoning, focused judgments and tool conversations; services do not parse vendor envelopes. Runtime schema validation, deadlines, attempt accounting and availability-only fallback belong at those boundaries. See [model operations](docs/operations/ai-models.md) and the [rollout specification](docs/specs/2026-09-19-typesafe-model-routing-spec.md).
-
----
-
-## Testing Guidelines
-
-### Types of Tests
-
-1. **Unit Tests** - Test individual services in isolation
-2. **Integration Tests** - Test the full API flow
-3. **Attack Vector Tests** - Verify detection of known attacks
-
-### Test Suites
-
-Tests are standalone scripts registered in `src/scripts/runOfflineTests.ts`. Use `npm run test:offline`: each suite gets a separate temporary filesystem, an allowlisted environment without credentials, and a network guard. Only explicitly marked endpoint suites can use loopback. Swallowed network errors still fail the suite. The historical `npm test` chain is retained but does not cover the new provider and policy suites.
-
-| Suite | Covers | Online? |
-|-------|--------|---------|
-| `patternServiceTests.ts` | Pattern CRUD, integrity manifest, HMAC | offline |
-| `integrationTests.ts` | End-to-end regression on the refactored services | offline |
-| `vulnFeedTests.ts` / `vulnFeed2Tests.ts` | NVD + GHSA ingest with mocked HTTP | offline |
-| `v11SkeletonTests.ts` | v1.1 service wiring smoke test | offline |
-| `unicodeSmugglingTests.ts` | Zero-width / tag-char / homoglyph payloads | offline |
-| `policyPuppetryTests.ts` | XML/JSON role-puppetry jailbreaks | offline |
-| `markdownExfilTests.ts` | Image/link-based exfil patterns | offline |
-| `mcpToolScannerTests.ts` | MCP-tool-manifest scanner | offline |
-| `trifectaTests.ts` | Lethal-Trifecta analyzer | offline |
-| `atlasKevTests.ts` | ATLAS + KEV feed ingest and lookup | offline |
-| `huggingFaceTests.ts` | HF Hub security-flag parser | offline |
-| `queryCveTests.ts` | Unified CVE cache + `query_cve` MCP tool | offline |
-| `canaryTests.ts` | Canary-token issue/verify lifecycle | offline |
-| `tasteTesterTests.ts` | Taste-Tester unit tests with stubs | offline |
-| `tasteTesterCorpusTests.ts` | Mocked historical Taster corpus, not live accuracy | offline |
-| `manyShotObfuscationTests.ts` | Many-shot jailbreak corpus | offline |
-| `advancedTests.ts` | 7 attack-vector scenarios | requires `GEMINI_API_KEY` |
-| `skillScanTests.ts` | 7 SKILL.md scan scenarios | requires `GEMINI_API_KEY` |
-
-When adding new detection logic, prefer extending one of these suites. New behavior should at minimum be exercised by an offline suite and registered in `OFFLINE_SUITES`. Contract tests should exercise native response fixtures, cancellation, schema failures and usage; decision tests must cover incomplete analysis never becoming safe.
-
-### Writing Tests
-
-```typescript
-// Example test structure
-describe('StaticCheckService', () => {
-  describe('SQL Injection Detection', () => {
-    it('should detect classic OR 1=1 attack', () => {
-      const result = staticChecker.check("' OR '1'='1");
-      expect(result.hasSQLi).toBe(true);
-      expect(result.categories).toContain('sqli');
-    });
-
-    it('should NOT flag educational SQL discussion', () => {
-      const result = staticChecker.check("How does SELECT work in SQL?");
-      expect(result.hasSQLi).toBe(false);
-    });
-  });
-});
-```
-
-### Running Tests
-
-```bash
-# Run all offline suites (recommended before opening a PR)
 npm run test:offline
-
-# Run a single suite directly (use npx tsx, not ts-node — ESM compat)
-npx tsx src/test/trifectaTests.ts
-
-# Explicitly bounded synthetic access probe (credentials stay in .env)
-npm run ai:probe -- --live --profile typesafe --pricing config/ai-pricing.example.json --max-requests 1 --max-usd 0.01
 ```
 
-The guarded suite is also run by the offline CI workflow. For model-quality experiments, use `evaluate:ai` with immutable corpus manifests; live runs require explicit profiles, rates, request and monetary caps. Development fixtures and mocked Taster verdicts cannot qualify enforcement. See [evaluation evidence](evaluations/ai/README.md). There is no line-coverage tool wired up yet.
+Offline development needs **no `.env`, provider keys or running server**. `npm ci` downloads dependencies; the offline test runner then builds, isolates each suite, removes credential access and guards network calls. Only designated transport tests may use loopback. `npm test` is an incomplete legacy chain; use `npm run test:offline` before a code PR.
 
----
+For the smaller saved-results check after building:
 
-## Pull Request Checklist
+```sh
+node dist/test/ai/historicalReplayTests.js
+```
 
-Before submitting your PR, ensure:
+This replays historical evidence without model inference. Live scans require the [README's provider setup](README.md#3-add-your-keys), send inputs to configured providers and may incur charges. Keep live tests synthetic and explicitly bounded; follow [model operations](docs/operations/ai-models.md) and [evaluation guidance](evaluations/ai/README.md).
 
-- [ ] Code builds without errors (`npm run build`)
-- [ ] All existing tests pass
-- [ ] New features have corresponding tests
-- [ ] No new TypeScript warnings
-- [ ] Documentation is updated if needed
-- [ ] Commit messages follow conventional format
-- [ ] PR description explains the change
+## Find the relevant code and tests
 
----
+[AGENTS.md](AGENTS.md) is the compact code and documentation map. Provider contracts live in `src/ai/contracts.ts`; final decisions and incomplete-analysis handling live in `src/services/DecisionPolicy.ts` and `src/services/AnalysisCoverage.ts`. Preserve known findings when a provider fails: unavailable required analysis must never become an allow decision. Keep MCP stdout reserved for protocol messages.
 
-## Security Vulnerability Reporting
+Tests are standalone scripts under `src/test/`, registered in `src/scripts/runOfflineTests.ts`. Extend the relevant suite for a behavior change; register new offline suites there. Use synthetic native-response fixtures for provider contracts. Decision tests should cover failures and incomplete coverage as well as successful analysis. [Evaluation evidence](evaluations/ai/README.md) distinguishes development fixtures, historical replay and live runs. Development fixtures and historical replay are not independent held-out qualification; live runs need the documented corpus, review and qualification evidence to support that claim.
 
-**⚠️ Do NOT open a public issue for security vulnerabilities!**
+## Submit a pull request
 
-If you discover a security vulnerability in Prompt Rejector itself (not the attacks it's designed to detect), please report it responsibly:
+Fork the repository, branch from `main`, and keep the change focused. In the [PR template](.github/pull_request_template.md), link the issue, explain the resulting behavior and list validation actually performed. Update affected documentation. For code changes, run `npm run test:offline`; for documentation-only changes, check commands and links. Plugin changes also need the checks below. Report sensitive findings privately before opening a public PR.
 
-1. **Email:** [your-security-email@example.com]
-2. **Include:**
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+## Plugin packaging
 
-We'll respond within 48 hours and work with you on a fix before any public disclosure.
-
----
-
-## Recognition
-
-Contributors will be recognized in:
-- The project README
-- Release notes when their changes ship
-- Our eternal gratitude 🙏
-
----
-
-## Questions?
-
-- Open a [Discussion](https://github.com/revsmoke/promptrejectormcp/discussions) for general questions
-- Check existing issues and discussions first
-- Be patient - maintainers are volunteers!
-
----
+Use Node 24 for `npm run plugin:build`, then `npm run test:plugins`. The offline app suite (`npm run test:offline`) also covers remote MCP authentication. Maintain the shared skill in `plugins/prompt-rejector/skills/prompt-rejector/`; generated ZIP/MCPB files are build artifacts and must not be committed. Bump package, portable, Codex, Claude and Desktop manifest versions together when releasing an update. See [plugin architecture](docs/plugin-architecture.md), [package guide](docs/plugins.md), and [schema provenance](packaging/schemas/README.md). Never include private environment files, certificates, canary state or feed caches in a package.
 
 ## Release & Publishing
 
@@ -407,11 +94,3 @@ Reference: GitHub's [npm publishing guide](https://docs.github.com/en/actions/tu
 ```bash
 npm deprecate prompt-rejector@1.0.0 "Deprecated; please upgrade to 1.0.1"
 ```
-
----
-
-Thank you for helping make AI agents safer! 🛡️
-
-## Plugin packaging
-
-Use Node 24 for `npm run plugin:build`, then `npm run test:plugins`. The offline app suite (`npm run test:offline`) also covers remote MCP authentication. Maintain the shared skill in `plugins/prompt-rejector/skills/prompt-rejector/`; generated ZIP/MCPB files are build artifacts and must not be committed. Bump package, portable, Codex, Claude and Desktop manifest versions together when releasing an update. See [plugin architecture](docs/plugin-architecture.md), [package guide](docs/plugins.md), and [schema provenance](packaging/schemas/README.md). Never include private environment files, certificates, canary state or feed caches in a package.
