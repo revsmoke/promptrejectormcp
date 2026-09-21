@@ -6,6 +6,7 @@
 npm_recovery_codes.txt
 .tmp_server.schema.json
 *.schema.json
+mcp-publisher
 
 # Do not publish TS sources or tests
 src/

@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Unreleased — installable plugins and remote MCP
+## [Unreleased]
+
+## [1.2.0] - 2026-09-21
 
 - Add a portable plugin with Codex and Claude Code compatibility manifests, repository marketplaces, and one provider-neutral setup/use skill.
 - Build complete local ZIP and Claude Desktop MCPB bundles, a standalone skill ZIP, checksums and CI download artifacts; exclude credentials and mutable state.
@@ -15,8 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a separate OAuth-protected Streamable HTTP MCP transport and remote plugin generator for hosted web connections; preserve the current HTTPS REST API and stdio behavior.
 - Add MCP tool safety annotations and regression tests for authentication, package relocation, credentials, cache-independent state and client startup.
 - Refresh compatible dependency lockfile patches; keep packaging-only interactive CLI dependencies out of delivered runtimes.
-
-## [Unreleased]
 
 ### Added
 
@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Rollout status
 
-Both launchers select an **active TypeSafe** profile with working Jev and Gemini analysis. The local HTTPS API and MCP installation are live verified with the same configuration. Taster remains opt-in. Formal held-out qualification is reported separately and is not claimed. Bounded live activation evidence includes real security blocks and clean contextual reasoning; Claude/OpenAI remain selectable adapters, with account access still needed for their live verification. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates. Package and registry versions remain 1.1.0 until a separate release.
+Both launchers select an **active TypeSafe** profile with working Jev and Gemini analysis. The local HTTPS API and MCP installation are live verified with the same configuration. Taster remains opt-in. Formal held-out qualification is reported separately and is not claimed. Bounded live activation evidence includes real security blocks and clean contextual reasoning; Claude/OpenAI remain selectable adapters, with account access still needed for their live verification. See the [delivery ledger](docs/implementation/typesafe-progress.md) for test/review results and pending gates.
 
 ## [1.1.0] - 2026-05-14
 
@@ -309,6 +309,7 @@ Successfully tested against 14 attack vectors with 100% detection rate:
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.2.0 | 2026-09-21 | TypeSafe rollout, current `/v2` API, installable plugins, authenticated remote MCP, and packaging/release hardening |
 | 1.1.0 | 2026-05-14 | LLM/agentic threat expansion: 6 new MCP tools, 5 new feed sources, Taste-Tester sandbox, lethal-trifecta analyzer |
 | 1.0.2 | 2026-02-08 | Pattern library, vuln feeds, skill scanning, code review fixes |
 | 1.0.1 | 2026-02-01 | MCP publishing setup |
