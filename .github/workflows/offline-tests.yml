@@ -22,3 +22,5 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run test:offline
+      - run: npm run test:cli-package
+        if: matrix.node == '24'

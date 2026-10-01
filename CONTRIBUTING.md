@@ -35,13 +35,13 @@ This replays historical evidence without model inference. Live scans require the
 
 ## Find the relevant code and tests
 
-[AGENTS.md](AGENTS.md) is the compact code and documentation map. Provider contracts live in `src/ai/contracts.ts`; final decisions and incomplete-analysis handling live in `src/services/DecisionPolicy.ts` and `src/services/AnalysisCoverage.ts`. Preserve known findings when a provider fails: unavailable required analysis must never become an allow decision. Keep MCP stdout reserved for protocol messages.
+[AGENTS.md](AGENTS.md) is the compact code and documentation map. Provider contracts live in `src/ai/contracts.ts`; final decisions and incomplete-analysis handling live in `src/services/DecisionPolicy.ts` and `src/services/AnalysisCoverage.ts`. Preserve known findings when a provider fails: unavailable required analysis must never become an allow decision. Keep MCP stdout reserved for protocol messages and CLI stdout reserved for results. CLI/SDK command contracts and exit codes live in `src/client/operations.ts`; test report parity, cancellation and incomplete coverage. SDK imports must not launch servers, load dotenv, change cwd or install signal handlers.
 
 Tests are standalone scripts under `src/test/`, registered in `src/scripts/runOfflineTests.ts`. Extend the relevant suite for a behavior change; register new offline suites there. Use synthetic native-response fixtures for provider contracts. Decision tests should cover failures and incomplete coverage as well as successful analysis. [Evaluation evidence](evaluations/ai/README.md) distinguishes development fixtures, historical replay and live runs. Development fixtures and historical replay are not independent held-out qualification; live runs need the documented corpus, review and qualification evidence to support that claim.
 
 ## Submit a pull request
 
-Fork the repository, branch from `main`, and keep the change focused. In the [PR template](.github/pull_request_template.md), link the issue, explain the resulting behavior and list validation actually performed. Update affected documentation. For code changes, run `npm run test:offline`; for documentation-only changes, check commands and links. Plugin changes also need the checks below. Report sensitive findings privately before opening a public PR.
+Fork the repository, branch from `main`, and keep the change focused. In the [PR template](.github/pull_request_template.md), link the issue, explain the resulting behavior and list validation actually performed. Update affected documentation. For code changes, run `npm run test:offline`; for documentation-only changes, check commands and links. CLI/SDK or package-entry changes also need `npm run test:cli-package`, which builds and installs a temporary npm tarball (dependency installation needs network). Plugin changes also need the checks below. Report sensitive findings privately before opening a public PR.
 
 ## Plugin packaging
 
@@ -60,6 +60,8 @@ This project uses Release Drafter and `v*` Git tags for GitHub releases and npm 
 - Exclude a PR from notes with `skip-changelog`.
 
 ### Cutting a release (two options)
+
+`npm pack` runs the build via `prepack`; the package includes the CLI executable and SDK declarations. Validate with `npm run test:cli-package`. The package root now exports the SDK rather than launching servers on import; document this migration and select the release version accordingly. Earlier published 1.2.0 packages do not have the CLI.
 
 Before releasing, commit the intended versions in `package.json`, `package-lock.json`, `server.json` and the plugin manifests. Choose the corresponding `vX.Y.Z` tag; the workflow does not bump the npm package version or move existing tags.
 

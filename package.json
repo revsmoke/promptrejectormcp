@@ -1,8 +1,8 @@
 {
   "name": "prompt-rejector",
   "version": "1.2.0",
-  "description": "Security gateway for LLM agents: detects prompt injections, jailbreaks, lethal-trifecta agent configurations, Hugging Face model risks, MCP tool poisoning, and classic web vulnerabilities. Ships an MCP server (11 tools) and a REST API.",
-  "main": "dist/index.js",
+  "description": "Security gateway for LLM agents: detects prompt injections, jailbreaks, lethal-trifecta agent configurations, Hugging Face model risks, MCP tool poisoning, and classic web vulnerabilities. Ships a CLI, typed JavaScript SDK, MCP server (11 tools), and REST API.",
+  "main": "dist/client/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -21,7 +21,10 @@
     "plugin:setup": "node plugins/prompt-rejector/scripts/setup.mjs",
     "plugin:doctor": "node plugins/prompt-rejector/scripts/doctor.mjs",
     "plugin:build": "npm run build && node scripts/build-plugins.mjs",
-    "test:plugins": "node --test scripts/plugin-tests.mjs"
+    "test:plugins": "node --test scripts/plugin-tests.mjs",
+    "cli": "node dist/cli/main.js",
+    "prepack": "npm run build",
+    "test:cli-package": "npm run build && node scripts/cli-package-tests.mjs"
   },
   "keywords": [
     "mcp",
@@ -91,5 +94,9 @@
       "identifier": "prompt-rejector",
       "version": "1.2.0"
     }
-  ]
+  ],
+  "types": "dist/client/index.d.ts",
+  "bin": {
+    "prompt-rejector": "dist/cli/main.js"
+  }
 }

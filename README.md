@@ -16,6 +16,8 @@ Local rules found nothing; Jev identified the instruction, and the application r
 
 | Use it from | Connection | Start command |
 | --- | --- | --- |
+| A shell, CI job or agent script | **CLI:** JSON, stdin/files, streaming JSONL | [CLI guide](docs/cli.md) |
+| JavaScript / TypeScript code | **SDK:** typed reusable local client | [SDK guide](docs/cli.md#javascript-and-typescript) |
 | An application or script | **HTTPS API:** `https://localhost:3001` | `npm start` |
 | Codex / Claude Code | **Plugin + MCP over stdio** | [Install the plugin](#plugins-and-skill) or configure the Node launcher |
 | Claude Desktop chat | **Bundled `.mcpb` extension + skill** | [Desktop installation](docs/plugins.md#claude-desktop-chat) |
@@ -26,6 +28,7 @@ The local API and MCP connections can run together and use the same analysis con
 - [Try the saved tests without API keys](#try-the-saved-tests-without-api-keys)
 - [Plugins and skill](#plugins-and-skill)
 - [Installation](#installation)
+- [CLI and programmatic use](#cli-and-programmatic-use)
 - [HTTPS API setup](#https-api-setup)
 - [MCP setup](#mcp-setup)
 - [Check a prompt](#check-a-prompt)
@@ -49,7 +52,7 @@ node dist/test/ai/historicalReplayTests.js
 
 Expect `PASS read-only historical primitive replay reproduces saved counts and latency`. The replay reads committed inputs and responses; it makes **no model calls**, needs no `.env` or API keys, and incurs no inference charges. Dependency installation needs an internet connection. It verifies the saved counts and timing calculations, not how a live model would answer today. Read the [test report](experiments/typesafe/REPORT.md) or run the broader [offline contributor checks](CONTRIBUTING.md#development-setup).
 
-To scan new inputs, continue at [Add your keys](#3-add-your-keys) in this same checkout, then choose MCP or HTTPS.
+To scan new inputs, continue at [Add your keys](#3-add-your-keys) in this same checkout, then choose CLI, SDK, MCP or HTTPS.
 
 ## Plugins and skill
 
@@ -80,7 +83,7 @@ For **ChatGPT or Claude on the web**, a skill alone does not connect to your com
 
 ## Installation
 
-Complete these steps once, then set up **HTTPS**, **MCP**, or **both**. Local stdio MCP installations do not need a certificate or an API port.
+Complete these steps once, then choose **CLI**, **SDK**, **HTTPS**, or **MCP**. CLI, SDK and local stdio MCP use do not need a certificate or an API port.
 
 ### 1. Check prerequisites
 
@@ -101,7 +104,7 @@ The commands below use a macOS/Linux shell. Actual scans send input to the confi
 
 ### 2. Download and build
 
-The current application, plugins and skill are included on **`main`**. Source installation below is the tested setup route. The published [npm package](https://www.npmjs.com/package/prompt-rejector) has no `npx` executable; `npx prompt-rejector` is not an installation or launch command. GitHub releases and optional npm publishing are described in the [release guide](CONTRIBUTING.md#release--publishing); MCP Registry publication is not required. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
+The current application, plugins and skill are included on **`main`**. Source installation below is the tested setup route. The source now includes a `prompt-rejector` executable and typed SDK; use this checkout or a tarball built from it until the next npm release. The previously published [npm package](https://www.npmjs.com/package/prompt-rejector) version 1.2.0 has no CLI executable. GitHub releases and optional npm publishing are described in the [release guide](CONTRIBUTING.md#release--publishing); MCP Registry publication is not required. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
 
 ```sh
 git clone --branch main https://github.com/revsmoke/promptrejectormcp.git
@@ -139,7 +142,32 @@ npm run ai:config
 
 Look for `inferencePerformed: false`, `missingCredentialEnvironmentVariables: []`, and TypeSafe modes `enforce` or `cascade`. This confirms configuration and key presence; the first real scan confirms account/model access. Placeholder text is not a working key.
 
-Now continue with [HTTPS API setup](#https-api-setup), [MCP setup](#mcp-setup), or both.
+Now continue with [CLI and programmatic use](#cli-and-programmatic-use), [HTTPS API setup](#https-api-setup), or [MCP setup](#mcp-setup).
+
+## CLI and programmatic use
+
+From the built checkout:
+
+```sh
+node dist/cli/main.js --help
+node dist/cli/main.js health --pretty
+printf '%s' 'Summarize the weather forecast.' | node dist/cli/main.js check-prompt
+node dist/cli/main.js scan-skill --file ./SKILL.md
+node dist/cli/main.js batch --file requests.jsonl > results.jsonl
+```
+
+The CLI covers all 11 MCP operations and configuration health. Results are JSON on stdout; diagnostics go to stderr. Scan exit codes are `0` for an explicit allow, `1` for block/review, `2` for invalid input, and `3` for unavailable analysis or operational errors. Use `--timeout-ms 30000` to bound the whole invocation. `commands` prints input schemas for agent discovery. Optional `npm install --global .` installs the executable from the built checkout.
+
+For repeated calls in JavaScript/TypeScript, install the built checkout into your application and reuse the typed client:
+
+```js
+import { createPromptRejector } from 'prompt-rejector';
+const scanner = createPromptRejector();
+const report = await scanner.run('check-prompt', { prompt: 'Summarize public weather.' });
+if (report.decision !== 'allow') throw new Error('Input was not approved');
+```
+
+Set provider environment variables before SDK construction; the SDK does not load `.env`. Read the [CLI/SDK reference](docs/cli.md) for installation, configuration precedence, command arguments, streaming batches, cancellation, exit codes, Python integration, and package-entry migration.
 
 ## HTTPS API setup
 
@@ -351,7 +379,7 @@ For older installations, set `AI_CONFIG_PATH=config/ai.active.json`, configure t
 | POST | `/v2/patterns/verify` |
 | GET | `/health` |
 
-REST exposes the endpoints listed above; the other tools are available through MCP. The Taste-Tester is disabled until `TASTE_TESTER_ENABLED=true`. Optional provider/feed/canary settings are explained in [.env.example](.env.example) and the [feature reference](docs/feature-reference.md).
+REST exposes the endpoints listed above; all 11 tools are available through MCP, the CLI and the SDK. The Taste-Tester is disabled until `TASTE_TESTER_ENABLED=true`. Optional provider/feed/canary settings are explained in [.env.example](.env.example) and the [feature reference](docs/feature-reference.md).
 
 ## Development and documentation
 
@@ -369,6 +397,7 @@ The guarded offline runner builds first, blocks unexpected network calls and nee
 - [Remote MCP and web connectors](docs/operations/remote-mcp.md)
 - [Local service, HTTPS trust and restart runbook](docs/operations/local-server.md)
 - [Model selection and native adapters](docs/operations/ai-models.md)
+- [CLI, streaming automation and typed SDK](docs/cli.md)
 - [Language integration examples](docs/integration-examples.md)
 - [Features, detection categories, feeds and architecture](docs/feature-reference.md)
 - [Skill security guide](SKILLS_SECURITY.md)

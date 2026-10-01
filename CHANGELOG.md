@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add a `prompt-rejector` CLI for all 11 MCP operations and health, with JSON/stdin/file input, streaming JSONL, schema discovery, bounded input, timeouts and fail-closed exit codes.
+- Add a reusable typed JavaScript/TypeScript SDK backed by the existing scanners and caches; share configuration health across CLI and HTTPS.
+- Change the package root from automatic server startup to SDK exports. Use dedicated API/MCP launchers for startup; existing npm start commands continue to work.
+- Build CLI and declarations during npm packing, exclude mutable runtime state, and test both offline behavior and installed npm artifacts.
+- Document CLI/SDK setup, shell/Python integration, automation contracts, configuration precedence and package-entry migration.
+
 ## [1.2.0] - 2026-09-21
 
 - Add a portable plugin with Codex and Claude Code compatibility manifests, repository marketplaces, and one provider-neutral setup/use skill.

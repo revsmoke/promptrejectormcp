@@ -1,7 +1,6 @@
-import { qualificationStatus } from "../ai/qualification.js";
+import { serviceHealth } from "./health.js";
 import express from "express";
 import cors from "cors";
-import { createRequire } from "module";
 import { readFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
@@ -9,9 +8,6 @@ import type { Services } from "../bootstrap.js";
 import { promptInputSchema, skillInputSchema, isSizeError } from "../ai/schemas.js";
 import { scanPromptReport, scanSkillReport } from "./reportSerializers.js";
 import { z } from "zod";
-
-const require = createRequire(import.meta.url);
-const { version } = require("../../package.json");
 
 export function createApiApp(services: Services) {
     const app = express();
@@ -114,22 +110,7 @@ export function createApiApp(services: Services) {
 
     // Health check
     app.get("/health", (req, res) => {
-        const roles = Object.fromEntries(Object.entries(services.snapshot.config.roles).map(([role, setting]) => {
-            const profile = services.snapshot.config.profiles[setting.primary];
-            const enabled = !["taster", "monitor"].includes(role) || services.tasterEnabled;
-            const configured = services.configuredProviders[profile.provider];
-            const fallback = setting.fallback ? services.snapshot.config.profiles[setting.fallback] : undefined;
-            return [role, { provider: profile.provider, model: profile.model, configured, enabled,
-                readiness: !enabled ? "disabled" : configured && (!fallback || services.configuredProviders[fallback.provider]) ? "ready" : "degraded",
-                fallback: fallback ? { provider: fallback.provider, model: fallback.model, configured: services.configuredProviders[fallback.provider] } : null }];
-        }));
-        const { model, ...modes } = services.snapshot.config.typesafe;
-        const enabled = Object.values(modes).some((mode) => mode !== "off");
-        res.json({ status: "ok", version, configHash: services.snapshot.hash, roles,
-            typesafe: { model, modes, configured: services.configuredProviders.typesafe, readiness: !enabled ? "disabled" : services.configuredProviders.typesafe ? "ready" : "degraded" },
-            qualificationPolicy: services.snapshot.config.qualificationPolicy, qualificationStatus: qualificationStatus(services.snapshot),
-            qualification: services.snapshot.qualification ?? { tasks: {} }, readinessMeaning: "local_configuration_and_credentials_only; account_access_and_quality_not_probed",
-            reports: { schemaVersion: 2, restPrefix: "/v2" } });
+        res.json(serviceHealth(services));
     });
     app.use((error: { type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         if (error.type === "entity.too.large") return res.status(413).json({ error: "input_too_large" });
