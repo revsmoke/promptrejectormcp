@@ -11,7 +11,7 @@ export const operationSchemas = {
     "check-prompt": promptInputSchema,
     "scan-skill": skillInputSchema,
     "scan-mcp-tool": z.strictObject({ tool: z.record(z.string(), z.unknown()), priorHash: z.string().max(128).optional() }),
-    "check-lethal-trifecta": capabilityInputSchema.refine(input => Object.keys(input).length > 0),
+    "check-lethal-trifecta": capabilityInputSchema.refine(input => Object.keys(input).length > 0).meta({ minProperties: 1 }),
     "taste-test": tasterInputSchema.omit({ reportVersion: true }),
     "list-patterns": z.strictObject({ category: z.string().optional(), scope: z.enum(["general", "skill"]).optional(), enabled: z.boolean().optional() }),
     "update-vuln-feeds": z.strictObject({ lookbackDays: z.number().int().min(1).max(365).optional() }),

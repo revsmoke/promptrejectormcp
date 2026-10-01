@@ -20,6 +20,8 @@ try {
     assert.equal(run(["--version"]).stdout.trim(), JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version);
     const commands = run(["commands"]);
     assert.equal(commands.status, 0); assert.equal(JSON.parse(commands.stdout).length, 12); assert.equal(commands.stderr, "");
+    assert.equal(JSON.parse(commands.stdout).find((entry: any) => entry.command === "check-lethal-trifecta").inputSchema.minProperties, 1);
+    assert.equal(JSON.parse(run(["check-lethal-trifecta", "--help"]).stdout).minProperties, 1);
     const schema = run(["check-prompt", "--help"]);
     assert.equal(JSON.parse(schema.stdout).properties.prompt.maxLength, 100000);
     const health = run(["health"]);
