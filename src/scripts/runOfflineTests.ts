@@ -10,6 +10,8 @@ export interface OfflineSuite { file: string; allowLoopback?: boolean }
 // live provider calls and must never enter this default offline suite.
 export const OFFLINE_SUITES: readonly OfflineSuite[] = [
     { file: "offlineRunnerTests.js" },
+    { file: "clientTests.js" },
+    { file: "cliTests.js" },
     { file: "patternServiceTests.js" },
     { file: "integrationTests.js" },
     { file: "vulnFeedTests.js" },

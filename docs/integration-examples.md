@@ -1,5 +1,7 @@
 # Integration examples
 
+For local terminal and automation use, see the [CLI and typed JavaScript/TypeScript SDK](cli.md). It covers all MCP operations without a running server, supports stdin/files and streaming JSONL, and provides fail-closed exit codes. The SDK package root exports `createPromptRejector`; importing it does not start services. The examples below remain useful when connecting to a running HTTPS service from another process or language.
+
 Use a certificate trusted by the client runtime. For local development, install your local CA or configure the runtime’s CA file; do not disable certificate verification. Node/Python may need their CA environment settings even when the browser trusts localhost. See [TLS client setup](operations/local-server.md#client-certificate-trust).
 
 ### Node.js / Express Middleware

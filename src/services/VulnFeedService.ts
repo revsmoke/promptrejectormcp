@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, renameSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { PatternService } from "./PatternService.js";
@@ -661,6 +661,7 @@ export class VulnFeedService {
     }
 
     private saveStaging(staging: StagingFile): void {
+        mkdirSync(dirname(this.stagingPath), { recursive: true });
         this.atomicWrite(this.stagingPath, JSON.stringify(staging, null, 2));
     }
 

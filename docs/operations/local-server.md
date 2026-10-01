@@ -1,6 +1,6 @@
 # Running the HTTPS API and MCP together
 
-Prompt Rejector has one current analysis pipeline, available locally through two connections:
+Prompt Rejector has one current analysis pipeline. This runbook covers its two local service connections:
 
 | Connection | Address or command | How it runs |
 | --- | --- | --- |
@@ -8,6 +8,8 @@ Prompt Rejector has one current analysis pipeline, available locally through two
 | MCP | The registered `prompt-rejector` stdio server | Each MCP client starts its own process |
 
 Both select `config/ai.active.json`, enabling TypeSafe Jev judgments and Gemini contextual reasoning. They can run simultaneously. The MCP connection uses the client's input/output pipes and does not need a network port or certificate. The REST connection uses HTTPS with a trusted local certificate. Port 3000 remains available to the existing Mapbox service.
+
+The [CLI and typed SDK](../cli.md) use the same pipeline directly, without a running service, port or certificate. Use `node dist/cli/main.js health --config config/ai.active.json` for CLI readiness, or import `createPromptRejector` from the package for in-process use. CLI/SDK health describes that process's configuration; use `/health` to inspect the running API. Keep using the dedicated API/MCP launchers for service startup; the package root now exports the SDK.
 
 `/v2` is the sole current API prefix. The old `/v1/*` routes return HTTP 410 without running analysis. The number identifies the response format; it does not mean that two scanning versions remain available. All 11 MCP tool names remain, with no advertised version selector.
 

@@ -4,6 +4,8 @@
 
 This document provides detailed information about scanning Claude Code skills for security vulnerabilities.
 
+For terminal or automation use, run `prompt-rejector scan-skill --file ./SKILL.md` from an installed CLI, or `node dist/cli/main.js scan-skill --file ./SKILL.md` from a built checkout. Exit 0 requires explicit allow; block/review and unavailable analysis return nonzero. The [CLI/SDK guide](docs/cli.md) covers configuration, JSONL batches, typed code integration and complete exit semantics.
+
 ## Table of Contents
 
 - [Overview](#overview)

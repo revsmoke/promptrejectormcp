@@ -29,3 +29,10 @@ node_modules/
 
 # Generated plugin bundles (use the packaging workflow artifacts)
 artifacts/
+
+# CLI/MCP mutable runtime state and generated npm archives
+patterns/canary-state.json
+patterns/canary-state.json.tmp
+patterns/feed-cache/
+patterns/staging/
+*.tgz
