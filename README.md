@@ -104,7 +104,7 @@ The commands below use a macOS/Linux shell. Actual scans send input to the confi
 
 ### 2. Download and build
 
-The current application, plugins and skill are included on **`main`**. Source installation below is the tested setup route. Version 2.0.0 includes a `prompt-rejector` executable and typed SDK in the [npm package](https://www.npmjs.com/package/prompt-rejector) and built source tarballs. Earlier 1.2.0 packages have no CLI executable. GitHub releases and optional npm publishing are described in the [release guide](CONTRIBUTING.md#release--publishing); MCP Registry publication is not required. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
+The current application, plugins and skill are included on **`main`**. Source installation below is the tested setup route. Version 2.0.0 includes a `prompt-rejector` executable and typed SDK in built source tarballs. After the release's npm publication succeeds, these are also available in the [npm package](https://www.npmjs.com/package/prompt-rejector); use source or a built tarball until then. Earlier 1.2.0 packages have no CLI executable. GitHub releases and optional npm publishing are described in the [release guide](CONTRIBUTING.md#release--publishing); MCP Registry publication is not required. If you already have a checkout with local changes, choose a different destination directory instead of overwriting it.
 
 ```sh
 git clone --branch main https://github.com/revsmoke/promptrejectormcp.git
