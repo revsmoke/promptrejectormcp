@@ -156,7 +156,7 @@ node dist/cli/main.js scan-skill --file ./SKILL.md
 node dist/cli/main.js batch --file requests.jsonl > results.jsonl
 ```
 
-The CLI covers all 11 MCP operations and configuration health. Results are JSON on stdout; diagnostics go to stderr. Scan exit codes are `0` for an explicit allow, `1` for block/review, `2` for invalid input, and `3` for unavailable analysis or operational errors. Use `--timeout-ms 30000` to bound the whole invocation. `commands` prints input schemas for agent discovery. Optional `npm install --global .` installs the executable from the built checkout.
+The CLI covers all 11 MCP operations and configuration health. Results are JSON on stdout; diagnostics go to stderr. Ordinary scan exit codes are `0` for an explicit allow, `1` for block/review, `2` for invalid input, and `3` for unavailable analysis or operational errors. Use `--timeout-ms 30000` to bound the whole invocation (exit `124` on timeout); SIGINT/SIGTERM exit with `130`/`143`. `commands` prints input schemas for agent discovery. Optional `npm install --global .` installs the executable from the built checkout.
 
 For repeated calls in JavaScript/TypeScript, install the built checkout into your application and reuse the typed client:
 

@@ -1,3 +1,4 @@
+/// <reference types="node" preserve="true" />
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { createServices, type Services } from "../bootstrap.js";
