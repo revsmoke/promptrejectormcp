@@ -1,6 +1,6 @@
 {
   "name": "prompt-rejector",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Security gateway for LLM agents: detects prompt injections, jailbreaks, lethal-trifecta agent configurations, Hugging Face model risks, MCP tool poisoning, and classic web vulnerabilities. Ships a CLI, typed JavaScript SDK, MCP server (11 tools), and REST API.",
   "main": "dist/client/index.js",
   "type": "module",
@@ -92,7 +92,7 @@
     {
       "registry_type": "npm",
       "identifier": "prompt-rejector",
-      "version": "1.2.0"
+      "version": "2.0.0"
     }
   ],
   "types": "dist/client/index.d.ts",

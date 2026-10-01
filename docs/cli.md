@@ -23,7 +23,7 @@ npm install --global .
 prompt-rejector --version
 ```
 
-Choose a user-writable npm prefix if needed. Alternatively, use the absolute `node /path/to/promptrejectormcp/dist/cli/main.js` entrypoint. For machines without a checkout, `npm pack` builds a tarball which can be installed with `npm install --global /path/to/prompt-rejector-<version>.tgz`. Use source or a tarball containing this change until a new npm release is published; the previously published 1.2.0 package does not have the CLI. `npm run --silent cli -- ...` also works from a built checkout; avoid ordinary npm banners when parsing stdout.
+Choose a user-writable npm prefix if needed. Alternatively, use the absolute `node /path/to/promptrejectormcp/dist/cli/main.js` entrypoint. For machines without a checkout, `npm pack` builds a tarball which can be installed with `npm install --global /path/to/prompt-rejector-<version>.tgz`. After npm publication succeeds, install version 2.0.0 with `npm install --global prompt-rejector@2.0.0`; until then, use built source or a tarball. Earlier 1.2.0 packages do not have the CLI. `npm run --silent cli -- ...` also works from a built checkout; avoid ordinary npm banners when parsing stdout.
 
 ## Configuration and paths
 
