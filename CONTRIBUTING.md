@@ -81,6 +81,8 @@ git push origin vX.Y.Z
 
 A tag push starts npm publishing; it does not by itself publish the draft GitHub Release. Open the draft and publish it using that tag, or use `gh release create vX.Y.Z --verify-tag --generate-notes` after reviewing the release contents.
 
+To attach the npm tarball, plugin ZIP, Desktop MCPB, shared skill, build metadata and checksums, run **Attach release downloads** (`.github/workflows/release-assets.yml`) with the existing tag. It builds and tests the tagged source on Node 24 and uploads to an existing draft or published GitHub release. This is independent of npm registry publication and can be retried to replace the downloads.
+
 ### npm publishing and GitHub-only releases
 
 - npm publishing stays enabled by default. Supply the GitHub Actions secret `NPM_TOKEN` with permission to publish `prompt-rejector`; it is passed as `NODE_AUTH_TOKEN`. Missing or invalid npm credentials fail npm publishing, rather than report a false success.

@@ -1,0 +1,51 @@
+name: Attach release downloads
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and attach downloads to
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Validate release tag
+        run: '[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify package version matches tag
+        run: node -e 'if ("v" + JSON.parse(require("fs").readFileSync("package.json")).version !== process.env.RELEASE_TAG) process.exit(1)'
+      - run: npm ci --ignore-scripts
+      - run: npm run test:cli-package
+      - run: npm run plugin:build
+      - run: npm run test:plugins
+      - name: Prepare downloads and checksums
+        run: |
+          mkdir -p artifacts/release
+          cp artifacts/plugins/* artifacts/release/
+          npm pack --ignore-scripts --pack-destination artifacts/release
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          folder = Path('artifacts/release')
+          files = sorted(p for p in folder.iterdir() if p.name != 'SHA256SUMS')
+          (folder / 'SHA256SUMS').write_text(''.join(
+              f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files))
+          PY
+      - name: Attach downloads to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" artifacts/release/* --clobber
